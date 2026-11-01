@@ -3,7 +3,7 @@
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://botero50.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
-![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.11-8A2BE2)
+![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.14-8A2BE2)
 ![Code](https://img.shields.io/badge/code-MIT-blue)
 ![Languages](https://img.shields.io/badge/languages-8-FFCB05)
 [![Stars](https://img.shields.io/github/stars/botero50/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/botero50/TamaPoke/stargazers)
@@ -49,6 +49,10 @@ This fork (**[botero50/TamaPoke](https://github.com/botero50/TamaPoke)**, branch
   fishing at the lake, and a kitchen that turns two foods into a better dish.
 - **Family**: a chores chart the parents tick, a piggy bank with weekly interest,
   an alarm clock, and a diary of the last week. Popping bubbles in the shower.
+- **More games**: memory pairs, Simon says, flappy flight and a tilt maze.
+- **Home and dress-up**: a room of its own with furniture and wallpapers, 20 hats.
+- **A livelier pet**: wishes, a personality, lonely and excited moods, a monthly
+  birthday, an Easter egg hunt and a summer festival.
 
 See the sections further down for the rules and the economy numbers.
 
@@ -450,6 +454,36 @@ The map is a grid of eight places now.
   it also says when it is time for bed.
 - **Shower bubbles**: in a quick wash, tap a bubble to pop it -- the first pop
   turns the wash into a 10-second bubble game.
+
+### More games (phase 12)
+In TRAIN: **Memory** (find the Pokemon pairs, 60 s) and **Simon says** (repeat a
+growing tune, three lives) train DEFENCE; **Flappy flight** (tap to fly between
+the trunks) trains SPEED; the **Tilt maze** (roll the berry to the flag -- tilt the
+ball, or hold a finger where it should go) trains STRENGTH. Records are kept like
+the other games, and old saves keep the old records.
+
+### Home and dress-up (phase 13)
+- **My room** is a free scenery: a wall and a wooden floor instead of the landscape.
+- **FURNITURE** in the shop: window, clock, painting and shelf hang on the wall
+  (two spots); sofa, TV, aquarium, bookcase and fireplace stand at the back (two
+  spots); a rug lies under the creature; three wallpapers recolour the wall.
+  Tap a piece in the bag to put it out (it opens the room) or away.
+- **Ten more hats**: chef, pirate, cat ears, bunny ears, headphones, graduation
+  cap, flower crown, hard hat, beret and viking helmet.
+
+### A livelier pet (phase 14)
+- **Wishes**: up to three a day it thinks of something -- a particular food, a
+  game, the park, a bath, fishing or a cuddle -- shown in a thought cloud. Doing it
+  within two hours grants the wish: joy, bond and 5 coins.
+- **Personality** (the diary's first page says which): playful (more joy from
+  games), lazy, a big eater (more from meals) or shy (more bond from cuddles). It
+  comes from the species and IVs, so a creature always has the same one.
+- **Moods**: *lonely* after three hours awake with nobody caring for it (a cuddle
+  fixes it), *excited* when every mission of the day is done.
+- **Birthday** every 30 days of its life: confetti all day, a cake and 20 coins.
+- **Events**: the Easter week (eggs in the grass, and walks in the park find up to
+  five eggs a day) and the July summer festival (lanterns, fireworks at night, a
+  free ice cream a day).
 
 ### The economy, checked
 `economy_test` plays thirty days through the real rules (missions, caps, steps):
