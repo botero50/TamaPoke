@@ -40,6 +40,12 @@ extern int8_t shopConfirm, shopCat, bagCat, foodCat;
 extern bool foodOpen, bathOpen, sleepOpen, scrubOpen, mapOpen;
 extern uint8_t placeScene;
 extern uint32_t fishBiteAt; extern uint8_t fishPhase;
+void startFunPackGame(uint8_t g);
+extern uint16_t fpScore; extern uint32_t fpOverUntil;
+extern int16_t memDex[12]; extern uint8_t memState[12];
+extern uint8_t simSeq[32], simLen; extern bool simShowing;
+extern float flyY, flyV;
+extern float mzBX, mzBY;
 extern bool alarmRinging, choresOpen, piggyOpen, diaryOpen;
 extern uint32_t bathUntil; extern uint8_t bathPops; extern bool bathPlay;
 void startBath(); void bathBubblePos(int i, int *x, int *y);
@@ -397,13 +403,26 @@ int main(int argc, char **argv) {
     pet.coins = 1000; pet.sceneryOwned = 0; pet.sceneryPick = -1;
     click(366, 72);
     click(155, 176);                     // SHOP
-    click(233, 76 + 52 + 5 * 44 + 20);     // category 5: SCENERY
+    click(233, 76 + 52 + 5 * 38 + 17);     // category 5: SCENERY (rows 128 + 38 i)
     if (shopCat != 5) { printf("FAIL: SCENERY did not open (cat %d)\n", shopCat); return 1; }
     click(233, 146 + 54 + 24);             // row 1: the beach
     click(163, 307);                       // BUY
     if (!pet.ownsScenery(1)) { printf("FAIL: the beach was not bought\n"); return 1; }
     click(20, 233); click(20, 233);
     printf("PASS: purse -> trophies; shop -> scenery -> the beach\n");
+
+    // furniture: bought in the shop, it goes up in the room
+    pet.coins = 1000; pet.furnOwned = 0; pet.furnWallL = pet.furnWallR = -1; pet.sceneryPick = -1;
+    click(366, 72);
+    click(155, 176);                       // SHOP
+    click(233, 76 + 52 + 6 * 38 + 17);     // category 6: FURNITURE
+    if (shopCat != 6) { printf("FAIL: FURNITURE did not open (cat %d)\n", shopCat); return 1; }
+    click(233, 146 + 24);                  // row 0: the window
+    click(163, 307);                       // BUY
+    if (!pet.ownsFurn(FURN_WINDOW) || pet.furnWallL != FURN_WINDOW || pet.sceneryPick != SCENERY_ROOM) { printf("FAIL: the window was not bought and hung up\n"); return 1; }
+    for (int k = 0; k < 2 && shopOpen; k++) click(20, 233);   // out of the shop, and no further
+    pet.sceneryPick = -1;
+    printf("PASS: shop -> furniture -> the window goes up in the room\n");
 
     // the parents' page: a bedtime that stops the games
     openClock();
@@ -512,6 +531,50 @@ int main(int argc, char **argv) {
     if (alarmRinging) { printf("FAIL: a tap did not stop the alarm\n"); return 1; }
     pet.alarmOn = false;
     printf("PASS: settings -> alarm; it rings and a tap stops it\n");
+
+    // phase 12 games, started as the TRAIN lists start them
+    pet.sleeping = false; pet.sickness = SICK_NONE; pet.parentBed = 0; pet.parentGames = 0;
+    startFunPackGame(MINI_MEMORY);
+    pump(2);
+    {
+      int a = -1, b = -1;                  // a matching pair, from the deal
+      for (int i = 0; i < 12 && b < 0; i++) for (int j = i + 1; j < 12; j++) if (memDex[i] == memDex[j]) { a = i; b = j; break; }
+      auto cardX = [](int i) { return 233 - 2 * 76 + (i % 4) * 76 + 3 + 35; };
+      auto cardY = [](int i) { return 132 + (i / 4) * 66 + 29; };
+      click(cardX(a), cardY(a));
+      click(cardX(b), cardY(b));
+      if (memState[a] != 2 || memState[b] != 2 || fpScore != 2) { printf("FAIL: a matching pair was not kept (score %u)\n", fpScore); return 1; }
+    }
+    fpOverUntil = 0; click(233, 40);       // the top: leave, banking the score
+    printf("PASS: memory -> a pair found\n");
+
+    startFunPackGame(MINI_SIMON);
+    for (int k = 0; k < 60 && simShowing; k++) pump(1);
+    if (simShowing) { printf("FAIL: simon never finished showing the tune\n"); return 1; }
+    {
+      static const int PX[4] = { 233, 233 + 92, 233, 233 - 92 }, PY[4] = { 168, 252, 336, 252 };
+      click(PX[simSeq[0]], PY[simSeq[0]]);
+      if (fpScore != 1 || simLen != 2) { printf("FAIL: repeating the tune did not make it longer\n"); return 1; }
+    }
+    click(233, 40);
+    printf("PASS: simon says -> the tune grows\n");
+
+    startFunPackGame(MINI_FLAPPY);
+    pump(2);
+    click(233, 250);
+    if (flyV >= 0) { printf("FAIL: a tap did not flap\n"); return 1; }
+    click(233, 40);
+    printf("PASS: flappy flight -> a tap flaps\n");
+
+    startFunPackGame(MINI_MAZE);
+    pump(2);
+    mzBX = 233 - 7 * 35 / 2 + 6 * 35 + 17; mzBY = 114 + 6 * 35 + 17;   // put the berry on the flag
+    pump(8);                               // a frame is ~100 ms: let one render
+    if (fpScore != 1) { printf("FAIL: reaching the flag did not score (score %u)\n", fpScore); return 1; }
+    if (mzBX > 233 - 7 * 35 / 2 + 35) { printf("FAIL: a new maze did not start at the top left\n"); return 1; }
+    click(233, 40);
+    pump(140);                             // the result screen goes
+    printf("PASS: tilt maze -> the flag scores and a new maze starts\n");
     g_seed = seedBefore;
   }
 

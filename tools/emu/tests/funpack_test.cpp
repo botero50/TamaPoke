@@ -44,7 +44,8 @@ int main(){
     ck(p.miniHi[MINI_MOLE] == 30, "and the record is kept");
     p.joy = 50;
     uint8_t j = p.applyMiniResult(MINI_DANCE, 40);
-    ck(j == 36 && p.joy == 86, "dance pays its capped joy (6 + 30)");
+    int pb = p.personality() == PERS_PLAYFUL ? 2 : 0;   // a playful one enjoys it a little more (phase 14)
+    ck(j == 36 + pb && p.joy == 86 + pb, "dance pays its capped joy (6 + 30)");
     p.applyMiniResult(MINI_MOLE, 3);
     ck(p.miniHi[MINI_MOLE] == 30, "a worse score does not lower the record");
     p.trSpe = p.trMaxSpe();
@@ -58,7 +59,7 @@ int main(){
     p.joy = 20; p.grumpy = true; p.boredTicks = BORED_TICKS;
     ck(p.isBored(), "8 h without a game is boredom");
     uint8_t j = p.applyMiniResult(MINI_LR, 5);
-    ck(j == 7, "grumpy: half of 4 + 10");
+    ck(j == 7 + (p.personality() == PERS_PLAYFUL ? 2 : 0), "grumpy: half of 4 + 10");
     ck(!p.grumpy && !p.isBored(), "one game cures both");
     p.grumpy = true; p.boredTicks = BORED_TICKS;
     p.trainSpeed(10);

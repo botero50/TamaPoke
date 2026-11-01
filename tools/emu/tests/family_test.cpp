@@ -179,6 +179,120 @@ int main(){
     ck(q.diary[0].day == 20000 && q.diary[0].baths == 1, "the diary persists");
   }
 
+  // --- the minigame records: a save from before the four new games still loads
+  {
+    Pet p; fresh(p, 20000);
+    p.setClock(p.lastSeenEpoch);
+    Preferences pr; pr.begin("tamapoke", false);
+    uint16_t old[8] = { 1, 2, 3, 44, 5, 6, 7, 8 };
+    pr.putBytes("mnhi", old, sizeof(old));
+    pr.end();
+    Pet q; q.begin();
+    ck(q.miniHi[3] == 44 && q.miniHi[7] == 8 && q.miniHi[MINI_MAZE] == 0, "old records load; the new games start at 0");
+    q.applyMiniResult(MINI_SIMON, 6);
+    ck(q.miniHi[MINI_SIMON] == 6, "a new game keeps its record");
+  }
+
+  // --- phase 13: the new hats need the high bits; the room's furniture
+  {
+    Pet p; fresh(p, 20000);
+    p.hatsOwned = 0; p.coins = 1000;
+    ck(p.buyHat(HAT_VIKING) && p.ownsHat(HAT_VIKING) && !p.ownsHat(HAT_CAP), "a new hat is bought into the high bits");
+    p.wearHat(HAT_VIKING);
+    p.furnOwned = 0; p.furnWallL = p.furnWallR = p.furnBackL = p.furnBackR = -1; p.rugOn = false; p.wallpaper = -1; p.sceneryPick = -1;
+    ck(p.buyFurn(FURN_SOFA) && p.coins == 1000 - Pet::hatPrice(HAT_VIKING) - Pet::furnPrice(FURN_SOFA), "furniture is bought");
+    ck(!p.buyFurn(FURN_SOFA), "once");
+    p.placeFurn(FURN_SOFA);
+    ck(p.furnBackL == FURN_SOFA && p.sceneryPick == SCENERY_ROOM, "the sofa stands at the back, and the room is shown");
+    p.placeFurn(FURN_SOFA);
+    ck(p.furnBackL == -1 && !p.furnPlaced(FURN_SOFA), "tapped again: put away");
+    p.furnOwned = 0xFFFF & ((1 << FURN_COUNT) - 1);
+    p.placeFurn(FURN_WINDOW); p.placeFurn(FURN_CLOCK); p.placeFurn(FURN_PAINTING);
+    ck(p.furnWallL == FURN_PAINTING && p.furnWallR == FURN_CLOCK, "a third wall piece replaces the left one");
+    p.placeFurn(FURN_TV); p.placeFurn(FURN_RUG); p.placeFurn(FURN_PAPER_PINK);
+    ck(p.furnBackL == FURN_TV && p.rugOn && p.wallpaper == FURN_PAPER_PINK, "floor, rug and wallpaper each have their place");
+    ck(p.ownsScenery(SCENERY_ROOM) && Pet::sceneryPrice(SCENERY_ROOM) == 0, "the room is free");
+    p.setClock(p.lastSeenEpoch);
+    Pet q; q.begin();
+    ck(q.ownsHat(HAT_VIKING) && q.hatOn == HAT_VIKING, "the new hat persists");
+    ck(q.furnWallL == FURN_PAINTING && q.furnBackL == FURN_TV && q.rugOn && q.wallpaper == FURN_PAPER_PINK && q.sceneryPick == SCENERY_ROOM, "the room persists");
+  }
+
+  // --- phase 14: wishes
+  {
+    Pet p; fresh(p, 20000);
+    p.wishKind = WISH_NONE; p.wishNextAt = 0; p.wishDay = 0; p.wishesToday = 0;
+    int made = 0;
+    for (int m = 0; m < 24 * 60; m++) {    // a whole day of awake minutes, granting every wish at once
+      p.lastSeenEpoch = atDay(20000, 0) + m * 60;
+      p.sleeping = false;
+      p.wishTick();
+      if (p.wishKind) { made++; p.wishKind = WISH_NONE; }
+    }
+    ck(made >= 1 && made <= WISHES_PER_DAY, "a few wishes a day, never more than three");
+    p.lastSeenEpoch = atDay(20001, 10);
+    p.wishKind = WISH_FOOD; p.wishArg = FOOD_CURRY; p.wishUntil = p.lastSeenEpoch + 3600;
+    p.foodCount[FOOD_SOUP] = 1; p.foodCount[FOOD_CURRY] = 1; p.fullness = 20;
+    uint32_t c = p.coins;
+    p.eatFood(FOOD_SOUP);
+    ck(p.wishKind == WISH_FOOD, "the wrong food does not grant a food wish");
+    p.eatFood(FOOD_CURRY);
+    ck(p.wishKind == WISH_NONE && p.coins >= c + WISH_COINS && p.wishGrantedFlash, "the right one does: coins and a flash");
+    p.wishKind = WISH_PET; p.wishUntil = p.lastSeenEpoch + 3600;
+    p.caress();
+    ck(p.wishKind == WISH_NONE, "a cuddle grants a cuddle wish");
+    p.wishKind = WISH_BATH; p.wishUntil = p.lastSeenEpoch + 3600;
+    p.lastSeenEpoch += 3601; p.wishTick();
+    ck(p.wishKind == WISH_NONE, "an old wish fades away");
+  }
+  // --- personality, lonely, excited
+  {
+    Pet p; fresh(p, 20000);
+    Personality a = p.personality();
+    ck(a < PERS_COUNT && p.personality() == a, "the personality is stable");
+    p.lastCareEpoch = p.lastSeenEpoch;
+    p.lastSeenEpoch += LONELY_SECS + 60;
+    ck(p.isLonely(), "three hours with nobody: lonely");
+    p.caress();
+    ck(!p.isLonely(), "a cuddle fixes it");
+    p.missionDone = (1 << MISSIONS_PER_DAY) - 1; p.coinDay = p.lastSeenEpoch / 86400;
+    ck(p.isExcited(), "every mission done: excited");
+  }
+  // --- birthdays
+  {
+    Pet p; fresh(p, 20000);
+    p.bornDay = 20000; p.bdayDay = 0;
+    p.lastSeenEpoch = atDay(20000 + BIRTHDAY_DAYS - 1, 12);
+    ck(p.birthdayMonths() == 0 && !p.claimBirthday(), "the day before: no party");
+    p.lastSeenEpoch = atDay(20000 + BIRTHDAY_DAYS, 12);
+    uint8_t cakes = p.foodCount[FOOD_CAKE];
+    ck(p.birthdayMonths() == 1 && p.claimBirthday() && p.foodCount[FOOD_CAKE] == cakes + 1, "one month: a party with cake");
+    ck(!p.claimBirthday(), "once on the day");
+    p.lastSeenEpoch = atDay(20000 + 2 * BIRTHDAY_DAYS, 12);
+    ck(p.birthdayMonths() == 2, "two months");
+  }
+  // --- events: Easter and the summer festival
+  {
+    int m, d;
+    Pet::easterDate(2026, m, d);
+    ck(m == 4 && d == 5, "Easter 2026 is 5 April");
+    Pet::easterDate(2027, m, d);
+    ck(m == 3 && d == 28, "Easter 2027 is 28 March");
+    Pet p; fresh(p, 20548);              // 2026-04-05
+    int y; Pet::civilDate(20548, y, m, d);
+    ck(m == 4 && d == 5 && p.eventToday() == EVENT_EASTER, "Easter Sunday is egg-hunt week");
+    p.eggDay = 0; p.eggsFound = 0;
+    int eggs = 0;
+    for (int i = 0; i < 100; i++) eggs += p.findEasterEgg();
+    ck(eggs == EASTER_EGGS_PER_DAY, "five eggs a day at most");
+    fresh(p, 20638);                     // 2026-07-04
+    ck(p.eventToday() == EVENT_SUMMER, "July is the summer festival");
+    p.festDay = 0;
+    ck(p.claimFestivalTreat() && !p.claimFestivalTreat(), "a free ice cream, once a day");
+    fresh(p, 20757);
+    ck(p.eventToday() == EVENT_NONE, "31 October: no event (the gift is separate)");
+  }
+
   if (bad) printf("FAILURES\n");
   return bad?1:0;
 }
