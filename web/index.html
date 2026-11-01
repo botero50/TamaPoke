@@ -26,6 +26,8 @@
   .row { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
   #log { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
          border-radius:10px; padding:.75rem 1rem; margin-top:1rem; max-height:220px; overflow:auto; white-space:pre-wrap; display:none; }
+  #savelog { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
+         border-radius:10px; padding:.75rem 1rem; margin-top:1rem; max-height:160px; overflow:auto; white-space:pre-wrap; display:none; }
   .bar { height:10px; background:var(--track); border-radius:5px; overflow:hidden; margin-top:.75rem; display:none; }
   .bar > div { height:100%; width:0; background:var(--ok); transition: width .15s; }
   code { background:#0001; padding:.1em .4em; border-radius:5px; }
@@ -57,6 +59,21 @@
        computer</b> rather than through a hub.</p>
   </div>
 
+  <h2><span class="num">💾</span>Updating? Save your pet first</h2>
+  <div class="step" style="border-left:4px solid var(--ok)">
+    <p>Already playing? Press <b>Save my pet</b> before you install. It downloads a
+       small backup file of your creature, Pokédex, coins and items. If anything goes
+       wrong, <b>Restore my pet</b> puts it all back. New board? Skip this.</p>
+    <div class="row">
+      <button id="petsave">💾 Save my pet</button>
+      <button id="petload">♻️ Restore my pet</button>
+      <input id="petfile" type="file" accept=".txt" hidden>
+    </div>
+    <p class="note">Pick the board's port when asked. Close any other tab or program
+       using the board first: only one can use the port at a time.</p>
+    <pre id="savelog"></pre>
+  </div>
+
   <h2><span class="num">1</span>Flash the firmware</h2>
   <div class="step">
     <p>Plug the board in via USB and press install. Pick the port and wait.
@@ -76,10 +93,9 @@
        <b>Installers before v2.7 erased it every time, without asking.</b>
        They shipped one image covering the whole start of flash, the save
        included, and were configured to wipe the chip before writing. Both are
-       fixed here. Even so, <code>EXPORT</code> on the serial console is the
-       only real safety net: it prints your whole save as a block of
-       <code>IMPORT</code> lines, and pasting that block back restores it.
-       Worth doing before any update you care about.<br><br>
+       fixed here. Even so, a backup is the only real safety net: use
+       <b>Save my pet</b> above before any update you care about (it is the
+       same as typing <code>EXPORT</code> on the serial console).<br><br>
        A fresh board with nothing on it can be erased safely, and on a board
        that has never run TamaPoke it makes no difference either way.</p>
   </div>
@@ -202,6 +218,100 @@ async function sendAll(items) {
   }
   log(`Done (${done - fail}/${items.length}). Restart the board (PWR button).`);
 }
+
+// ---------- save / restore the pet (EXPORT / IMPORT over serial) ----------
+// Each button opens the port, does its one job and closes it again, so the
+// installer in step 1 can have the port straight after.
+const slog = (m) => { const el = document.getElementById('savelog'); el.style.display = 'block';
+  el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function withPort(job) {
+  if (port && port.readable) { slog('Close the board connection in step 2 first (reload the page).'); return; }
+  let p, rd, wr;
+  try {
+    p = await navigator.serial.requestPort();
+    await p.open({ baudRate: 115200 });
+    rd = p.readable.getReader(); wr = p.writable.getWriter();
+    let buf = '', pending = null;      // one read in flight, kept across timeouts so no data is lost
+    const td = new TextDecoder();
+    const line = async (ms) => {          // the next line, or null after ms
+      const end = Date.now() + ms;
+      while (true) {
+        const nl = buf.indexOf('\n');
+        if (nl >= 0) { const l = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1); return l; }
+        const left = end - Date.now();
+        if (left <= 0) return null;
+        if (!pending) pending = rd.read();
+        const r = await Promise.race([pending, sleep(left).then(() => null)]);
+        if (!r) return null;
+        pending = null;
+        if (r.done) return null;
+        buf += td.decode(r.value);
+      }
+    };
+    await sleep(300);
+    await job((t) => wr.write(enc.encode(t + '\n')), line);
+  } catch (e) {
+    if (e.name !== 'NotFoundError') slog('Error: ' + e.message);
+  } finally {
+    try { rd && await rd.cancel(); } catch (e) {}   // ends the read still in flight
+    try { rd && rd.releaseLock(); } catch (e) {}
+    try { wr && wr.releaseLock(); } catch (e) {}
+    try { p && await p.close(); } catch (e) {}
+  }
+}
+
+document.getElementById('petsave').onclick = () => withPort(async (send, line) => {
+  slog('Reading the save...');
+  await send('EXPORT');
+  const out = []; let started = false;
+  while (true) {
+    const l = await line(5000);
+    if (l === null) break;
+    if (l.startsWith('# TamaPoke save')) { started = true; out.length = 0; }
+    if (!started) continue;
+    out.push(l);
+    if (l === 'IMPORT') break;            // the empty IMPORT closes the block
+  }
+  if (!started || out[out.length - 1] !== 'IMPORT') {
+    slog('No save came back. Is TamaPoke running on the board? Try again.');
+    return;
+  }
+  const d = new Date(), z = (n) => String(n).padStart(2, '0');   // local time, as on the clock
+  const stamp = d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes());
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([out.join('\n') + '\n'], { type: 'text/plain' }));
+  a.download = 'tamapoke-save-' + stamp + '.txt';
+  a.click();
+  slog('Saved ' + a.download + ' (' + (out.length - 2) + ' lines). Keep it somewhere safe.');
+});
+
+document.getElementById('petload').onclick = () => document.getElementById('petfile').click();
+document.getElementById('petfile').onchange = async (ev) => {
+  const f = ev.target.files[0]; ev.target.value = '';
+  if (!f) return;
+  const lines = (await f.text()).split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('IMPORT'));
+  if (lines.length < 2 || lines[lines.length - 1] !== 'IMPORT') {
+    slog('That file is not a TamaPoke save (it needs the IMPORT lines from Save my pet).');
+    return;
+  }
+  if (!confirm('Replace the pet on the board with the one in ' + f.name + '?')) return;
+  await withPort(async (send, line) => {
+    slog('Restoring ' + f.name + '...');
+    await send('IMPORT 0');              // an odd chunk: clears any half-received import
+    await sleep(100);
+    for (const l of lines.slice(0, -1)) { await send(l); await sleep(40); }
+    while (await line(200) !== null) {}  // drop anything printed so far
+    await send('IMPORT');
+    while (true) {
+      const l = await line(6000);
+      if (l === null) { slog('No answer from the board. Try again.'); return; }
+      if (l === 'IMPORT OK') { slog('Restored! The board restarts by itself.'); return; }
+      if (l.startsWith('IMPORT ')) { slog('The board refused the save (' + l + '). Nothing was changed.'); return; }
+    }
+  });
+};
 
 document.getElementById('connect').onclick = async () => {
   try {
