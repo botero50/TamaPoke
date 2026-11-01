@@ -3,7 +3,7 @@
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://botero50.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
-![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.14-8A2BE2)
+![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.19-8A2BE2)
 ![Code](https://img.shields.io/badge/code-MIT-blue)
 ![Languages](https://img.shields.io/badge/languages-8-FFCB05)
 [![Stars](https://img.shields.io/github/stars/botero50/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/botero50/TamaPoke/stargazers)
@@ -53,6 +53,11 @@ This fork (**[botero50/TamaPoke](https://github.com/botero50/TamaPoke)**, branch
 - **Home and dress-up**: a room of its own with furniture and wallpapers, 20 hats.
 - **A livelier pet**: wishes, a personality, lonely and excited moods, a monthly
   birthday, an Easter egg hunt and a summer festival.
+- **A new games menu and 8 more games** (28 in all), sorted into Strength, Speed,
+  Defence, Brain, Fun and Arcade.
+- **Outfits**: glasses, neck pieces and back pieces worn with the hats; full sets.
+- **Town life**: a second map page (beach, library, music hall, contest, arcade,
+  jobs), part-time jobs, daily mail, weekly story quests, Halloween and winter.
 
 See the sections further down for the rules and the economy numbers.
 
@@ -484,6 +489,36 @@ the other games, and old saves keep the old records.
 - **Events**: the Easter week (eggs in the grass, and walks in the park find up to
   five eggs a day) and the July summer festival (lanterns, fireworks at night, a
   free ice cream a day).
+
+### Games menu and arcade (phase 15)
+TRAIN opens a grid of six categories with icons -- **Strength**, **Speed** and
+**Defence** show how far each stat is trained -- and each opens a list of its games.
+New: **Balloon pop** (Strength), **Shake race** (Speed: shake the ball or tap fast),
+**Catch** and **Balance** (Defence: tilt the ball or use a finger), the **Type quiz**
+and the **Slide puzzle** (Brain), **Bubbles** and **Drawing** (Arcade).
+
+### Outfits (phase 16)
+OUTFITS in the shop now holds the 20 hats and 12 accessories: sunglasses, star,
+heart glasses, monocle; scarf, bow tie, medal, bandana; cape, backpack, angel and
+bat wings. One of each kind can be worn with a hat. Full sets (pirate, superhero,
+angel, spooky, chef) keep it cheerful and impress the contest judges.
+
+### Town life (phase 17)
+The map's second page: the **beach** (collect shells, build a sandcastle), the
+**library** (read about a Pokemon), the **music hall** (play the game's tunes and
+watch it dance), the **contest** (a weekly style show -- outfit, bond and joy win
+bronze, silver or gold ribbons), the **arcade** (the games menu) and **jobs**: the
+creature goes to the cafe, the flower shop or the post office for three hours and
+comes home with 15 coins (nothing drains while it is away). **Mail** in the purse
+brings a letter a day, each with a small gift.
+
+### Quests and seasons (phase 19)
+The missions panel has a **QUEST** button: a little story each week (Pikachu's
+lost hat, Meowth's lunch, Chansey's lost egg, a song for Jigglypuff) in three
+steps, each on a later day. Finishing it gives a hat not owned yet. **Halloween
+week** (24-31 October) brings pumpkins, a ghost and a daily treat; the **winter
+holidays** (20 December - 6 January) a snowman and hot cocoa. A whole year
+together is a bigger birthday party.
 
 ### The economy, checked
 `economy_test` plays thirty days through the real rules (missions, caps, steps):
