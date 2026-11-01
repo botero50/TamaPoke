@@ -41,7 +41,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.19"
+#define FW_VERSION "3.14-funpack.20"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -237,6 +237,9 @@ bool choresOpen = false, piggyOpen = false, diaryOpen = false;   // more of the 
 uint8_t diaryPage = 0;
 bool alarmRinging = false;   // the alarm clock is going off
 bool questView = false;      // the missions panel shows the weekly quest
+bool photoPending = false;   // the next main-screen frame goes into the album
+bool albumOpen = false;      // browsing the photos
+uint8_t albumIdx = 0, albumShown = 255;   // the photo asked for, and the one in the buffer
 uint8_t mapPage = 0;         // the map has two pages of places
 bool mailOpen = false;       // the letter of the day
 uint8_t mailShown = 0;       // which letter is on screen
@@ -940,7 +943,7 @@ void loop() {
   if (now - lastGiftCheck > 20000 && uiCurrentScreen() == SCR_MAIN && !screenOff) {
     lastGiftCheck = now;
     checkHolidayGift();
-    if (pet.claimBirthday()) { sfxPlay(SFX_VICTORY); fpShowToast(pet.birthdayMonths() % 12 == 0 ? S_ANNIVERSARY : S_HAPPY_BIRTHDAY, UI_BAR_OK); }
+    if (pet.claimBirthday()) { photoPending = true; sfxPlay(SFX_VICTORY); fpShowToast(pet.birthdayMonths() % 12 == 0 ? S_ANNIVERSARY : S_HAPPY_BIRTHDAY, UI_BAR_OK); }
     else if (uint8_t ev = pet.claimFestivalTreat()) {
       sfxPlay(SFX_MEDAL);
       fpShowToast(ev == EVENT_HALLOWEEN ? S_HALLOWEEN_TREAT : ev == EVENT_WINTER ? S_WINTER_TREAT : S_FESTIVAL_TREAT, UI_BAR_OK);
@@ -948,7 +951,7 @@ void loop() {
   }
   if (pet.wishGrantedFlash) { pet.wishGrantedFlash = false; sfxPlay(SFX_MEDAL); fpShowToast(S_WISH_DONE, UI_BAR_OK); }
   if (pet.jobDoneFlash) { pet.jobDoneFlash = false; sfxPlay(SFX_MEDAL); fpShowToast(S_JOB_DONE, UI_BAR_OK); }
-  if (pet.questDoneFlash) { pet.questDoneFlash = false; sfxPlay(SFX_VICTORY); fpShowToast(S_QUEST_DONE, UI_BAR_OK); }
+  if (pet.questDoneFlash) { pet.questDoneFlash = false; photoPending = true; sfxPlay(SFX_VICTORY); fpShowToast(S_QUEST_DONE, UI_BAR_OK); }
   // a trophy reached is announced on the main screen; homework ends on time
   static uint32_t lastTrophyCheck = 0;
   if (now - lastTrophyCheck > 5000 && uiCurrentScreen() == SCR_MAIN && !screenOff) {
@@ -957,6 +960,12 @@ void loop() {
   }
   studyTick();
   alarmTick();
+  placeMusicTick();
+  {                                         // an evolution: a photo of the new look
+    static int16_t seenSpecies = -1;
+    if (!pet.isEgg() && seenSpecies >= 0 && pet.speciesId != seenSpecies && !pet.evolving()) photoPending = true;
+    if (!pet.evolving()) seenSpecies = pet.isEgg() ? -1 : pet.speciesId;
+  }
 
   // Fun Pack: nobody has touched it for a while in the evening and the screen
   // is still on -- it nods off with the light on (Pet::dozeOff checks the hour)
@@ -2144,6 +2153,7 @@ void onTap(int16_t x, int16_t y) {
   if (trophyOpen) { trophyTap(x, y); return; }
   if (choresOpen) { choresTap(x, y); return; }
   if (piggyOpen) { piggyTap(x, y); return; }
+  if (albumOpen) { albumTap(x, y); return; }
   if (diaryOpen) { diaryTap(x, y); return; }
   if (mailOpen) { mailOpen = false; return; }   // any tap folds the letter away
   if (mapOpen) { mapMenuTap(x, y); return; }
@@ -3876,7 +3886,7 @@ uint8_t uiCurrentScreen() {
   if (shopOpen) return SCR_MENU;               // the shop can open over the store
   if (placeScene) return SCR_GAME;
   if (trainOpen || fpMenuCat) return SCR_TRAIN;
-  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen) return SCR_MENU;
+  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen || albumOpen) return SCR_MENU;
   return SCR_MAIN;
 }
 
@@ -4002,6 +4012,7 @@ void render() {
   }
   if (choresOpen) { renderChores(); return; }
   if (piggyOpen) { renderPiggy(); return; }
+  if (albumOpen) { renderAlbum(); return; }
   if (diaryOpen) { renderDiary(); return; }
   if (mailOpen) { renderMail(); return; }
   if (mapOpen) {
@@ -4189,6 +4200,10 @@ void render() {
     }
   }
 
+  if (photoPending && uiCurrentScreen() == SCR_MAIN) {
+    photoPending = false;
+    if (albumSave(gfx->getFramebuffer())) { sfxPlay(SFX_TAP); fpShowToast(S_PHOTO_SAVED, UI_BAR_OK); }
+  }
   drawFpToast();
   drawHatPad();
   if (menuOpen) drawMenu();
@@ -11122,6 +11137,7 @@ void trophyTap(int16_t x, int16_t y) {
 // a trophy reached anywhere is announced on the main screen
 void checkTrophyToast() {
   if (pet.checkTrophies() < 0) return;
+  photoPending = true;
   sfxPlay(SFX_VICTORY);
   fpShowToast(S_TROPHY_NEW, UI_BAR_OK);
 }
@@ -11377,6 +11393,7 @@ void renderDiary() {
   else { int yy, mm, dd; Pet::civilDate(d.day, yy, mm, dd); snprintf(b, sizeof(b), "%02d/%02d", dd, mm); }
   uiTextFit(UIF_MID, CX, PANEL_Y + 34, b, UI_INK, 1, PANEL_W - 80);
   drawMap(SPR_ICON_DIARY, 16, PANEL_X + 20, PANEL_Y + 10, 2, false);
+  drawAlbumButton();
   int y = PANEL_Y + 78, lines = 0;
   auto line = [&](const char *t) { if (lines < 8) { uiTextFit(UIF_SMALL, PANEL_X + 30, y, t, UI_INK, 0, PANEL_W - 60); y += 28; lines++; } };
   struct { uint8_t v; StrId fmt; } rows[] = {
@@ -11402,6 +11419,7 @@ void renderDiary() {
 
 void diaryTap(int16_t x, int16_t y) {
   if (!inPanel(x, y)) { diaryOpen = false; return; }
+  if (albumButtonHit(x, y)) { sfxPlay(SFX_TAP); albumOpen = true; albumIdx = 0; albumShown = 255; return; }
   uint8_t pages = diaryPages();
   int a = pageNavHit(x, y, pages);
   if (a) { diaryPage = (uint8_t)((diaryPage + pages + a) % pages); sfxPlay(SFX_TAP); }
@@ -13218,4 +13236,93 @@ void drawSeasonDecor() {
     gfx->fillRect(x - 14, y - 76, 28, 6, UI_INK);
     gfx->fillRect(x - 9, y - 92, 18, 16, UI_INK);
   }
+}
+
+// ===========================================================================
+// The photo album and the places' music. Photos are taken of the main screen
+// at big moments (a trophy, a birthday, a finished quest, an evolution) or with
+// PHOTO in the album, and kept on the SD card (albumSave in sdmon.cpp).
+// ===========================================================================
+
+#define ABTN_X (PANEL_X + PANEL_W - 104)
+#define ABTN_Y (PANEL_Y + 14)
+#define ABTN_W 88
+#define ABTN_H 34
+
+void drawAlbumButton() {
+  gfx->fillRoundRect(ABTN_X, ABTN_Y, ABTN_W, ABTN_H, 12, UI_BAR_WARN);
+  gfx->drawRoundRect(ABTN_X, ABTN_Y, ABTN_W, ABTN_H, 12, UI_INK);
+  uiTextFit(UIF_TINY, ABTN_X + ABTN_W / 2, uiMidY(UIF_TINY, ABTN_Y, ABTN_H), T(S_ALBUM), UI_INK, 1, ABTN_W - 8);
+}
+bool albumButtonHit(int16_t x, int16_t y) { return x >= ABTN_X && x <= ABTN_X + ABTN_W && y >= ABTN_Y && y <= ABTN_Y + ABTN_H; }
+
+#define AL_NAV_Y 420
+#define AL_PHOTO_X CX
+#define AL_PHOTO_W 120
+
+void renderAlbum() {
+  gfx->fillScreen(RGB565_BLACK);
+  uint8_t n = albumCount();
+  if (n && albumIdx < n) {
+    uint16_t *b = albumBuffer();
+    if (albumShown != albumIdx && b && albumLoad(albumIdx, b)) albumShown = albumIdx;
+    if (albumShown == albumIdx && b) {                    // twice the size: the whole screen again
+      uint16_t *fb = gfx->getFramebuffer();
+      for (int y = 0; y < ALBUM_W; y++) {
+        uint16_t *r0 = fb + (y * 2) * 466, *r1 = r0 + 466;
+        const uint16_t *src = b + y * ALBUM_W;
+        for (int x = 0; x < ALBUM_W; x++) { uint16_t c = src[x]; r0[x * 2] = r0[x * 2 + 1] = r1[x * 2] = r1[x * 2 + 1] = c; }
+      }
+    }
+    char t[12];
+    snprintf(t, sizeof(t), "%u/%u", (unsigned)(albumIdx + 1), (unsigned)n);
+    gfx->fillRoundRect(CX - 40, 24, 80, 30, 12, UI_WHITE);
+    uiText(UIF_SMALL, CX, 46, t, UI_INK, 1);
+  } else {
+    uiTextFit(UIF_MID, CX, 220, T(S_NO_PHOTOS), UI_WHITE, 1, 320);
+  }
+  for (int k = 0; k < 2; k++) {                            // previous / next
+    int cx = k ? CX + 110 : CX - 110;
+    gfx->fillCircle(cx, AL_NAV_Y - 20, 22, UI_WHITE);
+    gfx->drawCircle(cx, AL_NAV_Y - 20, 22, UI_INK);
+    int d = k ? 1 : -1;
+    gfx->fillTriangle(cx + d * 9, AL_NAV_Y - 20, cx - d * 7, AL_NAV_Y - 30, cx - d * 7, AL_NAV_Y - 10, UI_INK);
+  }
+  gfx->fillRoundRect(AL_PHOTO_X - AL_PHOTO_W / 2, AL_NAV_Y - 40, AL_PHOTO_W, 40, 14, UI_BAR_OK);
+  uiTextFit(UIF_SMALL, AL_PHOTO_X, uiMidY(UIF_SMALL, AL_NAV_Y - 40, 40), T(S_TAKE_PHOTO), UI_WHITE, 1, AL_PHOTO_W - 10);
+  gfx->flush();
+}
+
+void albumTap(int16_t x, int16_t y) {
+  uint8_t n = albumCount();
+  if (y >= AL_NAV_Y - 44 && y <= AL_NAV_Y + 4) {
+    if (abs(x - (CX - 110)) <= 28 && n) { albumIdx = (uint8_t)((albumIdx + n - 1) % n); sfxPlay(SFX_TAP); return; }
+    if (abs(x - (CX + 110)) <= 28 && n) { albumIdx = (uint8_t)((albumIdx + 1) % n); sfxPlay(SFX_TAP); return; }
+    if (abs(x - AL_PHOTO_X) <= AL_PHOTO_W / 2) {           // PHOTO: back to the pet, and snap it
+      sfxPlay(SFX_TAP);
+      albumOpen = false; diaryOpen = false;
+      photoPending = true;
+      return;
+    }
+  }
+  albumOpen = false;                                       // anywhere else: back to the diary
+}
+
+// each place hums its own tune, softly, while you are there
+void placeMusicTick() {
+  static uint8_t lastScene = 0;
+  if (placeScene == lastScene) return;
+  uint8_t tune = MUS_NONE;
+  switch (placeScene) {
+    case PLACE_PARK: tune = MUS_TWINKLE; break;
+    case PLACE_SCHOOL: tune = MUS_FRERE; break;
+    case PLACE_GARDEN: case PLACE_LAKE: tune = MUS_ODE; break;
+    case PLACE_BEACH: tune = MUS_CUCARACHA; break;
+    default: break;
+  }
+  uint8_t now = audioMusicNow();
+  bool placeTune = now >= MUS_TWINKLE;
+  if (tune) audioMusic(tune);
+  else if (placeTune) audioMusic(MUS_NONE);                // left a place: quiet again
+  lastScene = placeScene;
 }
