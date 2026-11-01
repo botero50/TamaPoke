@@ -41,7 +41,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.14"
+#define FW_VERSION "3.14-funpack.19"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -236,7 +236,11 @@ uint8_t trophyPage = 0;
 bool choresOpen = false, piggyOpen = false, diaryOpen = false;   // more of the purse
 uint8_t diaryPage = 0;
 bool alarmRinging = false;   // the alarm clock is going off
-float gAccX = 0, gAccY = 0;  // the last accelerometer sample
+bool questView = false;      // the missions panel shows the weekly quest
+uint8_t mapPage = 0;         // the map has two pages of places
+bool mailOpen = false;       // the letter of the day
+uint8_t mailShown = 0;       // which letter is on screen
+float gAccX = 0, gAccY = 0, gAccZ = 1;  // the last accelerometer sample
 bool gAccFresh = false;
 bool shopOpen = false;
 bool bagOpen = false;
@@ -860,7 +864,7 @@ void loop() {
   static StepDetector stepper;
   float ax, ay, az;
   if (imuReadAccel(ax, ay, az)) {
-    gAccX = ax; gAccY = ay; gAccFresh = true;   // the tilt maze reads the last sample
+    gAccX = ax; gAccY = ay; gAccZ = az; gAccFresh = true;   // the tilt maze reads the last sample
     pet.addSteps(stepper.feed(ax, ay, az, now));
   }
 
@@ -936,10 +940,15 @@ void loop() {
   if (now - lastGiftCheck > 20000 && uiCurrentScreen() == SCR_MAIN && !screenOff) {
     lastGiftCheck = now;
     checkHolidayGift();
-    if (pet.claimBirthday()) { sfxPlay(SFX_VICTORY); fpShowToast(S_HAPPY_BIRTHDAY, UI_BAR_OK); }
-    else if (pet.claimFestivalTreat()) { sfxPlay(SFX_MEDAL); fpShowToast(S_FESTIVAL_TREAT, UI_BAR_OK); }
+    if (pet.claimBirthday()) { sfxPlay(SFX_VICTORY); fpShowToast(pet.birthdayMonths() % 12 == 0 ? S_ANNIVERSARY : S_HAPPY_BIRTHDAY, UI_BAR_OK); }
+    else if (uint8_t ev = pet.claimFestivalTreat()) {
+      sfxPlay(SFX_MEDAL);
+      fpShowToast(ev == EVENT_HALLOWEEN ? S_HALLOWEEN_TREAT : ev == EVENT_WINTER ? S_WINTER_TREAT : S_FESTIVAL_TREAT, UI_BAR_OK);
+    }
   }
   if (pet.wishGrantedFlash) { pet.wishGrantedFlash = false; sfxPlay(SFX_MEDAL); fpShowToast(S_WISH_DONE, UI_BAR_OK); }
+  if (pet.jobDoneFlash) { pet.jobDoneFlash = false; sfxPlay(SFX_MEDAL); fpShowToast(S_JOB_DONE, UI_BAR_OK); }
+  if (pet.questDoneFlash) { pet.questDoneFlash = false; sfxPlay(SFX_VICTORY); fpShowToast(S_QUEST_DONE, UI_BAR_OK); }
   // a trophy reached is announced on the main screen; homework ends on time
   static uint32_t lastTrophyCheck = 0;
   if (now - lastTrophyCheck > 5000 && uiCurrentScreen() == SCR_MAIN && !screenOff) {
@@ -1431,7 +1440,8 @@ void onSwipeV(int dir) {
   if (uiCurrentScreen() == SCR_DEXPICK || uiCurrentScreen() == SCR_GYMPICK)
     return;                 // on the chooser, vertical does nothing: pick a row
   if (menuOpen) { menuOpen = false; return; }   // any swipe closes the menu
-  if (missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || hatAdjust || foodOpen || bathOpen || sleepOpen || mapOpen || placeScene || trophyOpen || choresOpen || piggyOpen || diaryOpen) {
+  if (missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || hatAdjust || foodOpen || bathOpen || sleepOpen || mapOpen || placeScene || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen) {
+    mailOpen = false;
     missionsOpen = walletOpen = hubOpen = shopOpen = bagOpen = hatAdjust = foodOpen = bathOpen = sleepOpen = mapOpen = trophyOpen = false;
     choresOpen = piggyOpen = diaryOpen = false;
     placeScene = 0;
@@ -1465,7 +1475,7 @@ void onSwipeV(int dir) {
   if (gameOpen) { leaveGame(); return; }
   if (sackOpen) { leaveSack(); return; }
   if (spdOpen) { leaveSpeed(); return; }
-  if (fpOpen) { if (fpGame != MINI_MAZE) fpLeave(); return; }   // the maze is steered by dragging
+  if (fpOpen) { if (!fpUsesDrag(fpGame)) fpLeave(); return; }   // the drag games are steered by dragging
   if (galleryOpen) {
     if (galleryDetail) { galleryDetail = 0; galleryPmd.unload(); galleryDirty = true; return; }
     galleryRegion = (uint8_t)((galleryRegion + (dir > 0 ? 1 : GAL_REGIONS - 1)) % GAL_REGIONS);
@@ -1778,7 +1788,8 @@ void onSwipe(int dir) {
   if (pet.awaitingStarter()) return;  // blocked during the starter choice
   if (menuOpen) { menuOpen = false; return; }   // any swipe closes the menu
   if (shopSwipe(dir)) return;
-  if (missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || hatAdjust || foodOpen || bathOpen || sleepOpen || mapOpen || placeScene || trophyOpen || choresOpen || piggyOpen || diaryOpen) {
+  if (missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || hatAdjust || foodOpen || bathOpen || sleepOpen || mapOpen || placeScene || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen) {
+    mailOpen = false;
     missionsOpen = walletOpen = hubOpen = shopOpen = bagOpen = hatAdjust = foodOpen = bathOpen = sleepOpen = mapOpen = trophyOpen = false;
     choresOpen = piggyOpen = diaryOpen = false;
     placeScene = 0;
@@ -1833,7 +1844,7 @@ void onSwipe(int dir) {
   }
   if (gameOpen) { leaveGame(); return; }   // swipe out, keeping what you earned
   if (spdOpen) { leaveSpeed(); return; }
-  if (fpOpen) { if (fpGame != MINI_MAZE) fpLeave(); return; }   // the maze is steered by dragging
+  if (fpOpen) { if (!fpUsesDrag(fpGame)) fpLeave(); return; }   // the drag games are steered by dragging
   if (kbOpen) return;
   if (clockOpen) {   // settings: horizontal pages, circular; OK/cancel close it
     int p = (int)settingsPage + (dir > 0 ? -1 : 1);
@@ -1989,21 +2000,7 @@ void onTap(int16_t x, int16_t y) {
   }
   if (fpOpen) { fpTap(x, y); return; }
   if (fpMenuCat) { funMenuTap(x, y); return; }
-  if (trainOpen) {
-    bool inPanel = (x >= TRAIN_X && x <= TRAIN_X + TRAIN_W &&
-                    y >= TRAIN_Y && y <= TRAIN_Y + TRAIN_H);
-    if (!inPanel) { trainOpen = false; return; }   // tap outside = back to the pet
-    for (int i = 0; i < TRAIN_ROWS; i++) {   // each row opens its category's games
-      int ry = TRAIN_ROW_Y(i);
-      if (x < TRAIN_X + 18 || x > TRAIN_X + TRAIN_W - 18) continue;
-      if (y < ry || y > ry + TRAIN_ROW_H) continue;
-      sfxPlay(SFX_TAP);
-      trainOpen = false;
-      fpMenuCat = (uint8_t)(i + 1);   // rows run STRENGTH, SPEED, DEFENCE, FUN
-      return;
-    }
-    return;
-  }
+  if (trainOpen) { gamesGridTap(x, y); return; }
   // The menu is modal and has three independent ways out: the CLOSE row, a tap
   // anywhere on the dimmed area outside the panel, and any swipe (see onSwipe).
   // Deliberately no timeout: a menu that vanishes while you read it is worse
@@ -2148,8 +2145,10 @@ void onTap(int16_t x, int16_t y) {
   if (choresOpen) { choresTap(x, y); return; }
   if (piggyOpen) { piggyTap(x, y); return; }
   if (diaryOpen) { diaryTap(x, y); return; }
+  if (mailOpen) { mailOpen = false; return; }   // any tap folds the letter away
   if (mapOpen) { mapMenuTap(x, y); return; }
   if (placeScene) { placeTap(x, y); return; }
+  if (missionsOpen && questButtonHit(x, y)) { questView = !questView; sfxPlay(SFX_TAP); return; }   // missions <-> quest
   if (missionsOpen || walletOpen) { missionsOpen = walletOpen = false; return; }
   if (hatPadTap(x, y)) return;
   if (feedMenuUntil) {       // food picker
@@ -2170,7 +2169,7 @@ void onTap(int16_t x, int16_t y) {
   if (mapButtonHit(x, y)) { sfxPlay(SFX_TAP); mapOpen = true; return; }
   if (int tb = topBarHit(x, y)) {
     sfxPlay(SFX_TAP);
-    if (tb == 1) missionsOpen = true;
+    if (tb == 1) { missionsOpen = true; questView = false; }
     else hubOpen = true;
     return;
   }
@@ -3877,7 +3876,7 @@ uint8_t uiCurrentScreen() {
   if (shopOpen) return SCR_MENU;               // the shop can open over the store
   if (placeScene) return SCR_GAME;
   if (trainOpen || fpMenuCat) return SCR_TRAIN;
-  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen) return SCR_MENU;
+  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen) return SCR_MENU;
   return SCR_MAIN;
 }
 
@@ -4004,6 +4003,7 @@ void render() {
   if (choresOpen) { renderChores(); return; }
   if (piggyOpen) { renderPiggy(); return; }
   if (diaryOpen) { renderDiary(); return; }
+  if (mailOpen) { renderMail(); return; }
   if (mapOpen) {
     renderMapMenu();
     return;
@@ -4116,6 +4116,7 @@ void render() {
     drawShine();
     drawWeather();
     drawEvents();
+    drawSeasonDecor();
     drawPoops();
     drawLightsOff();
     drawStepPlate();
@@ -7098,42 +7099,7 @@ static uint8_t trainPct(uint8_t cur, uint8_t cap) {
   return cap ? (uint8_t)((uint16_t)cur * 100 / cap) : 0;
 }
 
-void renderTrain() {
-  for (int y = 0; y < 466; y += 2)
-    gfx->drawFastHLine(0, y, 466, gNight ? 0x0000 : 0x2104);
-
-  gfx->fillRoundRect(TRAIN_X, TRAIN_Y, TRAIN_W, TRAIN_H, 18, UI_WHITE);
-  gfx->drawRoundRect(TRAIN_X, TRAIN_Y, TRAIN_W, TRAIN_H, 18, UI_INK);
-
-  uiTextFit(UIF_MID, CX, TRAIN_Y + 38, T(S_TRAIN), UI_INK, 1, TRAIN_W - 60);
-
-  const char *lbl[3] = { T(S_TR_ATK), T(S_TR_SPE), T(S_TR_DEF) };
-  uint8_t cur[3] = { pet.trAtk, pet.trSpe, pet.trDef };
-  uint8_t cap[3] = { pet.trMaxAtk(), pet.trMaxSpe(), pet.trMaxDef() };
-
-  for (int i = 0; i < 3; i++) {
-    int y = TRAIN_ROW_Y(i);
-    bool passive = false;      // every row opens a game now, DEF included
-    gfx->fillRoundRect(TRAIN_X + 18, y, TRAIN_W - 36, TRAIN_ROW_H, 12,
-                       passive ? UI_TRACK_TEXT : UI_BG_DAY);
-    gfx->drawRoundRect(TRAIN_X + 18, y, TRAIN_W - 36, TRAIN_ROW_H, 12, UI_INK);
-    uiTextFit(UIF_SMALL, TRAIN_X + 32, y + 26, lbl[i], UI_INK, 0, TRAIN_W - 64);
-
-    uint8_t pct = trainPct(cur[i], cap[i]);
-    int bx = TRAIN_X + 32, bw = TRAIN_W - 64, bh = 12, by = y + 34;
-    gfx->fillRoundRect(bx, by, bw, bh, 4, UI_TRACK_TEXT);
-    int fw = (bw - 4) * pct / 100;
-    if (fw > 0)
-      gfx->fillRoundRect(bx + 2, by + 2, fw, bh - 4, 3, pct >= 100 ? UI_BAR_OK : UI_BAR_WARN);
-  }
-
-  // Fun Pack: the fourth row opens the games that are just for fun
-  int my = TRAIN_ROW_Y(3);
-  gfx->fillRoundRect(TRAIN_X + 18, my, TRAIN_W - 36, TRAIN_ROW_H, 12, UI_BAR_WARN);
-  gfx->drawRoundRect(TRAIN_X + 18, my, TRAIN_W - 36, TRAIN_ROW_H, 12, UI_INK);
-  uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, my, TRAIN_ROW_H), T(S_CAT_FUN), UI_INK, 1, TRAIN_W - 64);
-  gfx->flush();   // without this the panel never updates and the screen freezes
-}
+void renderTrain() { renderGamesGrid(); }   // six category tiles: see the phase 15 code
 
 // ---------- the box ----------
 // Storage past the six that fight. A creature is moved by picking a party slot
@@ -7857,7 +7823,7 @@ static int bathBubbleY(int i, uint32_t now) { return bubbles[i].y - (int)((now -
 void bathBubblePos(int i, int *x, int *y) { uint32_t now = millis(); *x = bathBubbleX(i, now / 220.0f); *y = bathBubbleY(i, now); }
 
 void startBath() {
-  if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil) return;
+  if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil || pet.atWork()) return;
   uint32_t now = millis();
   bathUntil = now + 3000;
   bathPending = true;
@@ -8065,6 +8031,7 @@ void behNext() {
 }
 
 void drawPetPMD() {
+  if (pet.atWork()) { drawAwaySign(); return; }
   uint32_t now = millis();
 
   if (pet.evolving()) {
@@ -8104,9 +8071,11 @@ void drawPetPMD() {
     if (!pmd.has(act)) act = PMD_IDLE;
   }
 
+  drawAccBack();                       // a cape or wings go behind it (placed by the last frame)
   drawPmdActZ(pmd, act, (int)beh.x, PET_GROUND, now - beh.t0, loop || act == PMD_IDLE, false, 5,
               PET_ZOOM, PET_MAX_PX);
   drawHat(act);
+  drawAccFront();
 
   if (pet.showHeart()) {
     int hx, hy;
@@ -8296,6 +8265,7 @@ void drawHeartFloat(int hx, int hy) {
 }
 
 const char *statusMsg() {
+  if (pet.atWork()) return T(S_AT_WORK);
   if (pet.evolving()) return T(S_EVOLVING);
   if (bathUntil) return "Splish splash!";  // universal onomatopoeia
   if (pet.sleeping) return pet.lightOn ? T(S_ST_LIGHT) : "";   // the Zs say the rest
@@ -8312,6 +8282,7 @@ const char *statusMsg() {
   if (pet.isBored()) return T(S_ST_BORED);
   if (pet.weight > 60) return T(S_CHUBBY);
   if (pet.isExcited()) return T(S_ST_EXCITED);
+  if (pet.wearingSet() >= 0) return T(S_ST_STYLISH);
   if (pet.shiny && pet.ageMinutes < 15) return T(S_IS_SHINY);
   return T(S_HAPPY);
 }
@@ -8414,17 +8385,19 @@ void drawMap(const char *const *map, int n, int x, int y, int s, bool silhouette
 #define FPM_Y 76
 #define FPM_W 340
 #define FPM_H 316
-#define FPM_ROWS 4
+#define FPM_ROWS 5
 #define FPM_ROW_H 56
 #define FPM_ROW_Y(i) (FPM_Y + 56 + (i) * (FPM_ROW_H + 8))
-enum : uint8_t { FP_CAT_ATK = 0, FP_CAT_SPE, FP_CAT_DEF, FP_CAT_FUN, FP_CAT_COUNT };
+enum : uint8_t { FP_CAT_ATK = 0, FP_CAT_SPE, FP_CAT_DEF, FP_CAT_BRAIN, FP_CAT_FUN, FP_CAT_ARCADE, FP_CAT_COUNT };
 // an entry is a MINI_* game, or one of the original three
 enum : uint8_t { FP_G_BAG = 100, FP_G_REACT, FP_G_BALL, FP_G_NONE = 255 };
 static const uint8_t FP_CATS[FP_CAT_COUNT][FPM_ROWS] = {
-  { FP_G_BAG,   MINI_MOLE,  MINI_MAZE,   FP_G_NONE },   // strength
-  { FP_G_REACT, MINI_DROP,  MINI_ROPE,   MINI_FLAPPY },  // speed
-  { FP_G_BALL,  MINI_WHO,   MINI_MEMORY, MINI_SIMON },   // defence
-  { MINI_DANCE, MINI_HIDE,  MINI_LR,    MINI_HL   },   // fun: joy and bond
+  { FP_G_BAG,   MINI_MOLE,    MINI_MAZE,    MINI_BALLOON, FP_G_NONE  },   // strength
+  { FP_G_REACT, MINI_DROP,    MINI_ROPE,    MINI_FLAPPY,  MINI_SHAKE },   // speed
+  { FP_G_BALL,  MINI_CATCH,   MINI_BALANCE, FP_G_NONE,    FP_G_NONE  },   // defence
+  { MINI_WHO,   MINI_MEMORY,  MINI_SIMON,   MINI_QUIZ,    MINI_SLIDE },   // brain
+  { MINI_DANCE, MINI_HIDE,    MINI_LR,      MINI_HL,      FP_G_NONE  },   // fun: joy and bond
+  { MINI_BUBBLES, MINI_DRAW,  FP_G_NONE,    FP_G_NONE,    FP_G_NONE  },   // arcade
 };
 
 // shared state (only one game is open at a time)
@@ -8507,7 +8480,8 @@ static StrId fpGainFmt(uint8_t g) {
 static StrId fpTitle(uint8_t g) {
   static const StrId T_[MINI_COUNT] = {
     S_GAME_LR, S_GAME_HL, S_GAME_WHO, S_GAME_DROP, S_GAME_MOLE, S_GAME_ROPE, S_GAME_DANCE, S_GAME_HIDE,
-    S_GAME_MEMORY, S_GAME_SIMON, S_GAME_FLAPPY, S_GAME_MAZE
+    S_GAME_MEMORY, S_GAME_SIMON, S_GAME_FLAPPY, S_GAME_MAZE,
+    S_GAME_BALLOON, S_GAME_SHAKE, S_GAME_CATCH, S_GAME_BALANCE, S_GAME_QUIZ, S_GAME_SLIDE, S_GAME_BUBBLES, S_GAME_DRAW
   };
   return T_[g % MINI_COUNT];
 }
@@ -8524,6 +8498,7 @@ void fpShowToast(uint16_t s, uint16_t color) {
 // THE single answer to "may it play/train/fight right now?", asked by every
 // entry point so the rule cannot be enforced in one and forgotten in its twin.
 bool fpBlockedBySick() {
+  if (pet.atWork()) { sfxPlay(SFX_DENY); fpShowToast(S_AT_WORK, UI_BAR_WARN); return true; }
   if (parentBlocksPlay()) return true;
   if (!pet.isSick()) return false;
   sfxPlay(SFX_DENY);
@@ -9173,7 +9148,7 @@ static void hideRender(uint32_t now) {
 // ---------- the game lists ----------
 
 static StrId fpCatTitle(uint8_t c) {
-  static const StrId T_[FP_CAT_COUNT] = { S_TR_ATK, S_TR_SPE, S_TR_DEF, S_CAT_FUN };
+  static const StrId T_[FP_CAT_COUNT] = { S_TR_ATK, S_TR_SPE, S_TR_DEF, S_CAT_BRAIN, S_CAT_FUN, S_CAT_ARCADE };
   return T_[c % FP_CAT_COUNT];
 }
 
@@ -9191,38 +9166,8 @@ static uint16_t fpEntryRecord(uint8_t e) {
   return e < MINI_COUNT ? pet.miniHi[e] : 0;
 }
 
-void renderFunMenu() {
-  uint8_t c = (fpMenuCat - 1) % FP_CAT_COUNT;
-  for (int y = 0; y < 466; y += 2)
-    gfx->drawFastHLine(0, y, 466, gNight ? 0x0000 : 0x2104);
-  gfx->fillRoundRect(FPM_X, FPM_Y, FPM_W, FPM_H, 18, UI_WHITE);
-  gfx->drawRoundRect(FPM_X, FPM_Y, FPM_W, FPM_H, 18, UI_INK);
-  uiTextFit(UIF_MID, CX, FPM_Y + 38, T(fpCatTitle(c)), UI_INK, 1, FPM_W - 80);
-  for (int i = 0; i < FPM_ROWS; i++) {
-    uint8_t e = FP_CATS[c][i];
-    if (e == FP_G_NONE) continue;
-    int y = FPM_ROW_Y(i);
-    gfx->fillRoundRect(FPM_X + 18, y, FPM_W - 36, FPM_ROW_H, 12, UI_BG_DAY);
-    gfx->drawRoundRect(FPM_X + 18, y, FPM_W - 36, FPM_ROW_H, 12, UI_INK);
-    uiTextFit(UIF_SMALL, FPM_X + 32, uiMidY(UIF_SMALL, y, FPM_ROW_H), T(fpEntryName(e)), UI_INK, 0, 190);
-    char rec[16];
-    snprintf(rec, sizeof(rec), T(S_REC_FMT), fpEntryRecord(e));
-    uiTextFit(UIF_TINY, FPM_X + FPM_W - 32, uiMidY(UIF_TINY, y, FPM_ROW_H), rec, UI_INK, 2, 90);
-  }
-  gfx->flush();
-}
 
 // -1 = outside the panel, -2 = inside but on no game, else the entry
-int funMenuHit(int16_t x, int16_t y) {
-  if (x < FPM_X || x > FPM_X + FPM_W || y < FPM_Y || y > FPM_Y + FPM_H) return -1;
-  uint8_t c = (fpMenuCat - 1) % FP_CAT_COUNT;
-  for (int i = 0; i < FPM_ROWS; i++) {
-    int ry = FPM_ROW_Y(i);
-    if (FP_CATS[c][i] == FP_G_NONE) continue;
-    if (x >= FPM_X + 18 && x <= FPM_X + FPM_W - 18 && y >= ry && y <= ry + FPM_ROW_H) return FP_CATS[c][i];
-  }
-  return -2;
-}
 
 void funMenuTap(int16_t x, int16_t y) {
   int e = funMenuHit(x, y);
@@ -9288,6 +9233,14 @@ void startFunPackGame(uint8_t g) {
     case MINI_SIMON: fpLives = 3; simStart(); break;
     case MINI_FLAPPY: flyStart(); break;
     case MINI_MAZE: mazeStart(); break;
+    case MINI_BALLOON: balloonStart(); break;
+    case MINI_SHAKE: shakeStart(); break;
+    case MINI_CATCH: catchStart(); break;
+    case MINI_BALANCE: balanceStart(); break;
+    case MINI_QUIZ: quizStartGame(); break;
+    case MINI_SLIDE: slideStart(); break;
+    case MINI_BUBBLES: bubblesStart(); break;
+    case MINI_DRAW: drawStart(); break;
   }
   sfxPlay(SFX_TAP);
 }
@@ -9304,7 +9257,7 @@ void fpTap(int16_t x, int16_t y) {
     case MINI_ROPE: ropeTap(x, y); break;
     case MINI_DANCE: danceTap(x, y); break;
     case MINI_HIDE: hideTap(x, y); break;
-    default: fpTapPhase12(x, y); break;
+    default: if (!fpTapPhase12(x, y)) fpTapPhase15(x, y); break;
   }
 }
 
@@ -9348,7 +9301,7 @@ void renderFunPack() {
     case MINI_ROPE: ropeRender(now); break;
     case MINI_DANCE: danceRender(now); break;
     case MINI_HIDE: hideRender(now); break;
-    default: fpRenderPhase12(now); break;
+    default: if (!fpRenderPhase12(now)) fpRenderPhase15(now); break;
   }
   // a game that just finished drew nothing this frame: show the result now
   if (fpOverUntil) fpRenderResult();
@@ -9440,6 +9393,8 @@ static StrId missionText(uint8_t m) {
 
 void renderMissions() {
   drawPanelBase();
+  drawQuestButton();
+  if (questView) { renderQuest(); return; }
   uiTextFit(UIF_MID, CX, PANEL_Y + 38, T(S_MISSIONS_TITLE), UI_INK, 1, PANEL_W - 60);
   for (uint8_t i = 0; i < MISSIONS_PER_DAY; i++) {
     uint8_t m = pet.missionAt(i);
@@ -9624,6 +9579,7 @@ void hubTap(int16_t x, int16_t y) {
     case 3: piggyOpen = true; break;
     case 4: trophyOpen = true; trophyPage = 0; break;
     case 5: diaryOpen = true; diaryPage = 0; break;
+    case 7: mailOpen = true; mailShown = pet.openMail(); break;
     default: walletOpen = true; break;
   }
 }
@@ -9634,7 +9590,8 @@ void hubTap(int16_t x, int16_t y) {
 // hats, or a run of DecorId.
 
 enum : uint8_t { CAT_HATS = 0, CAT_TOYS, CAT_DECOR, CAT_FOOD, CAT_CARE, CAT_SCENE, CAT_FURN, CAT_COUNT };
-static const StrId CAT_NAME[CAT_COUNT] = { S_HATS, S_TOYS, S_DECOR, S_FOOD_TITLE, S_CARE, S_SCENERY, S_FURNITURE };
+static StrId accName(uint8_t a);   // with the wardrobe code
+static const StrId CAT_NAME[CAT_COUNT] = { S_WARDROBE, S_TOYS, S_DECOR, S_FOOD_TITLE, S_CARE, S_SCENERY, S_FURNITURE };
 static StrId furnName(uint8_t f) {
   static const StrId T_[FURN_COUNT] = {
     S_FURN_WINDOW, S_FURN_CLOCK, S_FURN_PAINTING, S_FURN_SHELF, S_FURN_SOFA, S_FURN_TV, S_FURN_AQUARIUM,
@@ -9651,7 +9608,7 @@ extern uint32_t bathUntil;
 bool feedFromBag(uint8_t f);   // defined with the food menu
 
 static uint8_t catCount(uint8_t c) {
-  return c == CAT_HATS ? HAT_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_COUNT - DEC_TOY_COUNT
+  return c == CAT_HATS ? HAT_COUNT + ACC_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_COUNT - DEC_TOY_COUNT
        : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : 3;   // CARE: the soap, the brush, garden seeds
 }
 static uint8_t catPages(uint8_t c) { return (catCount(c) + SHOP_PER_PAGE - 1) / SHOP_PER_PAGE; }
@@ -9670,18 +9627,21 @@ static const char *const *catIcon(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? SPR_CARE_SOAP : id == 1 ? SPR_CARE_BRUSH : SPR_PLACE_SEED;
   if (c == CAT_SCENE) return id == SCENERY_ROOM ? SPR_FURN_WINDOW : SPR_PLACE_TREE;
   if (c == CAT_FURN) return SPR_FURN[id];
+  if (c == CAT_HATS && id >= HAT_COUNT) return SPR_ACC[id - HAT_COUNT];   // past the hats: the accessories
   return c == CAT_HATS ? SPR_HATS[id] : c == CAT_FOOD ? SPR_FOODS[id] : SPR_DECOR[id];
 }
 static StrId catName(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? S_SOAP : id == 1 ? S_BRUSH_ITEM : S_SEED;
   if (c == CAT_SCENE) return sceneryName(id);
   if (c == CAT_FURN) return furnName(id);
+  if (c == CAT_HATS && id >= HAT_COUNT) return accName(id - HAT_COUNT);
   return c == CAT_HATS ? hatName(id) : c == CAT_FOOD ? foodName(id) : decorName(id);
 }
 static uint16_t catPrice(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? SOAP_PRICE : id == 1 ? BRUSH_PRICE : SEED_PRICE;
   if (c == CAT_SCENE) return Pet::sceneryPrice(id);
   if (c == CAT_FURN) return Pet::furnPrice(id);
+  if (c == CAT_HATS && id >= HAT_COUNT) return Pet::accPrice(id - HAT_COUNT);
   return c == CAT_HATS ? Pet::hatPrice(id) : c == CAT_FOOD ? Pet::foodInfo(id).price : Pet::decorPrice(id);
 }
 // Foods are bought by the serving: never "owned" in the shop, always buyable.
@@ -9690,17 +9650,20 @@ static bool catOwned(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? pet.soapCount > 0 : id == 1 ? pet.brushOwned : pet.seedCount > 0;
   if (c == CAT_SCENE) return pet.ownsScenery(id);
   if (c == CAT_FURN) return pet.ownsFurn(id);
+  if (c == CAT_HATS && id >= HAT_COUNT) return pet.ownsAcc(id - HAT_COUNT);
   return c == CAT_HATS ? pet.ownsHat(id) : c == CAT_FOOD ? pet.foodCount[id] > 0 : pet.ownsDecor(id);
 }
 static bool catInUse(uint8_t c, uint8_t id) {
   if (c == CAT_SCENE) return pet.sceneryPick == (int8_t)id;
   if (c == CAT_FURN) return pet.furnPlaced(id);
+  if (c == CAT_HATS && id >= HAT_COUNT) return pet.wearingAcc(id - HAT_COUNT);
   return c == CAT_HATS ? pet.hatOn == (int8_t)id : (c == CAT_FOOD || c == CAT_CARE) ? false : pet.hasDecorOut(id);
 }
 static bool catBuy(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? pet.buySoap() : id == 1 ? pet.buyBrush() : pet.buySeed();
   if (c == CAT_SCENE) return pet.buyScenery(id);
   if (c == CAT_FURN) return pet.buyFurn(id);
+  if (c == CAT_HATS && id >= HAT_COUNT) return pet.buyAcc(id - HAT_COUNT);
   return c == CAT_HATS ? pet.buyHat(id) : c == CAT_FOOD ? pet.buyFood(id) : pet.buyDecor(id);
 }
 // the row label: a food shows how many servings are in the bag
@@ -9714,7 +9677,8 @@ static const char *catLabel(uint8_t c, uint8_t id, char *buf, size_t n) {
 }
 // wear / take off a hat, put out / pick up a toy or decoration
 static void catUse(uint8_t c, uint8_t id) {
-  if (c == CAT_HATS) pet.wearHat(pet.hatOn == (int8_t)id ? -1 : (int8_t)id);
+  if (c == CAT_HATS && id >= HAT_COUNT) pet.wearAcc(id - HAT_COUNT);
+  else if (c == CAT_HATS) pet.wearHat(pet.hatOn == (int8_t)id ? -1 : (int8_t)id);
   else if (c == CAT_SCENE) pet.pickScenery((int8_t)id);   // again: back to its own
   else if (c == CAT_FURN) pet.placeFurn(id);              // and off to the room to see it
   else if (c == CAT_FOOD) { if (feedFromBag(id)) bagOpen = false; }   // eat it, and watch
@@ -9851,7 +9815,7 @@ static uint8_t bagEntries(int8_t *out, uint8_t max) {
   }
   return n;
 }
-#define BAG_MAX (HAT_COUNT + 2)
+#define BAG_MAX (HAT_COUNT + ACC_COUNT + 2)
 
 void renderBag() {
   if (bagCat < 0) { drawCatList(S_BAG); return; }
@@ -10352,7 +10316,8 @@ void drawBathDuck() {
 #define DEX_MEOWTH 52             // the shopkeeper
 #define DEX_CHANSEY 113           // the nurse
 enum : uint8_t { PLACE_NONE = 0, PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_TEETH,
-                 PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN };
+                 PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN,
+                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS };
 
 uint32_t placeAnimUntil = 0;      // the park walk animation
 uint32_t placeMsgUntil = 0;
@@ -10384,6 +10349,7 @@ void mapMenuTap(int16_t x, int16_t y) {
   if (pl < 0) return;
   sfxPlay(SFX_TAP);
   mapOpen = false;
+  if (pl == PLACE_ARCADE) { if (!fpBlockedBySick()) trainOpen = true; return; }   // the arcade is the games menu
   schoolReset();
   enterPlaceFamily();
   placeScene = (uint8_t)pl;
@@ -11025,6 +10991,7 @@ static void teethTap(int16_t x, int16_t y) {
 
 // the scenes added after the garden: one entry point for each of render / tap
 bool renderPlaceExtra() {
+  if (renderPlaceTown()) return true;     // beach, library, music, contest, jobs
   if (renderPlaceFamily()) return true;   // the lake, adventures, the kitchen
   if (placeScene == PLACE_SCHOOL) renderSchool();
   else if (placeScene == PLACE_TEETH) renderTeeth();
@@ -11036,6 +11003,7 @@ bool renderPlaceExtra() {
 }
 
 bool placeTapExtra(int16_t x, int16_t y) {
+  if (placeTapTown(x, y)) return true;
   if (placeTapFamily(x, y)) return true;
   if (placeScene == PLACE_SCHOOL) { schoolTap(x, y); return true; }
   if (placeScene == PLACE_TEETH) { teethTap(x, y); return true; }
@@ -11220,10 +11188,10 @@ void drawTalk() {
 #define TILE_W 148
 #define TILE_H 52
 #define TILE_X(c) ((c) ? CX + 4 : CX - 152)
-#define MAP_TILE_Y(r) (PANEL_Y + 52 + (r) * 60)
+#define MAP_TILE_Y(r) (PANEL_Y + 52 + (r) * 58)
 #define HUB_TILE_Y(r) (PANEL_Y + 74 + (r) * 58)
 #define MAP_TILES 8
-#define HUB_TILES 7
+#define HUB_TILES 8
 
 static void drawTile(int x, int y, const char *const *icon, StrId label, uint16_t fill) {
   gfx->fillRoundRect(x, y, TILE_W, TILE_H, 12, fill);
@@ -11240,25 +11208,40 @@ static int tileHit(int16_t x, int16_t y, int n, bool hub) {
   return -1;
 }
 
-static const uint8_t MAP_PLACE[MAP_TILES] = { PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN };
+static const uint8_t MAP_PLACE[2][MAP_TILES] = {
+  { PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN },
+  { PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NONE, PLACE_NONE },
+};
 
 void renderMapGrid() {
   drawMenuTitle(S_MAP_TITLE);
-  static const char *const *const ICON[MAP_TILES] = { SPR_PLACE_TREE, SPR_ICON_COIN, SPR_PLACE_CROSS, SPR_PLACE_SPROUT, SPR_ICON_MISSION, SPR_PLACE_FISH, SPR_PLACE_FLAG, SPR_PLACE_POT };
-  static const StrId NAME[MAP_TILES] = { S_PLACE_PARK, S_SHOP, S_CENTER_SHORT, S_PLACE_GARDEN, S_PLACE_SCHOOL, S_PLACE_LAKE, S_PLACE_ADVENTURE, S_PLACE_KITCHEN };
+  static const char *const *const ICON[2][MAP_TILES] = {
+    { SPR_PLACE_TREE, SPR_ICON_COIN, SPR_PLACE_CROSS, SPR_PLACE_SPROUT, SPR_ICON_MISSION, SPR_PLACE_FISH, SPR_PLACE_FLAG, SPR_PLACE_POT },
+    { SPR_DEC_DUCK, SPR_ICON_DIARY, SPR_CARE_NOTE, SPR_ACC_MEDAL, SPR_CAT_ARCADE, SPR_FURN_CLOCK, nullptr, nullptr },
+  };
+  static const StrId NAME[2][MAP_TILES] = {
+    { S_PLACE_PARK, S_SHOP, S_CENTER_SHORT, S_PLACE_GARDEN, S_PLACE_SCHOOL, S_PLACE_LAKE, S_PLACE_ADVENTURE, S_PLACE_KITCHEN },
+    { S_PLACE_BEACH, S_PLACE_LIBRARY, S_PLACE_MUSIC, S_PLACE_CONTEST, S_PLACE_ARCADE, S_PLACE_JOBS, S_PLACE_JOBS, S_PLACE_JOBS },
+  };
   uint16_t lit = lerp565(UI_BAR_OK, UI_WHITE, 4, 8);
+  uint8_t pg = mapPage % 2;
   for (int i = 0; i < MAP_TILES; i++) {
-    bool hot = (i == 3 && pet.gardenReady()) || (i == 6 && pet.advReady());
-    drawTile(TILE_X(i % 2), MAP_TILE_Y(i / 2), ICON[i], NAME[i], hot ? lit : UI_BG_DAY);
+    if (MAP_PLACE[pg][i] == PLACE_NONE) continue;
+    bool hot = pg == 0 && ((i == 3 && pet.gardenReady()) || (i == 6 && pet.advReady()));
+    drawTile(TILE_X(i % 2), MAP_TILE_Y(i / 2), ICON[pg][i], NAME[pg][i], hot ? lit : UI_BG_DAY);
   }
+  drawPageNav(pg, 2);
   gfx->flush();
 }
 
 // -1 outside the panel (close), -2 inside on nothing, else the PLACE_*
 int mapGridHit(int16_t x, int16_t y) {
   if (!inPanel(x, y)) return -1;
+  int nav = pageNavHit(x, y, 2);
+  if (nav) { mapPage = (uint8_t)((mapPage + 2 + nav) % 2); sfxPlay(SFX_TAP); return -2; }
   int i = tileHit(x, y, MAP_TILES, false);
-  return i < 0 ? -2 : MAP_PLACE[i];
+  if (i < 0 || MAP_PLACE[mapPage % 2][i] == PLACE_NONE) return -2;
+  return MAP_PLACE[mapPage % 2][i];
 }
 
 // the purse: SHOP, BAG, CHORES, PIGGY BANK, TROPHIES, DIARY, HOW TO EARN
@@ -11270,10 +11253,11 @@ void renderHubGrid() {
   char c[12];
   snprintf(c, sizeof(c), "%lu", (unsigned long)pet.coins);
   uiText(UIF_BIG, CX - 30, PANEL_Y + 54, c, UI_INK, 0);
-  static const char *const *const ICON[HUB_TILES] = { SPR_ICON_COIN, SPR_DEC_GIFT, SPR_ICON_CHORES, SPR_ICON_PIGGY, nullptr, SPR_ICON_DIARY, nullptr };
-  static const StrId NAME[HUB_TILES] = { S_SHOP, S_BAG, S_CHORES, S_PIGGY, S_TROPHIES, S_DIARY, S_EARN_TITLE };
+  static const char *const *const ICON[HUB_TILES] = { SPR_ICON_COIN, SPR_DEC_GIFT, SPR_ICON_CHORES, SPR_ICON_PIGGY, nullptr, SPR_ICON_DIARY, nullptr, SPR_ICON_MISSION };
+  static const StrId NAME[HUB_TILES] = { S_SHOP, S_BAG, S_CHORES, S_PIGGY, S_TROPHIES, S_DIARY, S_EARN_TITLE, S_MAIL };
   for (int i = 0; i < HUB_TILES; i++)
-    drawTile(TILE_X(i % 2), HUB_TILE_Y(i / 2), ICON[i], NAME[i], i == 0 ? UI_BAR_WARN : UI_BG_DAY);
+    drawTile(TILE_X(i % 2), HUB_TILE_Y(i / 2), ICON[i], NAME[i], i == 0 ? UI_BAR_WARN : (i == 7 && pet.hasMail()) ? lerp565(UI_BAR_OK, UI_WHITE, 4, 8) : UI_BG_DAY);
+  if (pet.hasMail()) { int bx = TILE_X(1) + TILE_W - 10, by = HUB_TILE_Y(3) + 8; gfx->fillCircle(bx, by, 8, UI_BAR_BAD); uiText(UIF_TINY, bx, by + 5, "1", UI_WHITE, 1); }
   gfx->flush();
 }
 
@@ -12283,5 +12267,955 @@ void drawEvents() {
         }
       }
     }
+  }
+}
+
+// ===========================================================================
+// Phase 15: the games menu as a grid of six categories, and eight more games.
+// BALLOON trains STRENGTH, SHAKE trains SPEED, CATCH and BALANCE train DEFENCE;
+// the type QUIZ, the SLIDE puzzle, BUBBLES and DRAW are for joy and bond.
+// ===========================================================================
+
+// ---------- the games menu: six tiles, then a list ----------
+
+#define GM_TILE_W 148
+#define GM_TILE_H 70
+#define GM_TILE_X(c) ((c) ? CX + 4 : CX - 152)
+#define GM_TILE_Y(r) (PANEL_Y + 56 + (r) * 80)
+#define GL_ROW_Y(i) (PANEL_Y + 56 + (i) * 50)
+#define GL_ROW_H 44
+
+static const char *const *catIconOf(uint8_t c) {
+  static const char *const *const I[FP_CAT_COUNT] = { SPR_CAT_STRENGTH, SPR_CAT_SPEED, SPR_CAT_DEFENCE, SPR_CAT_BRAIN, SPR_CAT_FUN, SPR_CAT_ARCADE };
+  return I[c % FP_CAT_COUNT];
+}
+
+void renderGamesGrid() {
+  drawPanelBase();
+  uiTextFit(UIF_MID, CX, PANEL_Y + 36, T(S_GAMES), UI_INK, 1, PANEL_W - 80);
+  const uint8_t cur[3] = { pet.trAtk, pet.trSpe, pet.trDef };
+  const uint8_t cap[3] = { pet.trMaxAtk(), pet.trMaxSpe(), pet.trMaxDef() };
+  for (int c = 0; c < FP_CAT_COUNT; c++) {
+    int x = GM_TILE_X(c % 2), y = GM_TILE_Y(c / 2);
+    gfx->fillRoundRect(x, y, GM_TILE_W, GM_TILE_H, 14, UI_BG_DAY);
+    gfx->drawRoundRect(x, y, GM_TILE_W, GM_TILE_H, 14, UI_INK);
+    drawMap(catIconOf(c), 16, x + 8, y + 8, 2, false);
+    uiTextFit(UIF_SMALL, x + 46, y + 30, T(fpCatTitle(c)), UI_INK, 0, GM_TILE_W - 52);
+    if (c < 3) {                                           // the stat it trains, and how far along
+      uint8_t pct = trainPct(cur[c], cap[c]);
+      int bx = x + 46, bw = GM_TILE_W - 58, by = y + 44;
+      gfx->fillRoundRect(bx, by, bw, 10, 4, UI_TRACK_TEXT);
+      int fw = (bw - 4) * pct / 100;
+      if (fw > 0) gfx->fillRoundRect(bx + 2, by + 2, fw, 6, 3, pct >= 100 ? UI_BAR_OK : UI_BAR_WARN);
+    }
+  }
+  gfx->flush();
+}
+
+void gamesGridTap(int16_t x, int16_t y) {
+  if (!inPanel(x, y)) { trainOpen = false; return; }      // outside: back to the pet
+  for (int c = 0; c < FP_CAT_COUNT; c++) {
+    int tx = GM_TILE_X(c % 2), ty = GM_TILE_Y(c / 2);
+    if (x < tx || x > tx + GM_TILE_W || y < ty || y > ty + GM_TILE_H) continue;
+    sfxPlay(SFX_TAP);
+    trainOpen = false;
+    fpMenuCat = (uint8_t)(c + 1);
+    return;
+  }
+}
+
+void renderFunMenu() {
+  uint8_t c = (fpMenuCat - 1) % FP_CAT_COUNT;
+  drawPanelBase();
+  drawMap(catIconOf(c), 16, PANEL_X + 22, PANEL_Y + 14, 2, false);
+  uiTextFit(UIF_MID, CX + 10, PANEL_Y + 38, T(fpCatTitle(c)), UI_INK, 1, PANEL_W - 110);
+  for (int i = 0; i < FPM_ROWS; i++) {
+    uint8_t e = FP_CATS[c][i];
+    if (e == FP_G_NONE) continue;
+    int y = GL_ROW_Y(i);
+    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_BG_DAY);
+    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_INK);
+    uiTextFit(UIF_SMALL, PANEL_X + 30, uiMidY(UIF_SMALL, y, GL_ROW_H), T(fpEntryName(e)), UI_INK, 0, 190);
+    char rec[16];
+    snprintf(rec, sizeof(rec), T(S_REC_FMT), fpEntryRecord(e));
+    uiTextFit(UIF_TINY, PANEL_X + PANEL_W - 28, uiMidY(UIF_TINY, y, GL_ROW_H), rec, UI_TRACK_TEXT, 2, 90);
+  }
+  gfx->flush();
+}
+
+// -1 = outside the panel, -2 = inside but on no game, else the entry
+int funMenuHit(int16_t x, int16_t y) {
+  if (!inPanel(x, y)) return -1;
+  uint8_t c = (fpMenuCat - 1) % FP_CAT_COUNT;
+  for (int i = 0; i < FPM_ROWS; i++) {
+    int ry = GL_ROW_Y(i);
+    if (FP_CATS[c][i] == FP_G_NONE) continue;
+    if (x >= PANEL_X + 14 && x <= PANEL_X + PANEL_W - 14 && y >= ry && y <= ry + GL_ROW_H) return FP_CATS[c][i];
+  }
+  return -2;
+}
+
+// ---------- balloon pop: pop the balloons, not the bombs ----------
+
+#define BAL_MAX 8
+#define BAL_GAME_MS 30000UL
+struct Balloon { float x, y, v; uint8_t col; bool bomb, alive; };
+Balloon bal[BAL_MAX];
+uint32_t balSpawnAt = 0, balLastMs = 0;
+static const uint16_t BAL_COL[4] = { C565(0xe8, 0x50, 0x3a), C565(0x4f, 0x93, 0xc4), C565(0xff, 0xcb, 0x05), C565(0x58, 0xb8, 0x68) };
+
+void balloonStart() {
+  for (int i = 0; i < BAL_MAX; i++) bal[i].alive = false;
+  uint32_t now = millis();
+  balSpawnAt = now + 300; balLastMs = now;
+  fpEndAt = now + BAL_GAME_MS;
+}
+
+static void balloonTap(int16_t x, int16_t y) {
+  for (int i = 0; i < BAL_MAX; i++) {
+    if (!bal[i].alive) continue;
+    float dx = x - bal[i].x, dy = y - bal[i].y;
+    if (dx * dx + dy * dy > 30 * 30) continue;
+    bal[i].alive = false;
+    if (bal[i].bomb) fpLoseLife(MINI_BALLOON);
+    else fpPoint(1);
+    return;
+  }
+}
+
+static void balloonRender(uint32_t now) {
+  if (fpReached(now, fpEndAt)) { fpFinish(MINI_BALLOON); return; }
+  uint32_t dt = now - balLastMs; if (dt > 60) dt = 60; balLastMs = now;
+  if (fpReached(now, balSpawnAt)) {
+    for (int i = 0; i < BAL_MAX; i++) if (!bal[i].alive) {
+      bal[i] = { (float)(110 + random(246)), 400.0f, 0.06f + fpScore * 0.002f + random(30) / 1000.0f, (uint8_t)random(4), random(100) < 18, true };
+      break;
+    }
+    balSpawnAt = now + 650 - (fpScore > 40 ? 300 : fpScore * 7);
+  }
+  drawGameScene();
+  for (int i = 0; i < BAL_MAX; i++) {
+    if (!bal[i].alive) continue;
+    bal[i].y -= bal[i].v * dt;
+    if (bal[i].y < 96) { bal[i].alive = false; continue; }   // floated away
+    int x = (int)bal[i].x, y = (int)bal[i].y;
+    if (bal[i].bomb) {
+      gfx->fillCircle(x, y, 20, UI_INK);
+      gfx->fillCircle(x - 7, y - 7, 4, C565(0x78, 0x7e, 0x8c));
+      gfx->drawLine(x + 10, y - 16, x + 16, y - 26, C565(0xb0, 0x7a, 0x45));
+      if ((now / 120) % 2) gfx->fillCircle(x + 16, y - 27, 4, UI_BAR_WARN);
+    } else {
+      fpEllipse(x, y, 20, 25, BAL_COL[bal[i].col]);
+      gfx->fillCircle(x - 7, y - 9, 4, UI_WHITE);
+      gfx->drawLine(x, y + 25, x + (int)(sinf(now * 0.006f + i) * 5), y + 50, UI_INK);
+    }
+  }
+  fpHeader(MINI_BALLOON, S_BALLOON_HINT);
+  fpTimeBar(now, fpEndAt, BAL_GAME_MS, 386);
+  gfx->flush();
+}
+
+// ---------- shake race: shake the ball (or tap fast) to win the race ----------
+
+#define RACE_LEN 100.0f
+float raceMe = 0, raceRival = 0, raceRivalV = 0;
+int16_t raceRivalDex = 19;
+float raceLastMag = 1.0f;
+uint32_t raceLastMs = 0, raceWaitUntil = 0;
+
+static void raceNew(uint32_t now) {
+  raceMe = 0; raceRival = 0;
+  raceRivalV = 0.010f + fpScore * 0.0015f;                 // each rival a little quicker
+  int16_t d = 0;
+  for (int t = 0; t < 40 && !d; t++) { int16_t c = (int16_t)(1 + random(DEX_COUNT)); if (regionAvailable(regionOfDex(c)) && thumbs.get(c)) d = c; }
+  raceRivalDex = d ? d : 19;
+  raceWaitUntil = now + 1200;                              // ready... go
+  raceLastMs = now;
+}
+
+void shakeStart() { raceNew(millis()); }
+
+static void shakeTap(int16_t, int16_t) { if (!fpReached(millis(), raceWaitUntil)) return; raceMe += 2.2f; sfxPlay(SFX_TAP); }
+
+static void shakeRender(uint32_t now) {
+  uint32_t dt = now - raceLastMs; if (dt > 60) dt = 60; raceLastMs = now;
+  bool go = fpReached(now, raceWaitUntil);
+  if (go) {
+    float mag = sqrtf(gAccX * gAccX + gAccY * gAccY + gAccZ * gAccZ);
+    if (gAccFresh && fabsf(mag - raceLastMag) > 0.35f) raceMe += fabsf(mag - raceLastMag) * 2.0f;   // a shake
+    raceLastMag = mag;
+    raceRival += raceRivalV * dt;
+    if (raceMe >= RACE_LEN) { fpPoint(1); sfxPlay(SFX_MEDAL); raceNew(now); }
+    else if (raceRival >= RACE_LEN) { fpLoseLife(MINI_SHAKE); if (fpOverUntil) return; raceNew(now); }
+  }
+  drawGameScene();
+  for (int lane = 0; lane < 2; lane++) {                   // two lanes and a finish line
+    int y = 200 + lane * 90;
+    gfx->fillRect(60, y + 30, 346, 4, lerp565(UI_WHITE, UI_INK, 2, 8));
+  }
+  for (int k = 0; k < 6; k++) gfx->fillRect(394, 170 + k * 22, 8, 11, (k % 2) ? UI_INK : UI_WHITE);
+  int mx = 70 + (int)(raceMe / RACE_LEN * 320), rx = 70 + (int)(raceRival / RACE_LEN * 320);
+  fpThumb(pet.isEgg() ? 16 : pet.speciesId, mx, 210, 1, false);
+  fpThumb(raceRivalDex, rx, 300, 1, false);
+  if (!go) uiText(UIF_BIG, CX, 150, (raceWaitUntil - now) > 600 ? "3, 2..." : "GO!", fpInk(), 1);
+  fpHeader(MINI_SHAKE, S_SHAKE_HINT);
+  gfx->flush();
+}
+
+// ---------- catch: move the ball under the falling Pokemon, dodge Voltorb ----------
+
+#define CT_MAX 5
+#define CT_GAME_MS 45000UL
+struct Faller { float x, y, v; int16_t dex; bool bad, alive; };
+Faller ct[CT_MAX];
+float ctBallX = CX;
+uint32_t ctSpawnAt = 0, ctLastMs = 0;
+
+void catchStart() {
+  for (int i = 0; i < CT_MAX; i++) ct[i].alive = false;
+  uint32_t now = millis();
+  ctBallX = CX; ctSpawnAt = now + 500; ctLastMs = now;
+  fpEndAt = now + CT_GAME_MS;
+}
+
+static void catchTap(int16_t x, int16_t) { ctBallX = x; }
+
+static void catchRender(uint32_t now) {
+  if (fpReached(now, fpEndAt)) { fpFinish(MINI_CATCH); return; }
+  uint32_t dt = now - ctLastMs; if (dt > 60) dt = 60; ctLastMs = now;
+  // steer: a held finger, or the tilt
+  if (wasPressed) ctBallX += (tXl - ctBallX) * 0.25f;
+  else if (gAccFresh) ctBallX += -gAccX * 0.9f * dt;
+  if (ctBallX < 90) ctBallX = 90;
+  if (ctBallX > 376) ctBallX = 376;
+  if (fpReached(now, ctSpawnAt)) {
+    for (int i = 0; i < CT_MAX; i++) if (!ct[i].alive) {
+      bool bad = random(100) < 22;
+      int16_t d = DEX_MAGIKARP;
+      if (!bad) for (int t = 0; t < 30; t++) { int16_t c = (int16_t)(1 + random(DEX_COUNT)); if (regionAvailable(regionOfDex(c)) && thumbs.get(c)) { d = c; break; } }
+      ct[i] = { (float)(100 + random(266)), 100.0f, 0.08f + fpScore * 0.003f, bad ? (int16_t)FP_DEX_VOLTORB : d, bad, true };
+      break;
+    }
+    ctSpawnAt = now + 900 - (fpScore > 30 ? 450 : fpScore * 15);
+  }
+  drawGameScene();
+  for (int i = 0; i < CT_MAX; i++) {
+    if (!ct[i].alive) continue;
+    ct[i].y += ct[i].v * dt;
+    if (ct[i].y > 330 && fabsf(ct[i].x - ctBallX) < 36) {   // in the ball
+      ct[i].alive = false;
+      if (ct[i].bad) fpLoseLife(MINI_CATCH); else fpPoint(1);
+      if (fpOverUntil) return;
+      continue;
+    }
+    if (ct[i].y > 380) { ct[i].alive = false; continue; }
+    fpThumb(ct[i].dex, (int)ct[i].x, (int)ct[i].y, 1, false);
+  }
+  int bx = (int)ctBallX;                                   // the Poke Ball
+  gfx->fillCircle(bx, 352, 26, UI_WHITE);
+  gfx->fillRect(bx - 26, 326, 53, 26, UI_BAR_BAD);
+  gfx->drawCircle(bx, 352, 26, UI_INK);
+  gfx->drawFastHLine(bx - 26, 352, 53, UI_INK);
+  gfx->fillCircle(bx, 352, 7, UI_WHITE);
+  gfx->drawCircle(bx, 352, 7, UI_INK);
+  fpHeader(MINI_CATCH, S_CATCH_HINT);
+  fpTimeBar(now, fpEndAt, CT_GAME_MS, 388);
+  gfx->flush();
+}
+
+// ---------- balance: keep the berry on the seesaw ----------
+
+float blAngle = 0, blPos = 0, blVel = 0, blWind = 0;
+uint32_t blLastMs = 0, blSecondAt = 0, blWindAt = 0;
+
+static void balanceReset(uint32_t now) { blAngle = 0; blPos = 0; blVel = 0; blWind = 0; blLastMs = now; blSecondAt = now + 1000; blWindAt = now + 2000; }
+void balanceStart() { balanceReset(millis()); }
+static void balanceTap(int16_t, int16_t) {}
+
+static void balanceRender(uint32_t now) {
+  uint32_t dt = now - blLastMs; if (dt > 60) dt = 60; blLastMs = now;
+  float target = 0;                                        // the board follows the tilt, or the finger's side
+  if (wasPressed) target = (tXl - CX) / 200.0f * 0.35f;
+  else if (gAccFresh) target = -gAccX * 0.35f;
+  blAngle += (target - blAngle) * 0.15f;
+  if (fpReached(now, blWindAt)) { blWind = (random(200) - 100) / 100000.0f * (1 + fpScore / 10); blWindAt = now + 1500 + random(2000); }
+  blVel += (sinf(blAngle) * 0.0012f + blWind) * dt;
+  blVel *= 0.995f;
+  blPos += blVel * dt;
+  if (fabsf(blPos) > 1.0f) {                               // it rolled off
+    fpLoseLife(MINI_BALANCE);
+    if (fpOverUntil) return;
+    balanceReset(now);
+  } else if (fpReached(now, blSecondAt)) { blSecondAt = now + 1000; fpPoint(1); }
+  drawGameScene();
+  int px = CX, py = 300, half = 150;
+  float ca = cosf(blAngle), sa = sinf(blAngle);
+  int x0 = px - (int)(half * ca), y0 = py - (int)(half * sa), x1 = px + (int)(half * ca), y1 = py + (int)(half * sa);
+  gfx->fillTriangle(px, py, px - 22, py + 50, px + 22, py + 50, C565(0x7e, 0x55, 0x30));
+  for (int t = -3; t <= 3; t++) gfx->drawLine(x0, y0 + t, x1, y1 + t, C565(0xb0, 0x7a, 0x45));
+  int bx = px + (int)(blPos * half * ca), by = py + (int)(blPos * half * sa) - 18;
+  gfx->fillCircle(bx, by, 14, UI_BAR_BAD);
+  gfx->drawCircle(bx, by, 14, UI_INK);
+  gfx->fillCircle(bx - 4, by - 5, 3, UI_WHITE);
+  fpHeader(MINI_BALANCE, S_BALANCE_HINT);
+  gfx->flush();
+}
+
+// ---------- the type quiz ----------
+
+uint8_t tqAtk = 0, tqDef = 0, tqRight = 0, tqQ = 0;
+int8_t tqPicked = -1;
+uint32_t tqNextAt = 0;
+static const uint16_t TQ_VAL[4] = { 200, 100, 50, 0 };
+static const char *const TQ_LABEL[4] = { "x2", "x1", "x1/2", "x0" };
+#define TQ_QUESTIONS 10
+#define TQ_BTN_W 78
+#define TQ_BTN_X(i) (CX - 166 + (i) * 84)
+#define TQ_BTN_Y 300
+
+static void tqNew() {
+  for (int t = 0; t < 30; t++) {                           // mostly the interesting ones
+    tqAtk = (uint8_t)random(TYPE_COUNT); tqDef = (uint8_t)random(TYPE_COUNT);
+    if (TYPE_FX[tqAtk][tqDef] != 10 || random(3) == 0) break;
+  }
+  uint16_t v = typeEffPct(tqAtk, tqDef, 255);
+  tqRight = v >= 200 ? 0 : v >= 100 ? 1 : v > 0 ? 2 : 3;
+  tqPicked = -1;
+}
+
+void quizStartGame() { tqQ = 0; tqNew(); }
+
+static void typeQuizTap(int16_t x, int16_t y) {
+  if (tqPicked >= 0 || y < TQ_BTN_Y || y > TQ_BTN_Y + 56) return;
+  for (int i = 0; i < 4; i++) {
+    if (x < TQ_BTN_X(i) || x > TQ_BTN_X(i) + TQ_BTN_W) continue;
+    tqPicked = (int8_t)i;
+    if (i == tqRight) fpPoint(1); else sfxPlay(SFX_DENY);
+    tqNextAt = millis() + (i == tqRight ? 600 : 1300);
+    return;
+  }
+}
+
+static void typeChip(int cx, int y, uint8_t t) {
+  const char *n = typeName(t);
+  int w = uiTextWidth(UIF_SMALL, n) + 24;
+  gfx->fillRoundRect(cx - w / 2, y, w, 40, 12, TYPE_COL[t]);
+  gfx->drawRoundRect(cx - w / 2, y, w, 40, 12, UI_INK);
+  uiText(UIF_SMALL, cx, uiMidY(UIF_SMALL, y, 40), n, UI_WHITE, 1);
+}
+
+static void typeQuizRender(uint32_t now) {
+  if (tqPicked >= 0 && fpReached(now, tqNextAt)) {
+    if (++tqQ >= TQ_QUESTIONS) { fpFinish(MINI_QUIZ); return; }
+    tqNew();
+  }
+  drawGameScene();
+  fpHeader(MINI_QUIZ, S_QUIZ_HINT);
+  typeChip(CX - 90, 160, tqAtk);
+  uiText(UIF_BIG, CX, 194, ">", fpInk(), 1);
+  typeChip(CX + 90, 160, tqDef);
+  char n[12]; snprintf(n, sizeof(n), "%u/%u", (unsigned)(tqQ + 1), (unsigned)TQ_QUESTIONS);
+  uiText(UIF_SMALL, CX, 250, n, fpInk(), 1);
+  for (int i = 0; i < 4; i++) {
+    uint16_t fill = UI_BG_DAY;
+    if (tqPicked >= 0 && i == tqRight) fill = UI_BAR_OK;
+    else if (tqPicked == i) fill = UI_BAR_BAD;
+    gfx->fillRoundRect(TQ_BTN_X(i), TQ_BTN_Y, TQ_BTN_W, 56, 14, fill);
+    gfx->drawRoundRect(TQ_BTN_X(i), TQ_BTN_Y, TQ_BTN_W, 56, 14, UI_INK);
+    uiTextFit(UIF_MID, TQ_BTN_X(i) + TQ_BTN_W / 2, uiMidY(UIF_MID, TQ_BTN_Y, 56), TQ_LABEL[i], UI_INK, 1, TQ_BTN_W - 8);
+  }
+  (void)TQ_VAL;
+  gfx->flush();
+}
+
+// ---------- slide puzzle ----------
+
+#define SL_N 3
+#define SL_CELL 80
+#define SL_X0 (CX - SL_N * SL_CELL / 2)
+#define SL_Y0 128
+#define SL_GAME_MS 120000UL
+uint8_t slTile[SL_N * SL_N];       // 0 = the gap
+uint16_t slMoves = 0;
+
+static void slShuffle() {
+  for (int i = 0; i < SL_N * SL_N; i++) slTile[i] = (uint8_t)((i + 1) % (SL_N * SL_N));
+  int gap = SL_N * SL_N - 1, last = -1;
+  for (int k = 0; k < 60; k++) {                           // random legal slides: always solvable
+    int opts[4], n = 0, gx = gap % SL_N, gy = gap / SL_N;
+    if (gx > 0) opts[n++] = gap - 1;
+    if (gx < SL_N - 1) opts[n++] = gap + 1;
+    if (gy > 0) opts[n++] = gap - SL_N;
+    if (gy < SL_N - 1) opts[n++] = gap + SL_N;
+    int pick;
+    do { pick = opts[random(n)]; } while (pick == last && n > 1);
+    slTile[gap] = slTile[pick]; slTile[pick] = 0; last = gap; gap = pick;
+  }
+  slMoves = 0;
+}
+
+void slideStart() { slShuffle(); fpEndAt = millis() + SL_GAME_MS; }
+
+static bool slSolved() { for (int i = 0; i < SL_N * SL_N - 1; i++) if (slTile[i] != i + 1) return false; return true; }
+
+static void slideTap(int16_t x, int16_t y) {
+  int cx = (x - SL_X0) / SL_CELL, cy = (y - SL_Y0) / SL_CELL;
+  if (x < SL_X0 || y < SL_Y0 || cx >= SL_N || cy >= SL_N) return;
+  int i = cy * SL_N + cx;
+  const int nb[4] = { i - 1, i + 1, i - SL_N, i + SL_N };
+  for (int k = 0; k < 4; k++) {
+    int j = nb[k];
+    if (j < 0 || j >= SL_N * SL_N || slTile[j]) continue;
+    if ((k == 0 && cx == 0) || (k == 1 && cx == SL_N - 1)) continue;
+    slTile[j] = slTile[i]; slTile[i] = 0; slMoves++;
+    sfxPlay(SFX_TAP);
+    if (slSolved()) { fpPoint(5); sfxPlay(SFX_MEDAL); slShuffle(); }
+    return;
+  }
+}
+
+static void slideRender(uint32_t now) {
+  if (fpReached(now, fpEndAt)) { fpFinish(MINI_SLIDE); return; }
+  drawGameScene();
+  fpHeader(MINI_SLIDE, S_SLIDE_HINT);
+  static const uint16_t SC[8] = { C565(0xe8, 0x50, 0x3a), C565(0xf5, 0x86, 0x3d), C565(0xff, 0xcb, 0x05), C565(0x58, 0xb8, 0x68),
+                                  C565(0x5f, 0xae, 0x8c), C565(0x4f, 0x93, 0xc4), C565(0x6f, 0x7c, 0xb8), C565(0xc0, 0x70, 0xe0) };
+  for (int i = 0; i < SL_N * SL_N; i++) {
+    int x = SL_X0 + (i % SL_N) * SL_CELL, y = SL_Y0 + (i / SL_N) * SL_CELL;
+    if (!slTile[i]) { gfx->fillRoundRect(x + 3, y + 3, SL_CELL - 6, SL_CELL - 6, 12, lerp565(UI_BG_DAY, UI_INK, 1, 8)); continue; }
+    gfx->fillRoundRect(x + 3, y + 3, SL_CELL - 6, SL_CELL - 6, 12, SC[(slTile[i] - 1) % 8]);
+    gfx->drawRoundRect(x + 3, y + 3, SL_CELL - 6, SL_CELL - 6, 12, UI_INK);
+    char n[3] = { (char)('0' + slTile[i]), 0, 0 };
+    uiText(UIF_BIG, x + SL_CELL / 2, y + SL_CELL / 2 + 14, n, UI_WHITE, 1);
+  }
+  fpTimeBar(now, fpEndAt, SL_GAME_MS, 384);
+  gfx->flush();
+}
+
+// ---------- bubbles: tap a group of two or more of one colour ----------
+
+#define BB_COLS 7
+#define BB_ROWS 6
+#define BB_R 20
+#define BB_X0 (CX - BB_COLS * 21)
+#define BB_Y0 132
+int8_t bbCell[BB_ROWS][BB_COLS];   // -1 empty, else a colour
+static const uint16_t BB_COL[4] = { C565(0xe8, 0x50, 0x3a), C565(0x4f, 0x93, 0xc4), C565(0xff, 0xcb, 0x05), C565(0x58, 0xb8, 0x68) };
+
+static void bbFill() { for (int r = 0; r < BB_ROWS; r++) for (int c = 0; c < BB_COLS; c++) bbCell[r][c] = (int8_t)random(4); }
+void bubblesStart() { bbFill(); }
+
+static int bbFlood(int r, int c, int8_t col, bool mark[BB_ROWS][BB_COLS]) {
+  if (r < 0 || c < 0 || r >= BB_ROWS || c >= BB_COLS || mark[r][c] || bbCell[r][c] != col) return 0;
+  mark[r][c] = true;
+  return 1 + bbFlood(r + 1, c, col, mark) + bbFlood(r - 1, c, col, mark) + bbFlood(r, c + 1, col, mark) + bbFlood(r, c - 1, col, mark);
+}
+
+static bool bbAnyMove() {
+  for (int r = 0; r < BB_ROWS; r++) for (int c = 0; c < BB_COLS; c++) {
+    int8_t v = bbCell[r][c];
+    if (v < 0) continue;
+    if ((c + 1 < BB_COLS && bbCell[r][c + 1] == v) || (r + 1 < BB_ROWS && bbCell[r + 1][c] == v)) return true;
+  }
+  return false;
+}
+
+static void bubblesTap(int16_t x, int16_t y) {
+  int c = (x - BB_X0) / (2 * 21), r = (y - BB_Y0) / (2 * 21);
+  if (x < BB_X0 || y < BB_Y0 || c >= BB_COLS || r >= BB_ROWS || bbCell[r][c] < 0) return;
+  bool mark[BB_ROWS][BB_COLS] = {};
+  int n = bbFlood(r, c, bbCell[r][c], mark);
+  if (n < 2) { sfxPlay(SFX_DENY); return; }
+  for (int rr = 0; rr < BB_ROWS; rr++) for (int cc = 0; cc < BB_COLS; cc++) if (mark[rr][cc]) bbCell[rr][cc] = -1;
+  for (int cc = 0; cc < BB_COLS; cc++) {                   // gravity: down
+    int w = BB_ROWS - 1;
+    for (int rr = BB_ROWS - 1; rr >= 0; rr--) if (bbCell[rr][cc] >= 0) { int8_t v = bbCell[rr][cc]; bbCell[rr][cc] = -1; bbCell[w--][cc] = v; }
+  }
+  int w = 0;                                               // empty columns close up to the left
+  for (int cc = 0; cc < BB_COLS; cc++) {
+    if (bbCell[BB_ROWS - 1][cc] < 0) continue;
+    if (w != cc) for (int rr = 0; rr < BB_ROWS; rr++) { bbCell[rr][w] = bbCell[rr][cc]; bbCell[rr][cc] = -1; }
+    w++;
+  }
+  fpPoint((uint8_t)(n * (n - 1) / 2 > 40 ? 40 : n * (n - 1) / 2));
+  bool empty = true;
+  for (int cc = 0; cc < BB_COLS; cc++) if (bbCell[BB_ROWS - 1][cc] >= 0) empty = false;
+  if (empty) { fpPoint(20); bbFill(); }                    // a clear board: a bonus and a new one
+  else if (!bbAnyMove()) fpFinish(MINI_BUBBLES);
+}
+
+static void bubblesRender(uint32_t) {
+  drawGameScene();
+  fpHeader(MINI_BUBBLES, S_BUBBLES_HINT);
+  for (int r = 0; r < BB_ROWS; r++) for (int c = 0; c < BB_COLS; c++) {
+    if (bbCell[r][c] < 0) continue;
+    int x = BB_X0 + c * 42 + 21, y = BB_Y0 + r * 42 + 21;
+    gfx->fillCircle(x, y, BB_R, BB_COL[bbCell[r][c]]);
+    gfx->drawCircle(x, y, BB_R, UI_INK);
+    gfx->fillCircle(x - 6, y - 7, 4, UI_WHITE);
+  }
+  gfx->flush();
+}
+
+// ---------- draw: finger painting, and the pet loves it ----------
+
+#define DR_MAX 1600
+#define DR_CX CX
+#define DR_CY 236
+#define DR_R 128
+struct DrawDot { int16_t x, y; uint8_t col; };
+DrawDot *drDots = nullptr;
+uint16_t drN = 0;
+uint8_t drCol = 0;
+int16_t drLastX = -100, drLastY = -100;
+static const uint16_t DR_PAL[6] = { C565(0x1b, 0x1b, 0x25), C565(0xe8, 0x50, 0x3a), C565(0xff, 0xcb, 0x05), C565(0x58, 0xb8, 0x68), C565(0x4f, 0x93, 0xc4), C565(0xc0, 0x70, 0xe0) };
+#define DR_PAL_Y 384
+#define DR_PAL_X(i) (CX - 150 + (i) * 40)
+#define DR_DONE_X (CX + 96)
+
+void drawStart() {
+  if (!drDots) drDots = (DrawDot *)malloc(sizeof(DrawDot) * DR_MAX);   // ~10 KB, kept for next time
+  drN = 0; drCol = 0; drLastX = drLastY = -100;
+}
+
+static void drawTap(int16_t x, int16_t y) {
+  if (y >= DR_PAL_Y - 18 && y <= DR_PAL_Y + 18) {
+    for (int i = 0; i < 6; i++) if (abs(x - DR_PAL_X(i)) <= 17) { drCol = (uint8_t)i; sfxPlay(SFX_TAP); return; }
+    if (x >= DR_DONE_X - 10 && x <= DR_DONE_X + 70) {      // DONE: the pet admires it
+      uint16_t s = drN / 20;
+      fpScore = s > 60 ? 60 : s;
+      fpFinish(MINI_DRAW);
+    }
+  }
+}
+
+static void drawRender(uint32_t) {
+  if (wasPressed && drDots && drN < DR_MAX) {               // painting with a held finger
+    int dx = tXl - DR_CX, dy = tYl - DR_CY;
+    if (dx * dx + dy * dy < (DR_R - 6) * (DR_R - 6) && (abs(tXl - drLastX) + abs(tYl - drLastY) > 3)) {
+      drDots[drN++] = { tXl, tYl, drCol };
+      drLastX = tXl; drLastY = tYl;
+    }
+  } else { drLastX = drLastY = -100; }
+  drawGameScene();
+  gfx->fillCircle(DR_CX, DR_CY, DR_R, UI_WHITE);
+  gfx->drawCircle(DR_CX, DR_CY, DR_R, UI_INK);
+  for (uint16_t i = 0; i < drN; i++) gfx->fillCircle(drDots[i].x, drDots[i].y, 5, DR_PAL[drDots[i].col]);
+  for (int i = 0; i < 6; i++) {
+    gfx->fillCircle(DR_PAL_X(i), DR_PAL_Y, 15, DR_PAL[i]);
+    gfx->drawCircle(DR_PAL_X(i), DR_PAL_Y, i == drCol ? 18 : 15, UI_INK);
+  }
+  gfx->fillRoundRect(DR_DONE_X - 10, DR_PAL_Y - 18, 80, 36, 12, UI_BAR_OK);
+  gfx->drawRoundRect(DR_DONE_X - 10, DR_PAL_Y - 18, 80, 36, 12, UI_INK);
+  uiTextFit(UIF_SMALL, DR_DONE_X + 30, uiMidY(UIF_SMALL, DR_PAL_Y - 18, 36), T(S_DRAW_DONE), UI_WHITE, 1, 72);
+  uiTextFit(UIF_MID, CX, 52, T(S_GAME_DRAW), fpInk(), 1, 250);
+  gfx->flush();
+}
+
+// ---------- the framework's entry points for these eight ----------
+
+// the games steered by dragging: a swipe must not end them
+bool fpUsesDrag(uint8_t g) { return g == MINI_MAZE || g == MINI_CATCH || g == MINI_BALANCE || g == MINI_DRAW; }
+
+bool fpTapPhase15(int16_t x, int16_t y) {
+  switch (fpGame) {
+    case MINI_BALLOON: balloonTap(x, y); return true;
+    case MINI_SHAKE: shakeTap(x, y); return true;
+    case MINI_CATCH: catchTap(x, y); return true;
+    case MINI_BALANCE: balanceTap(x, y); return true;
+    case MINI_QUIZ: typeQuizTap(x, y); return true;
+    case MINI_SLIDE: slideTap(x, y); return true;
+    case MINI_BUBBLES: bubblesTap(x, y); return true;
+    case MINI_DRAW: drawTap(x, y); return true;
+  }
+  return false;
+}
+
+bool fpRenderPhase15(uint32_t now) {
+  switch (fpGame) {
+    case MINI_BALLOON: balloonRender(now); return true;
+    case MINI_SHAKE: shakeRender(now); return true;
+    case MINI_CATCH: catchRender(now); return true;
+    case MINI_BALANCE: balanceRender(now); return true;
+    case MINI_QUIZ: typeQuizRender(now); return true;
+    case MINI_SLIDE: slideRender(now); return true;
+    case MINI_BUBBLES: bubblesRender(now); return true;
+    case MINI_DRAW: drawRender(now); return true;
+  }
+  return false;
+}
+
+// ===========================================================================
+// Phase 16: the wardrobe. Accessories hang off the head the hat already found
+// (gSprTop) and the ground line: glasses about a third of the way down the body,
+// neck pieces just past half way, back pieces behind it.
+// ===========================================================================
+
+static StrId accName(uint8_t a) {
+  static const StrId T_[ACC_COUNT] = {
+    S_ACC_SUNGLASSES, S_ACC_STARGLASSES, S_ACC_HEARTGLASSES, S_ACC_MONOCLE,
+    S_ACC_SCARF, S_ACC_BOWTIE, S_ACC_MEDAL, S_ACC_BANDANA,
+    S_ACC_CAPE, S_ACC_BACKPACK, S_ACC_WINGS, S_ACC_BATWINGS
+  };
+  return T_[a % ACC_COUNT];
+}
+
+static void accDraw(int8_t a, float down) {
+  if (a < 0 || a >= ACC_COUNT || !gSprTop.ok || pet.isEgg()) return;
+  const char *const *m = SPR_ACC[a];
+  int hs = gSprTop.sc >= 300 ? 4 : 3;
+  int body = PET_GROUND - gSprTop.y;
+  int cy = gSprTop.y + (int)(body * down);
+  drawMap(m, 16, gSprTop.x - 8 * hs, cy - 8 * hs, hs, false);
+}
+
+void drawAccBack() { accDraw(pet.accOn[ACC_BACK], 0.45f); }
+void drawAccFront() { accDraw(pet.accOn[ACC_NECK], 0.58f); accDraw(pet.accOn[ACC_FACE], 0.30f); }
+
+// ===========================================================================
+// Phase 17: town life -- the beach, the library, the music hall, the weekly
+// contest and the job board (map page two), the mailbox in the purse, and the
+// creature away at work. The rules live in Pet (findShell, readBook, playSong,
+// enterContest, startJob, openMail).
+// ===========================================================================
+
+int16_t shellX[3], shellY[3];     // the shells on the sand right now
+bool shellsDealt = false;
+uint32_t townUntil = 0;           // an animation or a page held on screen until then
+int16_t townDex = 0;              // the Pokemon in the library book
+uint8_t townRibbon = 0, townScore = 0;
+bool townShowResult = false;
+
+static void townDealShells() {
+  for (int i = 0; i < 3; i++) { shellX[i] = (int16_t)(100 + random(266)); shellY[i] = (int16_t)(300 + random(60)); }
+  shellsDealt = true;
+}
+
+static void townButtons(StrId act, bool on) { drawPlaceButtons(act, on); }
+
+static void beachScene(uint32_t now) {
+  for (int y = 0; y < 200; y += 8) gfx->fillRect(0, y, 466, 8, lerp565(C565(0x9f, 0xd4, 0xf4), UI_WHITE, y, 400));
+  for (int y = 200; y < 280; y += 6) gfx->fillRect(0, y, 466, 6, lerp565(C565(0x4f, 0x93, 0xc4), C565(0x7c, 0xc4, 0xea), y - 200, 80));
+  int wave = (int)(sinf(now * 0.002f) * 6);
+  gfx->fillRect(0, 280 + wave, 466, 186, C565(0xf0, 0xdc, 0xa8));
+  for (int x = 0; x < 466; x += 30) gfx->fillCircle(x + 15, 280 + wave, 12, C565(0xf0, 0xdc, 0xa8));
+  if (!shellsDealt) townDealShells();
+  if (pet.shellsToday < SHELLS_PER_DAY || pet.shellDay != pet.lastSeenEpoch / 86400)
+    for (int i = 0; i < 3; i++) {
+      fpEllipse(shellX[i], shellY[i], 12, 9, C565(0xf8, 0xc8, 0xd0));
+      for (int k = -1; k <= 1; k++) gfx->drawLine(shellX[i], shellY[i] + 8, shellX[i] + k * 8, shellY[i] - 6, C565(0xc7, 0x5f, 0x80));
+    }
+  if (pet.castleDay == pet.lastSeenEpoch / 86400) {        // today's castle
+    int cx = 360, cy = 300;
+    gfx->fillRect(cx - 30, cy - 20, 60, 30, C565(0xe0, 0xc0, 0x80));
+    for (int k = 0; k < 3; k++) gfx->fillRect(cx - 30 + k * 24, cy - 34, 12, 14, C565(0xe0, 0xc0, 0x80));
+    gfx->fillRect(cx - 2, cy - 54, 3, 22, UI_INK);
+    gfx->fillTriangle(cx + 1, cy - 54, cx + 16, cy - 48, cx + 1, cy - 42, UI_BAR_BAD);
+  }
+  fpDrawPet(150, 320, PMD_IDLE, 3);
+}
+
+static void libraryScene(uint32_t now) {
+  drawIndoor(C565(0xe8, 0xd8, 0xb8), C565(0x9c, 0x6a, 0x40));
+  for (int r = 0; r < 2; r++) for (int k = 0; k < 9; k++)  // shelves of books
+    gfx->fillRect(70 + k * 36, 110 + r * 70, 26, 56, (k + r) % 3 == 0 ? UI_BAR_BAD : (k + r) % 3 == 1 ? C565(0x4f, 0x93, 0xc4) : UI_BAR_OK);
+  if (townUntil && now < townUntil && townDex) {            // the open book: a Pokemon's page
+    gfx->fillRoundRect(83, 112, 300, 170, 14, UI_WHITE);
+    gfx->drawRoundRect(83, 112, 300, 170, 14, UI_INK);
+    gfx->drawFastVLine(CX, 116, 162, UI_TRACK_TEXT);
+    fpThumb(townDex, 158, 190, 2, false);
+    const DexEntry &d = DEX_TBL[townDex];
+    uiTextFit(UIF_SMALL, 300, 168, d.name, UI_INK, 1, 150);
+    typeChipSmall(300, 186, d.type1);
+    if (d.type2 < TYPE_COUNT) typeChipSmall(300, 224, d.type2);
+  } else townUntil = 0;
+  fpDrawPet(150, FP_GROUND, PMD_IDLE, 3);
+}
+
+static void musicScene(uint32_t now) {
+  drawIndoor(C565(0x50, 0x3c, 0x78), C565(0x7e, 0x55, 0x30));
+  gfx->fillRect(60, 300, 346, 20, C565(0xb0, 0x7a, 0x45));  // the stage
+  for (int k = 0; k < 5; k++)                                 // spotlights
+    gfx->fillTriangle(90 + k * 70, 90, 70 + k * 70, 300, 110 + k * 70, 300, lerp565(C565(0x50, 0x3c, 0x78), UI_WHITE, 1, 6));
+  bool dancing = townUntil && now < townUntil;
+  int bob = dancing ? (int)(fabsf(sinf(now * 0.012f)) * 18) : 0;
+  fpDrawPet(CX, 300 - bob, PMD_IDLE, 3);
+  if (dancing) for (int k = 0; k < 4; k++) drawMap(SPR_CARE_NOTE, 16, 100 + k * 80, 130 + (int)(sinf(now * 0.004f + k) * 14), 2, false);
+  else townUntil = 0;
+  static const StrId SONG[3] = { S_SONG_1, S_SONG_2, S_SONG_3 };
+  for (int i = 0; i < 3; i++) {                               // three songs on the jukebox
+    int x = CX - 156 + i * 106;
+    gfx->fillRoundRect(x, 326, 100, 40, 12, UI_BG_DAY);
+    gfx->drawRoundRect(x, 326, 100, 40, 12, UI_INK);
+    uiTextFit(UIF_TINY, x + 50, uiMidY(UIF_TINY, 326, 40), T(SONG[i]), UI_INK, 1, 92);
+  }
+}
+
+static void contestScene(uint32_t now) {
+  drawIndoor(C565(0xf8, 0xd4, 0xdc), C565(0xe0, 0x50, 0x60));
+  static const int16_t JUDGE[3] = { 25, 39, 52 };            // Pikachu, Jigglypuff, Meowth judge
+  for (int k = 0; k < 3; k++) fpThumb(JUDGE[k], 120 + k * 113, 136, 2, false);
+  gfx->fillRect(60, 300, 346, 14, C565(0xb0, 0x7a, 0x45));
+  fpDrawPet(CX, 300, PMD_IDLE, 3);
+  char b[24];
+  snprintf(b, sizeof(b), "%u  %u  %u", (unsigned)pet.ribbons[0], (unsigned)pet.ribbons[1], (unsigned)pet.ribbons[2]);
+  static const uint16_t RC[3] = { C565(0xc0, 0x80, 0x40), C565(0xc0, 0xc8, 0xd0), C565(0xff, 0xcb, 0x05) };
+  for (int k = 0; k < 3; k++) { gfx->fillCircle(150 + k * 83, 196, 12, RC[k]); gfx->drawCircle(150 + k * 83, 196, 12, UI_INK);
+    char n[6]; snprintf(n, sizeof(n), "%u", (unsigned)pet.ribbons[k]); uiText(UIF_SMALL, 172 + k * 83, 204, n, UI_INK, 0); }
+  (void)b;
+  if (townShowResult && townUntil && now < townUntil) {
+    static const uint16_t RCOL[4] = { UI_TRACK_TEXT, C565(0xc0, 0x80, 0x40), C565(0xc0, 0xc8, 0xd0), C565(0xff, 0xcb, 0x05) };
+    gfx->fillCircle(CX, 240, 24, RCOL[townRibbon]);
+    gfx->drawCircle(CX, 240, 24, UI_INK);
+    char sc[8]; snprintf(sc, sizeof(sc), "%u", (unsigned)townScore);
+    uiText(UIF_SMALL, CX, 248, sc, UI_INK, 1);
+  } else townShowResult = false;
+  uiTextFit(UIF_TINY, CX, 228 + (townShowResult ? 50 : 0), T(S_CONTEST_HINT), UI_INK, 1, 300);
+}
+
+static void jobsScene(uint32_t) {
+  drawIndoor(C565(0xd8, 0xe8, 0xc8), C565(0xb0, 0x7a, 0x45));
+  gfx->fillRoundRect(73, 104, 320, 230, 14, C565(0xc8, 0x9a, 0x60));   // the board
+  static const StrId JOB[3] = { S_JOB_CAFE, S_JOB_FLOWERS, S_JOB_POST };
+  for (int i = 0; i < 3; i++) {
+    int y = 118 + i * 68;
+    bool can = !pet.jobDoneToday();
+    gfx->fillRoundRect(90, y, 286, 56, 10, can ? UI_WHITE : UI_TRACK_TEXT);
+    gfx->drawRoundRect(90, y, 286, 56, 10, UI_INK);
+    uiTextFit(UIF_SMALL, 104, y + 26, T(JOB[i]), UI_INK, 0, 170);
+    uiTextFit(UIF_TINY, 360, y + 44, T(S_JOB_INFO), UI_INK, 2, 110);
+  }
+  if (pet.jobDoneToday()) uiTextFit(UIF_SMALL, CX, 356, T(S_JOB_TOMORROW), UI_INK, 1, 300);
+}
+
+void typeChipSmall(int cx, int y, uint8_t t) {
+  const char *n = typeName(t);
+  int w = uiTextWidth(UIF_TINY, n) + 16;
+  gfx->fillRoundRect(cx - w / 2, y, w, 30, 10, TYPE_COL[t]);
+  uiText(UIF_TINY, cx, uiMidY(UIF_TINY, y, 30), n, UI_WHITE, 1);
+}
+
+bool renderPlaceTown() {
+  uint32_t now = millis();
+  StrId act = S_CASTLE, title = S_PLACE_BEACH;
+  bool on = true, buttons = true;
+  switch (placeScene) {
+    case PLACE_BEACH: beachScene(now); act = S_CASTLE; on = pet.castleDay != pet.lastSeenEpoch / 86400; break;
+    case PLACE_LIBRARY: libraryScene(now); act = S_READ; title = S_PLACE_LIBRARY; break;
+    case PLACE_MUSIC: musicScene(now); title = S_PLACE_MUSIC; buttons = false; break;
+    case PLACE_CONTEST: contestScene(now); act = S_ENTER_CONTEST; on = !pet.contestDoneThisWeek(); title = S_PLACE_CONTEST; break;
+    case PLACE_JOBS: jobsScene(now); title = S_PLACE_JOBS; buttons = false; break;
+    default: return false;
+  }
+  uiTextFit(UIF_MID, CX, 52, T(title), placeScene == PLACE_MUSIC ? UI_WHITE : UI_INK, 1, 300);
+  if (buttons) townButtons(act, on);
+  else {                                                    // only BACK
+    int x = PLACE_BACK_X - 64;
+    gfx->fillRoundRect(x, PLACE_BTN_Y, PLACE_BTN_W, PLACE_BTN_H, 12, UI_WHITE);
+    gfx->drawRoundRect(x, PLACE_BTN_Y, PLACE_BTN_W, PLACE_BTN_H, 12, UI_INK);
+    uiTextFit(UIF_SMALL, x + PLACE_BTN_W / 2, uiMidY(UIF_SMALL, PLACE_BTN_Y, PLACE_BTN_H), T(S_LEAVE), UI_INK, 1, PLACE_BTN_W - 10);
+  }
+  drawPlaceMsg();
+  drawFpToast();
+  gfx->flush();
+  return true;
+}
+
+bool placeTapTown(int16_t x, int16_t y) {
+  if (placeScene < PLACE_BEACH || placeScene > PLACE_JOBS || placeScene == PLACE_ARCADE) return false;
+  bool inBtnRow = y >= PLACE_BTN_Y && y <= PLACE_BTN_Y + PLACE_BTN_H;
+  bool backOnly = placeScene == PLACE_MUSIC || placeScene == PLACE_JOBS;
+  int bx = backOnly ? PLACE_BACK_X - 64 : PLACE_BACK_X;
+  if (y < 72 || (inBtnRow && x >= bx && x <= bx + PLACE_BTN_W)) {
+    sfxPlay(SFX_TAP); placeScene = PLACE_NONE; townUntil = 0; shellsDealt = false; return true;
+  }
+  bool act = !backOnly && inBtnRow && x >= PLACE_ACT_X && x <= PLACE_ACT_X + PLACE_BTN_W;
+  switch (placeScene) {
+    case PLACE_BEACH:
+      if (act) {
+        if (pet.buildCastle()) { sfxPlay(SFX_MEDAL); placeSay(T(S_CASTLE_DONE)); }
+        else { sfxPlay(SFX_DENY); placeSay(T(S_CASTLE_AGAIN)); }
+        return true;
+      }
+      for (int i = 0; i < 3; i++) {
+        if (abs(x - shellX[i]) > 22 || abs(y - shellY[i]) > 20) continue;
+        if (pet.findShell()) { sfxPlay(SFX_MEDAL); placeSay(T(S_SHELL_FOUND)); shellX[i] = (int16_t)(100 + random(266)); shellY[i] = (int16_t)(300 + random(60)); }
+        else { sfxPlay(SFX_DENY); placeSay(T(S_SHELLS_DONE)); }
+        return true;
+      }
+      return true;
+    case PLACE_LIBRARY:
+      if (!act) return true;
+      if (!pet.readBook()) { sfxPlay(SFX_DENY); placeSay(T(S_BOOKS_DONE)); return true; }
+      townDex = 0;
+      for (int t = 0; t < 40 && !townDex; t++) { int16_t c = (int16_t)(1 + random(DEX_COUNT)); if (regionAvailable(regionOfDex(c)) && thumbs.get(c)) townDex = c; }
+      if (!townDex) townDex = 25;
+      townUntil = millis() + 7000;
+      placeMsgUntil = 0;
+      sfxPlay(SFX_TAP);
+      return true;
+    case PLACE_MUSIC:
+      if (y >= 326 && y <= 366) for (int i = 0; i < 3; i++) {
+        int sx = CX - 156 + i * 106;
+        if (x < sx || x > sx + 100) continue;
+        if (!pet.playSong()) { sfxPlay(SFX_DENY); placeSay(T(S_SONGS_DONE)); return true; }
+        static const uint8_t TUNE[3] = { MUS_BATTLE, MUS_VICTORY, MUS_LULLABY };
+        audioMusic(TUNE[i]);
+        townUntil = millis() + 8000;
+        placeMsgUntil = 0;
+        return true;
+      }
+      return true;
+    case PLACE_CONTEST:
+      if (!act) return true;
+      if (pet.contestDoneThisWeek()) { sfxPlay(SFX_DENY); placeSay(T(S_CONTEST_DONE)); return true; }
+      {
+        townScore = (uint8_t)min(255, pet.contestScore() + (int)random(21));
+        townRibbon = pet.enterContest(townScore);
+        static const StrId RES[4] = { S_RIB_NONE, S_RIB_BRONZE, S_RIB_SILVER, S_RIB_GOLD };
+        sfxPlay(townRibbon ? SFX_VICTORY : SFX_TAP);
+        placeSay(T(RES[townRibbon]));
+        townShowResult = true;
+        townUntil = millis() + 6000;
+      }
+      return true;
+    case PLACE_JOBS:
+      for (int i = 0; i < 3; i++) {
+        int jy = 118 + i * 68;
+        if (x < 90 || x > 376 || y < jy || y > jy + 56) continue;
+        if (pet.startJob((uint8_t)(JOB_CAFE + i))) { sfxPlay(SFX_TAP); placeScene = PLACE_NONE; }   // off it goes
+        else { sfxPlay(SFX_DENY); placeSay(T(pet.jobDoneToday() ? S_JOB_TOMORROW : S_TOO_TIRED)); }
+        return true;
+      }
+      return true;
+  }
+  return true;
+}
+
+// ---------- the mailbox ----------
+
+void renderMail() {
+  drawPanelBase();
+  uiTextFit(UIF_MID, CX, PANEL_Y + 36, T(S_MAIL), UI_INK, 1, PANEL_W - 80);
+  if (!mailShown) {
+    uiTextFit(UIF_SMALL, CX, PANEL_Y + 160, T(S_NO_MAIL), UI_TRACK_TEXT, 1, PANEL_W - 60);
+    gfx->flush();
+    return;
+  }
+  // an envelope, and the letter written across a few lines
+  gfx->fillRoundRect(CX - 40, PANEL_Y + 56, 80, 52, 6, C565(0xf8, 0xe8, 0xc8));
+  gfx->drawRoundRect(CX - 40, PANEL_Y + 56, 80, 52, 6, UI_INK);
+  gfx->drawLine(CX - 40, PANEL_Y + 56, CX, PANEL_Y + 86, UI_INK);
+  gfx->drawLine(CX + 40, PANEL_Y + 56, CX, PANEL_Y + 86, UI_INK);
+  static const StrId L[LETTER_KINDS] = { S_LETTER_1, S_LETTER_2, S_LETTER_3, S_LETTER_4, S_LETTER_5, S_LETTER_6 };
+  const char *t = T(L[(mailShown - 1) % LETTER_KINDS]);
+  char line[64];
+  int y = PANEL_Y + 146, start = 0, n = (int)strlen(t);
+  while (start < n && y < PANEL_Y + 290) {                  // word wrap to the panel
+    int end = n, best = -1;
+    for (int k = start; k <= n; k++) {
+      if (k == n || t[k] == ' ') {
+        int len = k - start;
+        if (len >= (int)sizeof(line)) break;
+        memcpy(line, t + start, len); line[len] = 0;
+        if (uiTextWidth(UIF_SMALL, line) > PANEL_W - 60) break;
+        best = k;
+        if (k == n) break;
+      }
+    }
+    end = best > start ? best : n;
+    int len = end - start; if (len >= (int)sizeof(line)) len = sizeof(line) - 1;
+    memcpy(line, t + start, len); line[len] = 0;
+    uiText(UIF_SMALL, CX, y, line, UI_INK, 1);
+    y += 30;
+    start = end + 1;
+  }
+  gfx->flush();
+}
+
+// ---------- away at work ----------
+
+void drawAwaySign() {
+  static const StrId JOB[JOB_KINDS] = { S_AT_WORK, S_JOB_CAFE, S_JOB_FLOWERS, S_JOB_POST };
+  int x = CX - 90, y = PET_GROUND - 120;
+  gfx->fillRect(CX - 4, y + 70, 8, 50, C565(0x7e, 0x55, 0x30));          // a little signpost
+  gfx->fillRoundRect(x, y, 180, 76, 10, C565(0xc8, 0x9a, 0x60));
+  gfx->drawRoundRect(x, y, 180, 76, 10, UI_INK);
+  uiTextFit(UIF_SMALL, CX, y + 28, T(JOB[pet.jobKind % JOB_KINDS]), UI_INK, 1, 166);
+  uint32_t back = pet.jobUntil;
+  char b[32];
+  snprintf(b, sizeof(b), T(S_BACK_AT_FMT), (unsigned)((back / 3600) % 24), (unsigned)((back / 60) % 60));
+  uiTextFit(UIF_TINY, CX, y + 58, b, UI_INK, 1, 166);
+}
+
+// ===========================================================================
+// Phase 19: the weekly story quest, on the missions panel's second face, and the
+// Halloween and winter decorations on the main screen.
+// ===========================================================================
+
+#define QBTN_X (PANEL_X + PANEL_W - 104)
+#define QBTN_Y (PANEL_Y + 14)
+#define QBTN_W 88
+#define QBTN_H 34
+
+void drawQuestButton() {
+  bool ready = pet.questStepReady();
+  gfx->fillRoundRect(QBTN_X, QBTN_Y, QBTN_W, QBTN_H, 12, questView ? UI_BAR_OK : ready ? UI_BAR_WARN : UI_BG_DAY);
+  gfx->drawRoundRect(QBTN_X, QBTN_Y, QBTN_W, QBTN_H, 12, UI_INK);
+  uiTextFit(UIF_TINY, QBTN_X + QBTN_W / 2, uiMidY(UIF_TINY, QBTN_Y, QBTN_H), T(questView ? S_LEAVE : S_QUEST), UI_INK, 1, QBTN_W - 8);
+}
+
+bool questButtonHit(int16_t x, int16_t y) { return x >= QBTN_X && x <= QBTN_X + QBTN_W && y >= QBTN_Y && y <= QBTN_Y + QBTN_H; }
+
+void renderQuest() {
+  pet.questRoll();
+  static const StrId QT[QUEST_COUNT] = { S_QUEST_1, S_QUEST_2, S_QUEST_3, S_QUEST_4 };
+  static const StrId QK[12] = { S_QK_PARK, S_QK_BEACH, S_QK_READ, S_QK_FISH, S_QK_COOK, S_QK_MEAL, S_QK_ADV, S_QK_CENTER, S_QK_BATH, S_QK_SONG, S_QK_GAME, S_QK_STUDY };
+  uint8_t q = pet.questToday();
+  static const int16_t WHO[QUEST_COUNT] = { 25, 52, 113, 39 };   // Pikachu, Meowth, Chansey, Jigglypuff
+  fpThumb(WHO[q], PANEL_X + 46, PANEL_Y + 40, 1, false);
+  uiTextFit(UIF_SMALL, PANEL_X + 80, PANEL_Y + 82, T(QT[q]), UI_INK, 0, PANEL_W - 100);
+  for (uint8_t i = 0; i < QUEST_STEPS; i++) {
+    int y = PANEL_Y + 100 + i * 60;
+    bool done = pet.questStep > i, next = pet.questStep == i;
+    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, 52, 12, done ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : next ? UI_BG_DAY : UI_WHITE);
+    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, 52, 12, done || next ? UI_INK : UI_TRACK_TEXT);
+    int cx = PANEL_X + 36, cy = y + 26;
+    if (done) { gfx->fillCircle(cx, cy, 11, UI_BAR_OK); gfx->drawLine(cx - 5, cy, cx - 1, cy + 4, UI_WHITE); gfx->drawLine(cx - 1, cy + 4, cx + 6, cy - 4, UI_WHITE); }
+    else { char n[2] = { (char)('1' + i), 0 }; gfx->drawCircle(cx, cy, 11, UI_INK); uiText(UIF_TINY, cx, cy + 5, n, UI_INK, 1); }
+    uiTextFit(UIF_SMALL, PANEL_X + 56, uiMidY(UIF_SMALL, y, 52), T(QK[Pet::questStepKind(q, i)]), done || next ? UI_INK : UI_TRACK_TEXT, 0, 236);
+  }
+  if (pet.questStep < QUEST_STEPS && !pet.questStepReady()) uiTextFit(UIF_SMALL, CX, PANEL_Y + 296, T(S_QUEST_NEXT_DAY), UI_TRACK_TEXT, 1, PANEL_W - 60);
+  gfx->flush();
+}
+
+void drawSeasonDecor() {
+  if (pet.isEgg() || pet.sceneryPick == SCENERY_ROOM) return;
+  EventId e = pet.eventToday();
+  if (e == EVENT_HALLOWEEN) {                              // pumpkins in the grass, a little ghost
+    for (int k = 0; k < 2; k++) {
+      int x = k ? 392 : 74, y = PET_GROUND - 14;
+      fpEllipse(x, y, 18, 14, C565(0xf5, 0x86, 0x3d));
+      gfx->fillRect(x - 2, y - 20, 4, 8, C565(0x3c, 0x8a, 0x4c));
+      gfx->fillTriangle(x - 9, y - 4, x - 3, y - 4, x - 6, y - 10, UI_INK);
+      gfx->fillTriangle(x + 3, y - 4, x + 9, y - 4, x + 6, y - 10, UI_INK);
+      gfx->fillRect(x - 8, y + 4, 16, 3, UI_INK);
+    }
+    int gy = 170 + (int)(sinf(millis() * 0.002f) * 10);
+    gfx->fillCircle(96, gy, 16, UI_WHITE);
+    gfx->fillRect(80, gy, 33, 18, UI_WHITE);
+    gfx->fillCircle(90, gy - 3, 3, UI_INK);
+    gfx->fillCircle(102, gy - 3, 3, UI_INK);
+  } else if (e == EVENT_WINTER) {                          // a snowman beside the creature
+    int x = 386, y = PET_GROUND;
+    gfx->fillCircle(x, y - 22, 22, UI_WHITE);
+    gfx->fillCircle(x, y - 56, 15, UI_WHITE);
+    gfx->drawCircle(x, y - 22, 22, C565(0xb8, 0xd8, 0xe8));
+    gfx->drawCircle(x, y - 56, 15, C565(0xb8, 0xd8, 0xe8));
+    gfx->fillCircle(x - 5, y - 60, 2, UI_INK);
+    gfx->fillCircle(x + 5, y - 60, 2, UI_INK);
+    gfx->fillTriangle(x, y - 56, x + 12, y - 54, x, y - 52, C565(0xf5, 0x86, 0x3d));
+    gfx->fillRect(x - 14, y - 76, 28, 6, UI_INK);
+    gfx->fillRect(x - 9, y - 92, 18, 16, UI_INK);
   }
 }

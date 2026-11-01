@@ -71,7 +71,15 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 13: hats and the room
     "GORRO DE CHEF", "SOMBRERO PIRATA", "OREJAS DE GATO", "OREJAS DE CONEJO", "AURICULARES", "BIRRETE", "CORONA DE FLORES", "CASCO DE OBRA", "BOINA", "CASCO VIKINGO", "MUEBLES", "MI CUARTO", "VENTANA", "RELOJ", "CUADRO", "ESTANTE", "SOFA", "TELE", "ACUARIO", "LIBRERIA", "CHIMENEA", "ALFOMBRA", "PAPEL AZUL", "PAPEL ROSA", "PAPEL MENTA",
     // phase 14
-    "Quiero %s!", "Quiero jugar!", "Vamos al parque!", "Quiero un bano!", "Vamos a pescar!", "Acariciame!", "Deseo cumplido! +5", "Te echa de menos", "Que gran dia!", "Te extrane...", "Feliz cumpleanos! +20", "%u meses!", "Un huevo de Pascua! +5", "Festival de verano: helado gratis!", "Personalidad: %s", "juguetona", "perezosa", "glotona", "timida", },
+    "Quiero %s!", "Quiero jugar!", "Vamos al parque!", "Quiero un bano!", "Vamos a pescar!", "Acariciame!", "Deseo cumplido! +5", "Te echa de menos", "Que gran dia!", "Te extrane...", "Feliz cumpleanos! +20", "%u meses!", "Un huevo de Pascua! +5", "Festival de verano: helado gratis!", "Personalidad: %s", "juguetona", "perezosa", "glotona", "timida",
+    // phase 15
+    "JUEGOS", "MENTE", "ARCADE", "GLOBOS", "CARRERA", "ATRAPA", "EQUILIBRIO", "TIPOS", "PUZLE", "BURBUJAS", "DIBUJO", "Revienta globos, no bombas", "Agita la bola o toca rapido", "Atrapa, esquiva a Voltorb", "Inclina o toca a un lado", "Que tan efectivo es?", "Ordena del 1 al 8", "Toca grupos del mismo color", "LISTO",
+    // phase 16
+    "ROPA", "GAFAS DE SOL", "GAFAS ESTRELLA", "GAFAS CORAZON", "MONOCULO", "BUFANDA", "PAJARITA", "MEDALLA", "PANUELO", "CAPA", "MOCHILA", "ALAS DE ANGEL", "ALAS DE MURCIELAGO", "Que elegante!",
+    // phase 17
+    "PLAYA", "BIBLIOTECA", "MUSICA", "CONCURSO", "ARCADE", "TRABAJOS", "CASTILLO", "Una concha! +1", "No hay mas conchas hoy", "Un castillo de arena!", "Ya hizo uno hoy", "LEER", "Ya leyo bastante hoy", "Basta de musica hoy", "BATALLA", "VICTORIA", "NANA", "PARTICIPAR", "Vuelve la semana que viene", "Sin cinta esta vez... +2", "Cinta de bronce! +5", "Cinta de plata! +10", "Cinta de oro! +20", "Ropa, carino y alegria cuentan", "CAFETERIA", "FLORISTERIA", "CORREOS", "3 h   +15", "Esta trabajando", "Vuelve a las %u:%02u", "Volvio del trabajo! +15", "Manana mas trabajo", "CORREO", "No hay cartas", "Prof. Oak: Gran trabajo! Te envio 5 monedas.", "Meowth: Una galleta de regalo, miau!", "Chansey: Una semilla para tu huerto.", "Pikachu: Pika pika! (un jabon)", "La abuela: 8 monedas para tus ahorros.", "Un amigo: Te echo de menos, juguemos!",
+    // phase 19
+    "AVENTURA", "Pikachu perdio su gorro", "El almuerzo de Meowth", "El huevo perdido de Chansey", "Una cancion para Jigglypuff", "Busca en el parque", "Busca en la playa", "Pregunta en la biblioteca", "Pesca algo en el lago", "Cocina un plato", "Comed juntos algo casero", "Abre una parada de aventura", "Visita el Centro Pokemon", "Date un bano", "Pon una cancion", "Juega un juego", "Estudia en la escuela", "El siguiente paso, manana", "Aventura completada! Un gorro nuevo", "Truco o trato! Una galleta", "Chocolate caliente gratis!", "Un ano juntos! +50", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -137,7 +145,15 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 13: hats and the room
     "CHEF HAT", "PIRATE HAT", "CAT EARS", "BUNNY EARS", "HEADPHONES", "GRAD CAP", "FLOWER CROWN", "HARD HAT", "BERET", "VIKING HELMET", "FURNITURE", "MY ROOM", "WINDOW", "CLOCK", "PAINTING", "SHELF", "SOFA", "TV", "AQUARIUM", "BOOKCASE", "FIREPLACE", "RUG", "BLUE WALLPAPER", "PINK WALLPAPER", "MINT WALLPAPER",
     // phase 14
-    "I want %s!", "I want to play!", "Let's go to the park!", "I want a bath!", "Let's go fishing!", "Pet me!", "Wish granted! +5", "Feels lonely", "Having a great day!", "I missed you...", "Happy birthday! +20", "%u months old!", "An Easter egg! +5", "Summer festival: a free ice cream!", "Personality: %s", "playful", "lazy", "a big eater", "shy", },
+    "I want %s!", "I want to play!", "Let's go to the park!", "I want a bath!", "Let's go fishing!", "Pet me!", "Wish granted! +5", "Feels lonely", "Having a great day!", "I missed you...", "Happy birthday! +20", "%u months old!", "An Easter egg! +5", "Summer festival: a free ice cream!", "Personality: %s", "playful", "lazy", "a big eater", "shy",
+    // phase 15
+    "GAMES", "BRAIN", "ARCADE", "BALLOON POP", "SHAKE RACE", "CATCH", "BALANCE", "TYPE QUIZ", "SLIDE PUZZLE", "BUBBLES", "DRAWING", "Pop balloons, not bombs", "Shake the ball or tap fast", "Catch them, dodge Voltorb", "Tilt, or touch a side", "How effective is it?", "Put 1 to 8 in order", "Tap groups of one colour", "DONE",
+    // phase 16
+    "OUTFITS", "SUNGLASSES", "STAR GLASSES", "HEART GLASSES", "MONOCLE", "SCARF", "BOW TIE", "MEDAL", "BANDANA", "CAPE", "BACKPACK", "ANGEL WINGS", "BAT WINGS", "Looking great!",
+    // phase 17
+    "BEACH", "LIBRARY", "MUSIC HALL", "CONTEST", "ARCADE", "JOBS", "CASTLE", "A shell! +1", "No more shells today", "A sandcastle!", "Already built one today", "READ", "Enough reading today", "Enough music today", "BATTLE", "VICTORY", "LULLABY", "ENTER", "Come back next week", "No ribbon this time... +2", "Bronze ribbon! +5", "Silver ribbon! +10", "Gold ribbon! +20", "Outfit, bond and joy count", "CAFE", "FLOWER SHOP", "POST OFFICE", "3 h   +15", "It's at work", "Back at %u:%02u", "Home from work! +15", "More work tomorrow", "MAIL", "No letters", "Prof. Oak: Great job! Here are 5 coins.", "Meowth: A free cookie for you, meow!", "Chansey: A seed for your garden.", "Pikachu: Pika pika! (a soap)", "Grandma: 8 coins for your savings.", "A friend: I miss you, let's play!",
+    // phase 19
+    "QUEST", "Pikachu lost its hat", "Meowth's lunch", "Chansey's lost egg", "A song for Jigglypuff", "Search the park", "Search the beach", "Ask at the library", "Catch something at the lake", "Cook a dish", "Eat something home-made", "Open an adventure stop", "Visit the Pokemon Center", "Have a bath", "Play a song", "Play a game", "Study at school", "The next step tomorrow", "Quest complete! A new hat", "Trick or treat! A cookie", "A free hot cocoa!", "One year together! +50", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -202,7 +218,15 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 13: hats and the room
     "TOQUE", "CHAPEAU DE PIRATE", "OREILLES DE CHAT", "OREILLES DE LAPIN", "CASQUE AUDIO", "TOQUE DE DIPLOME", "COURONNE DE FLEURS", "CASQUE DE CHANTIER", "BERET", "CASQUE VIKING", "MEUBLES", "MA CHAMBRE", "FENETRE", "HORLOGE", "TABLEAU", "ETAGERE", "CANAPE", "TELE", "AQUARIUM", "BIBLIOTHEQUE", "CHEMINEE", "TAPIS", "PAPIER BLEU", "PAPIER ROSE", "PAPIER MENTHE",
     // phase 14
-    "Je veux %s !", "Je veux jouer !", "Allons au parc !", "Je veux un bain !", "Allons pecher !", "Caresse-moi !", "Voeu exauce ! +5", "Se sent seul", "Super journee !", "Tu m'as manque...", "Joyeux anniversaire ! +20", "%u mois !", "Un oeuf de Paques ! +5", "Fete d'ete : une glace offerte !", "Caractere : %s", "joueur", "paresseux", "gourmand", "timide", },
+    "Je veux %s !", "Je veux jouer !", "Allons au parc !", "Je veux un bain !", "Allons pecher !", "Caresse-moi !", "Voeu exauce ! +5", "Se sent seul", "Super journee !", "Tu m'as manque...", "Joyeux anniversaire ! +20", "%u mois !", "Un oeuf de Paques ! +5", "Fete d'ete : une glace offerte !", "Caractere : %s", "joueur", "paresseux", "gourmand", "timide",
+    // phase 15
+    "JEUX", "CERVEAU", "ARCADE", "BALLONS", "COURSE", "ATTRAPE", "EQUILIBRE", "QUIZ DES TYPES", "TAQUIN", "BULLES", "DESSIN", "Eclate les ballons, pas les bombes", "Secoue la balle ou touche vite", "Attrape-les, evite Voltorbe", "Penche ou touche un cote", "Quelle efficacite ?", "Range de 1 a 8", "Touche les groupes", "FINI",
+    // phase 16
+    "TENUES", "LUNETTES DE SOLEIL", "LUNETTES ETOILES", "LUNETTES COEUR", "MONOCLE", "ECHARPE", "NOEUD PAPILLON", "MEDAILLE", "BANDANA", "CAPE", "SAC A DOS", "AILES D'ANGE", "AILES DE CHAUVE-SOURIS", "Trop chic !",
+    // phase 17
+    "PLAGE", "BIBLIOTHEQUE", "MUSIQUE", "CONCOURS", "ARCADE", "PETITS BOULOTS", "CHATEAU", "Un coquillage ! +1", "Plus de coquillages", "Un chateau de sable !", "Deja fait aujourd hui", "LIRE", "Assez lu aujourd hui", "Assez de musique", "COMBAT", "VICTOIRE", "BERCEUSE", "PARTICIPER", "Reviens la semaine prochaine", "Pas de ruban... +2", "Ruban de bronze ! +5", "Ruban d'argent ! +10", "Ruban d'or ! +20", "Tenue, lien et joie comptent", "CAFE", "FLEURISTE", "POSTE", "3 h   +15", "Il est au travail", "Retour a %u:%02u", "Retour du travail ! +15", "Demain encore", "COURRIER", "Pas de lettre", "Prof. Chen : Bravo ! Voici 5 pieces.", "Miaouss : Un biscuit offert, miaou !", "Leveinard : Une graine pour ton potager.", "Pikachu : Pika pika ! (un savon)", "Mamie : 8 pieces pour tes economies.", "Un ami : Tu me manques, on joue ?",
+    // phase 19
+    "QUETE", "Pikachu a perdu son chapeau", "Le dejeuner de Miaouss", "L'oeuf perdu de Leveinard", "Une chanson pour Rondoudou", "Cherche au parc", "Cherche a la plage", "Demande a la bibliotheque", "Peche au lac", "Cuisine un plat", "Mangez un plat maison", "Ouvre une etape d'aventure", "Va au Centre Pokemon", "Prends un bain", "Joue une chanson", "Joue a un jeu", "Etudie a l'ecole", "Prochaine etape demain", "Quete reussie ! Un chapeau", "Un bonbon ou un sort ! Un biscuit", "Un chocolat chaud offert !", "Un an ensemble ! +50", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -267,7 +291,15 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 13: hats and the room
     "KOCHMUETZE", "PIRATENHUT", "KATZENOHREN", "HASENOHREN", "KOPFHOERER", "DOKTORHUT", "BLUMENKRANZ", "BAUHELM", "BASKENMUETZE", "WIKINGERHELM", "MOEBEL", "MEIN ZIMMER", "FENSTER", "UHR", "BILD", "REGAL", "SOFA", "FERNSEHER", "AQUARIUM", "BUECHERREGAL", "KAMIN", "TEPPICH", "BLAUE TAPETE", "ROSA TAPETE", "MINZTAPETE",
     // phase 14
-    "Ich will %s!", "Ich will spielen!", "Ab in den Park!", "Ich will baden!", "Lass uns angeln!", "Streichel mich!", "Wunsch erfuellt! +5", "Fuehlt sich einsam", "Ein toller Tag!", "Ich hab dich vermisst...", "Alles Gute! +20", "%u Monate!", "Ein Osterei! +5", "Sommerfest: ein Gratis-Eis!", "Charakter: %s", "verspielt", "faul", "verfressen", "schuechtern", },
+    "Ich will %s!", "Ich will spielen!", "Ab in den Park!", "Ich will baden!", "Lass uns angeln!", "Streichel mich!", "Wunsch erfuellt! +5", "Fuehlt sich einsam", "Ein toller Tag!", "Ich hab dich vermisst...", "Alles Gute! +20", "%u Monate!", "Ein Osterei! +5", "Sommerfest: ein Gratis-Eis!", "Charakter: %s", "verspielt", "faul", "verfressen", "schuechtern",
+    // phase 15
+    "SPIELE", "KOPF", "ARCADE", "BALLONS", "RENNEN", "FANGEN", "BALANCE", "TYPENQUIZ", "SCHIEBEPUZZLE", "BLASEN", "MALEN", "Ballons ja, Bomben nein", "Schuettel oder tippe schnell", "Fangen, Voltobal meiden", "Kippen oder Seite tippen", "Wie effektiv?", "Ordne 1 bis 8", "Tippe gleiche Gruppen", "FERTIG",
+    // phase 16
+    "OUTFITS", "SONNENBRILLE", "STERNBRILLE", "HERZBRILLE", "MONOKEL", "SCHAL", "FLIEGE", "MEDAILLE", "HALSTUCH", "UMHANG", "RUCKSACK", "ENGELSFLUEGEL", "FLEDERMAUSFLUEGEL", "Sieht toll aus!",
+    // phase 17
+    "STRAND", "BIBLIOTHEK", "MUSIK", "WETTBEWERB", "SPIELHALLE", "JOBS", "BURG", "Eine Muschel! +1", "Heute keine Muscheln mehr", "Eine Sandburg!", "Heute schon gebaut", "LESEN", "Genug gelesen heute", "Genug Musik heute", "KAMPF", "SIEG", "WIEGENLIED", "MITMACHEN", "Naechste Woche wieder", "Kein Band... +2", "Bronzeband! +5", "Silberband! +10", "Goldband! +20", "Outfit, Bindung, Freude", "CAFE", "BLUMENLADEN", "POST", "3 Std.   +15", "Es arbeitet", "Zurueck um %u:%02u", "Zurueck von der Arbeit! +15", "Morgen wieder", "POST", "Keine Briefe", "Prof. Eich: Super! Hier 5 Muenzen.", "Mauzi: Ein Keks fuer dich, miau!", "Chaneira: Ein Samen fuer deinen Garten.", "Pikachu: Pika pika! (eine Seife)", "Oma: 8 Muenzen zum Sparen.", "Ein Freund: Lass uns spielen!",
+    // phase 19
+    "QUEST", "Pikachu hat seinen Hut verloren", "Mauzis Mittagessen", "Chaneiras verlorenes Ei", "Ein Lied fuer Pummeluff", "Such im Park", "Such am Strand", "Frag in der Bibliothek", "Angle am See", "Koche ein Gericht", "Esst etwas Selbstgemachtes", "Oeffne einen Abenteuerhalt", "Besuch das Pokemon-Center", "Nimm ein Bad", "Spiel ein Lied", "Spiel ein Spiel", "Lern in der Schule", "Naechster Schritt morgen", "Quest geschafft! Ein Hut", "Suesses oder Saures! Ein Keks", "Ein Gratis-Kakao!", "Ein Jahr zusammen! +50", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -332,7 +364,15 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 13: hats and the room
     "CAPPELLO DA CHEF", "CAPPELLO PIRATA", "ORECCHIE DA GATTO", "ORECCHIE DA CONIGLIO", "CUFFIE", "TOCCO", "CORONA DI FIORI", "CASCO DA CANTIERE", "BASCO", "ELMO VICHINGO", "MOBILI", "LA MIA STANZA", "FINESTRA", "OROLOGIO", "QUADRO", "MENSOLA", "DIVANO", "TV", "ACQUARIO", "LIBRERIA", "CAMINO", "TAPPETO", "CARTA BLU", "CARTA ROSA", "CARTA MENTA",
     // phase 14
-    "Voglio %s!", "Voglio giocare!", "Andiamo al parco!", "Voglio un bagno!", "Andiamo a pescare!", "Accarezzami!", "Desiderio esaudito! +5", "Si sente solo", "Che giornata!", "Mi sei mancato...", "Buon compleanno! +20", "%u mesi!", "Un uovo di Pasqua! +5", "Festa d'estate: gelato gratis!", "Carattere: %s", "giocherellone", "pigrone", "golosone", "timido", },
+    "Voglio %s!", "Voglio giocare!", "Andiamo al parco!", "Voglio un bagno!", "Andiamo a pescare!", "Accarezzami!", "Desiderio esaudito! +5", "Si sente solo", "Che giornata!", "Mi sei mancato...", "Buon compleanno! +20", "%u mesi!", "Un uovo di Pasqua! +5", "Festa d'estate: gelato gratis!", "Carattere: %s", "giocherellone", "pigrone", "golosone", "timido",
+    // phase 15
+    "GIOCHI", "MENTE", "ARCADE", "PALLONCINI", "CORSA", "PRENDI", "EQUILIBRIO", "QUIZ TIPI", "PUZZLE", "BOLLE", "DISEGNO", "Palloncini si, bombe no", "Scuoti o tocca veloce", "Prendili, evita Voltorb", "Inclina o tocca un lato", "Quanto e efficace?", "Ordina da 1 a 8", "Tocca gruppi uguali", "FATTO",
+    // phase 16
+    "VESTITI", "OCCHIALI DA SOLE", "OCCHIALI STELLA", "OCCHIALI CUORE", "MONOCOLO", "SCIARPA", "PAPILLON", "MEDAGLIA", "BANDANA", "MANTELLO", "ZAINO", "ALI D'ANGELO", "ALI DI PIPISTRELLO", "Che stile!",
+    // phase 17
+    "SPIAGGIA", "BIBLIOTECA", "MUSICA", "CONCORSO", "SALA GIOCHI", "LAVORETTI", "CASTELLO", "Una conchiglia! +1", "Niente piu conchiglie", "Un castello di sabbia!", "Gia fatto oggi", "LEGGI", "Basta leggere oggi", "Basta musica oggi", "LOTTA", "VITTORIA", "NINNA NANNA", "PARTECIPA", "Torna la prossima settimana", "Niente fiocco... +2", "Fiocco di bronzo! +5", "Fiocco d'argento! +10", "Fiocco d'oro! +20", "Contano vestiti, legame, gioia", "CAFFE", "FIORAIO", "POSTA", "3 h   +15", "E al lavoro", "Torna alle %u:%02u", "Tornato dal lavoro! +15", "Domani ancora", "POSTA", "Nessuna lettera", "Prof. Oak: Ottimo! Ecco 5 monete.", "Meowth: Un biscotto per te, miao!", "Chansey: Un seme per il tuo orto.", "Pikachu: Pika pika! (un sapone)", "La nonna: 8 monete per i risparmi.", "Un amico: Mi manchi, giochiamo!",
+    // phase 19
+    "MISSIONE", "Pikachu ha perso il cappello", "Il pranzo di Meowth", "L'uovo perso di Chansey", "Una canzone per Jigglypuff", "Cerca al parco", "Cerca in spiaggia", "Chiedi in biblioteca", "Pesca al lago", "Cucina un piatto", "Mangiate qualcosa fatto in casa", "Apri una tappa d'avventura", "Visita il Centro Pokemon", "Fai un bagno", "Metti una canzone", "Fai un gioco", "Studia a scuola", "Prossimo passo domani", "Missione compiuta! Un cappello", "Dolcetto o scherzetto! Un biscotto", "Una cioccolata calda gratis!", "Un anno insieme! +50", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -397,7 +437,15 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 13: hats and the room
     "CHAPEU DE CHEF", "CHAPEU PIRATA", "ORELHAS DE GATO", "ORELHAS DE COELHO", "FONES", "CAPELO", "COROA DE FLORES", "CAPACETE", "BOINA", "CAPACETE VIKING", "MOVEIS", "MEU QUARTO", "JANELA", "RELOGIO", "QUADRO", "PRATELEIRA", "SOFA", "TV", "AQUARIO", "ESTANTE DE LIVROS", "LAREIRA", "TAPETE", "PAPEL AZUL", "PAPEL ROSA", "PAPEL MENTA",
     // phase 14
-    "Quero %s!", "Quero brincar!", "Vamos ao parque!", "Quero um banho!", "Vamos pescar!", "Faz carinho!", "Desejo realizado! +5", "Sente saudade", "Que dia otimo!", "Senti sua falta...", "Feliz aniversario! +20", "%u meses!", "Um ovo de Pascoa! +5", "Festa de verao: sorvete gratis!", "Personalidade: %s", "brincalhona", "preguicosa", "comilona", "timida", },
+    "Quero %s!", "Quero brincar!", "Vamos ao parque!", "Quero um banho!", "Vamos pescar!", "Faz carinho!", "Desejo realizado! +5", "Sente saudade", "Que dia otimo!", "Senti sua falta...", "Feliz aniversario! +20", "%u meses!", "Um ovo de Pascoa! +5", "Festa de verao: sorvete gratis!", "Personalidade: %s", "brincalhona", "preguicosa", "comilona", "timida",
+    // phase 15
+    "JOGOS", "MENTE", "ARCADE", "BALOES", "CORRIDA", "PEGA", "EQUILIBRIO", "QUIZ DE TIPOS", "QUEBRA-CABECA", "BOLHAS", "DESENHO", "Estoure baloes, nao bombas", "Sacuda ou toque rapido", "Pegue, desvie de Voltorb", "Incline ou toque um lado", "Quao eficaz e?", "Ordene de 1 a 8", "Toque grupos iguais", "PRONTO",
+    // phase 16
+    "ROUPAS", "OCULOS DE SOL", "OCULOS ESTRELA", "OCULOS CORACAO", "MONOCULO", "CACHECOL", "GRAVATA BORBOLETA", "MEDALHA", "BANDANA", "CAPA", "MOCHILA", "ASAS DE ANJO", "ASAS DE MORCEGO", "Que estilo!",
+    // phase 17
+    "PRAIA", "BIBLIOTECA", "MUSICA", "CONCURSO", "FLIPERAMA", "TRABALHOS", "CASTELO", "Uma concha! +1", "Sem mais conchas hoje", "Um castelo de areia!", "Ja fez um hoje", "LER", "Chega de leitura hoje", "Chega de musica hoje", "BATALHA", "VITORIA", "CANCAO DE NINAR", "PARTICIPAR", "Volte semana que vem", "Sem fita desta vez... +2", "Fita de bronze! +5", "Fita de prata! +10", "Fita de ouro! +20", "Roupa, laco e alegria contam", "CAFETERIA", "FLORICULTURA", "CORREIO", "3 h   +15", "Esta trabalhando", "Volta as %u:%02u", "Voltou do trabalho! +15", "Amanha tem mais", "CORREIO", "Sem cartas", "Prof. Carvalho: Muito bem! 5 moedas.", "Meowth: Um biscoito pra voce, miau!", "Chansey: Uma semente para sua horta.", "Pikachu: Pika pika! (um sabonete)", "Vovo: 8 moedas para guardar.", "Um amigo: Saudade, vamos brincar!",
+    // phase 19
+    "MISSAO", "Pikachu perdeu o chapeu", "O almoco de Meowth", "O ovo perdido de Chansey", "Uma cancao para Jigglypuff", "Procure no parque", "Procure na praia", "Pergunte na biblioteca", "Pesque no lago", "Cozinhe um prato", "Comam algo caseiro", "Abra uma parada de aventura", "Visite o Centro Pokemon", "Tome um banho", "Toque uma musica", "Jogue um jogo", "Estude na escola", "Proximo passo amanha", "Missao completa! Um chapeu", "Gostosuras! Um biscoito", "Chocolate quente gratis!", "Um ano juntos! +50", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -464,7 +512,15 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 13: hats and the room
     "厨师帽", "海盗帽", "猫耳", "兔耳", "耳机", "学士帽", "花冠", "安全帽", "贝雷帽", "维京头盔", "家具", "我的房间", "窗户", "挂钟", "画", "架子", "沙发", "电视", "鱼缸", "书架", "壁炉", "地毯", "蓝色壁纸", "粉色壁纸", "薄荷壁纸",
     // phase 14
-    "我想要%s!", "我想玩!", "去公园吧!", "我想洗澡!", "去钓鱼吧!", "摸摸我!", "愿望实现! +5", "有点寂寞", "今天超棒!", "我想你了...", "生日快乐! +20", "%u个月啦!", "复活节彩蛋! +5", "夏日祭: 免费冰淇淋!", "性格: %s", "爱玩", "懒洋洋", "贪吃", "害羞", },
+    "我想要%s!", "我想玩!", "去公园吧!", "我想洗澡!", "去钓鱼吧!", "摸摸我!", "愿望实现! +5", "有点寂寞", "今天超棒!", "我想你了...", "生日快乐! +20", "%u个月啦!", "复活节彩蛋! +5", "夏日祭: 免费冰淇淋!", "性格: %s", "爱玩", "懒洋洋", "贪吃", "害羞",
+    // phase 15
+    "游戏", "头脑", "街机", "气球", "赛跑", "接住", "平衡", "属性测验", "滑块拼图", "泡泡", "画画", "戳气球, 别碰炸弹", "摇动或快速点击", "接住, 躲开霹雳电球", "倾斜或按住一边", "效果如何?", "按1到8排好", "点击同色泡泡", "完成",
+    // phase 16
+    "服装", "墨镜", "星星眼镜", "爱心眼镜", "单片眼镜", "围巾", "领结", "奖牌", "头巾", "斗篷", "背包", "天使翅膀", "蝙蝠翅膀", "真时髦!",
+    // phase 17
+    "海滩", "图书馆", "音乐厅", "比赛", "游戏厅", "打工", "城堡", "贝壳! +1", "今天没有贝壳了", "沙堡!", "今天已经堆过了", "阅读", "今天读够了", "今天听够了", "战斗", "胜利", "摇篮曲", "参加", "下周再来", "这次没有缎带... +2", "铜缎带! +5", "银缎带! +10", "金缎带! +20", "服装, 亲密度和心情", "咖啡馆", "花店", "邮局", "3小时 +15", "在打工", "%u:%02u 回来", "下班回来了! +15", "明天再打工", "信件", "没有信", "大木博士: 做得好! 送你5枚金币。", "喵喵: 送你一块饼干, 喵!", "吉利蛋: 送你一颗种子。", "皮卡丘: 皮卡皮卡! (肥皂)", "奶奶: 8枚金币给你存起来。", "朋友: 想你了, 一起玩吧!",
+    // phase 19
+    "任务", "皮卡丘的帽子丢了", "喵喵的午饭", "吉利蛋丢失的蛋", "给胖丁的歌", "去公园找找", "去海滩找找", "去图书馆问问", "在湖边钓鱼", "做一道菜", "一起吃自制的菜", "打开一个冒险站点", "去宝可梦中心", "洗个澡", "放一首歌", "玩个游戏", "在学校学习", "下一步明天继续", "任务完成! 新帽子", "不给糖就捣蛋! 饼干", "免费热可可!", "在一起一年了! +50", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -530,7 +586,15 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 13: hats and the room
     "요리사 모자", "해적 모자", "고양이 귀", "토끼 귀", "헤드폰", "학사모", "꽃관", "안전모", "베레모", "바이킹 투구", "가구", "내 방", "창문", "시계", "그림", "선반", "소파", "TV", "어항", "책장", "벽난로", "러그", "파란 벽지", "분홍 벽지", "민트 벽지",
     // phase 14
-    "%s 먹고 싶어요!", "놀고 싶어요!", "공원 가요!", "목욕하고 싶어요!", "낚시 가요!", "쓰다듬어 줘요!", "소원 성취! +5", "외로워해요", "최고의 하루!", "보고 싶었어요...", "생일 축하해요! +20", "%u개월!", "부활절 달걀! +5", "여름 축제: 아이스크림 공짜!", "성격: %s", "장난꾸러기", "게으름뱅이", "먹보", "수줍음", },
+    "%s 먹고 싶어요!", "놀고 싶어요!", "공원 가요!", "목욕하고 싶어요!", "낚시 가요!", "쓰다듬어 줘요!", "소원 성취! +5", "외로워해요", "최고의 하루!", "보고 싶었어요...", "생일 축하해요! +20", "%u개월!", "부활절 달걀! +5", "여름 축제: 아이스크림 공짜!", "성격: %s", "장난꾸러기", "게으름뱅이", "먹보", "수줍음",
+    // phase 15
+    "게임", "두뇌", "아케이드", "풍선 터뜨리기", "흔들기 경주", "받기", "균형", "타입 퀴즈", "슬라이드 퍼즐", "버블", "그림 그리기", "폭탄은 피해요", "흔들거나 빠르게 눌러요", "받고, 찌리리공은 피해요", "기울이거나 한쪽을 눌러요", "효과는 얼마나?", "1부터 8까지 정렬", "같은 색 묶음을 눌러요", "완성",
+    // phase 16
+    "옷", "선글라스", "별 안경", "하트 안경", "외알 안경", "목도리", "나비넥타이", "메달", "반다나", "망토", "배낭", "천사 날개", "박쥐 날개", "멋쟁이!",
+    // phase 17
+    "해변", "도서관", "음악당", "콘테스트", "오락실", "아르바이트", "모래성", "조개! +1", "오늘은 조개가 없어요", "모래성 완성!", "오늘 이미 만들었어요", "읽기", "오늘은 충분히 읽었어요", "오늘은 음악 그만", "배틀", "승리", "자장가", "참가", "다음 주에 와요", "이번엔 리본 없음... +2", "동 리본! +5", "은 리본! +10", "금 리본! +20", "옷, 친밀도, 기쁨이 중요해요", "카페", "꽃집", "우체국", "3시간 +15", "일하는 중", "%u:%02u 돌아와요", "퇴근했어요! +15", "내일 또 해요", "우편", "편지가 없어요", "오박사: 잘했어! 코인 5개 줄게.", "나옹: 쿠키 선물이다옹!", "럭키: 텃밭에 심을 씨앗이야.", "피카츄: 피카피카! (비누)", "할머니: 저금하렴, 코인 8개.", "친구: 보고 싶어, 같이 놀자!",
+    // phase 19
+    "퀘스트", "피카츄가 모자를 잃어버렸어요", "나옹의 점심", "럭키의 잃어버린 알", "푸린을 위한 노래", "공원을 찾아봐요", "해변을 찾아봐요", "도서관에 물어봐요", "호수에서 낚시해요", "요리를 해요", "직접 만든 음식을 먹어요", "모험 정류장을 열어요", "포켓몬센터에 가요", "목욕해요", "노래를 틀어요", "게임을 해요", "학교에서 공부해요", "다음 단계는 내일", "퀘스트 완료! 새 모자", "트릭 오어 트릿! 쿠키", "핫초코 공짜!", "함께한 지 1년! +50", },
 };
 
 // Medal names in their three lengths [language][medal].
