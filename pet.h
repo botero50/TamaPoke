@@ -38,6 +38,136 @@ enum : uint8_t { SLEEP_NONE = 0, SLEEP_AUTO, SLEEP_PLAYER };
 // end-of-cycle ceremonies
 enum : uint8_t { CER_NONE = 0, CER_FAREWELL, CER_RUNAWAY, CER_RELEASE };
 
+// Fun Pack: the eight extra minigames (index into miniHi and the reward table)
+enum MiniGameId : uint8_t {
+  MINI_LR = 0,   // left or right
+  MINI_HL,       // higher or lower
+  MINI_WHO,      // who's that pokemon
+  MINI_DROP,     // berry drop
+  MINI_MOLE,     // mole pop
+  MINI_ROPE,     // jump rope
+  MINI_DANCE,    // dance
+  MINI_HIDE,     // hide and seek
+  MINI_COUNT
+};
+#define MINI_NO_STAT (-1)
+enum : int8_t { MINI_STAT_ATK = 0, MINI_STAT_DEF, MINI_STAT_SPE };
+
+// Fun Pack: sickness and medicine. PILL_* rather than MED_*, which are medals.
+enum Sickness : uint8_t { SICK_NONE = 0, SICK_STOMACH, SICK_COLD };
+enum PillResult : uint8_t {
+  PILL_CURED = 0,   // cured
+  PILL_MORE,        // a cold needs another dose
+  PILL_WAIT,        // too soon for the next dose
+  PILL_NEED_BATH,   // doses done, a bath finishes the cure
+  PILL_NOT_SICK,    // it was healthy: tastes awful
+};
+#define OVERFEED_SICK 3          // binges until a stomachache
+#define DIRTY_SICK_TICKS 45      // minutes dirty (3 poops or HYG<15) until a cold
+#define SICK_MISTAKE_TICKS 360   // every 6 h left sick = 1 care mistake
+#define COLD_DOSE_GAP_MIN 10     // minutes between the two cold doses
+#define BORED_TICKS 480          // 8 h awake without a minigame
+#define DOZE_IDLE_MS (20UL * 60 * 1000)  // untouched time in the evening until it dozes off
+#define LIGHT_GRUMPY_TICKS 30    // minutes asleep with the light on until grumpy
+// Late evening by the RTC, for dozing off with the light on: 21:00 to 06:00.
+// Wider than NIGHT_START/END on purpose -- this is about a Pokemon left alone
+// with the screen on, not about putting the device in a pocket.
+#define DOZE_START 21
+#define DOZE_END 6
+
+// Coins: earned by caring, playing and walking, spent in the shop (phase 2).
+// Activity coins (games, care) stop at a daily cap so they cannot be farmed;
+// steps, missions, the daily bonus and badges are outside it.
+#define COIN_DAILY_CAP 50        // coins a day from games and care actions
+#define COIN_MAX 99999UL
+#define COIN_DAILY_BONUS 5       // first care of the day
+#define COIN_STREAK7_BONUS 15    // every 7th day of the streak
+#define COIN_PER_1000_STEPS 2
+#define COIN_STEP_CAP_K 10       // steps past 10 000 a day earn nothing more
+#define COIN_BADGE 15            // a badge won for the first time
+#define COIN_BEDTIME 3           // sent to bed with the light off in the evening
+#define COIN_MISSION 8
+#define COIN_ALL_MISSIONS 10     // extra, for finishing all three
+// A good day is about 60-80 coins (at most ~110): a cap or bow in a day or two,
+// the crown in about a week.
+#define MISSIONS_PER_DAY 3
+#define COIN_GAME_MAX 5          // a game pays 1 + score/10, at most this
+
+// Hats, bought in the shop with coins and worn on the main screen. Append new
+// ones at the END: ownership is a bit per hat in NVS.
+enum HatId : uint8_t {
+  HAT_CAP = 0, HAT_BOW, HAT_FLOWER, HAT_BEANIE, HAT_PARTY,
+  HAT_STRAW, HAT_WITCH, HAT_SANTA, HAT_TOPHAT, HAT_CROWN,
+  HAT_COUNT
+};
+static_assert(HAT_COUNT <= 16, "hatsOwned needs a bit per hat");
+#define HAT_NUDGE_MAX 60     // how far the player may move a hat, px each way
+
+// Toys and decorations, bought in the shop and set down on the main screen's
+// floor, one each side of the creature. The first DEC_TOY_COUNT are toys: a
+// toy out keeps it company (boredom builds half as fast) and it goes over to
+// play with it. Append new ones at the END: ownership is a bit each in NVS.
+enum DecorId : uint8_t {
+  DEC_BALL = 0, DEC_PLUSH, DEC_DUCK, DEC_BLOCKS, DEC_DRUM, DEC_KITE,
+  DEC_PLANT, DEC_FLOWERS, DEC_LAMP, DEC_BED, DEC_GIFT, DEC_PUMPKIN,
+  DEC_COUNT
+};
+#define DEC_TOY_COUNT 6
+
+// Foods bought in the shop and kept in the bag, a count each (the berries and
+// the candy stay free and unlimited). Grouped for the food menu: meals, then
+// sweets, then drinks. Append new ones at the END: the counts are one byte
+// each in NVS, in this order.
+enum FoodId : uint8_t {
+  FOOD_SANDWICH = 0, FOOD_CURRY, FOOD_SOUP, FOOD_ONIGIRI,   // meals
+  FOOD_CAKE, FOOD_COOKIE, FOOD_ICECREAM,                     // sweets
+  FOOD_MILK, FOOD_JUICE,                                     // drinks
+  FOOD_COUNT
+};
+#define FOOD_MEALS 4
+#define FOOD_SWEETS 3
+#define FOOD_DRINKS 2
+#define FOOD_STACK_MAX 99
+// Bath and sleep extras
+#define SOAP_PRICE 10            // one bubble bath
+#define BRUSH_PRICE 60           // bought once
+#define NAP_MINUTES 30
+#define SHINE_MS 60000UL         // sparkles after brushing
+
+// Places (the map): the park, the store, the Pokemon Center and the garden.
+#define PARK_FINDS_PER_DAY 3     // coins found in the park, at most this often a day
+#define PARK_WALK_ENERGY 5
+#define CENTER_PRICE 20          // a second visit the same day
+#define SEED_PRICE 5
+#define GARDEN_GROW_SECS (8UL * 3600)   // a seed is ready to harvest after 8 h
+enum ParkResult : uint8_t { PARK_TIRED = 0, PARK_COINS, PARK_BERRY, PARK_FRIEND, PARK_NOTHING };
+enum CenterResult : uint8_t { CENTER_FREE = 0, CENTER_PAID, CENTER_NO_COINS };
+// Seasonal gifts, by the RTC date. GIFT_NONE when today is no holiday or the
+// gift was already handed out today.
+enum GiftKind : uint8_t { GIFT_NONE = 0, GIFT_HALLOWEEN, GIFT_CHRISTMAS, GIFT_NEWYEAR, GIFT_VALENTINE };
+struct FoodInfo {
+  int8_t food, joy, energy, weight;   // what one serving does
+  uint8_t price;
+  bool sweet;                         // counts double towards a stomachache, like candy
+};
+static_assert(DEC_COUNT <= 16, "decorOwned needs a bit per item");
+// Daily missions. Which three come up is derived from the day number, so it is
+// the same after a reboot and needs no storage -- only the progress is saved.
+// Append new ones at the END: the day's pick indexes this list.
+enum MissionId : uint8_t {
+  MIS_FEED = 0,     // feed it N times
+  MIS_FEED_FAV,     // feed its favourite berry
+  MIS_PLAY,         // play N minigames
+  MIS_STEPS,        // walk N steps
+  MIS_BATH,         // give it a bath
+  MIS_PET,          // pet it N times
+  MIS_TRAIN_ATK,    // play a strength game
+  MIS_TRAIN_SPE,    // play a speed game
+  MIS_TRAIN_DEF,    // play a defence game
+  MIS_SCORE,        // score N in any game
+  MIS_COUNT
+};
+
 enum PetMood : uint8_t { MOOD_HAPPY, MOOD_SAD, MOOD_EATING, MOOD_SLEEPING };
 
 // the individual's medals (bitmask)
@@ -176,6 +306,118 @@ public:
   uint8_t rewardTraining(uint8_t amount, uint8_t &which);
   uint16_t spdHi = 0;    // best reaction-test score
 
+  // Fun Pack: the extra minigames' rewards and records
+  uint8_t applyMiniResult(uint8_t game, uint8_t score);  // stat points, or joy for joy-only games
+  static int8_t miniGameStat(uint8_t game);
+  uint16_t miniHi[MINI_COUNT] = { 0 };
+  // Fun Pack: statuses. All persisted under new keys, so an older save loads
+  // healthy and with no records.
+  uint8_t sickness = SICK_NONE;
+  uint8_t sickDoses = 0;
+  uint32_t lastDoseMinute = 0;
+  uint16_t sickTicks = 0;
+  uint8_t overfeed = 0;
+  uint8_t dirtyTicks = 0;
+  bool lightOn = false;        // dozed off by itself and the light is still on
+  uint8_t lightOnTicks = 0;
+  bool grumpy = false;
+  uint16_t boredTicks = 0;
+  bool isSick() const { return sickness != SICK_NONE; }
+  bool isBored() const { return boredTicks >= BORED_TICKS; }
+  bool canPlay() const { return !isSick(); }
+  PillResult giveMedicine();
+  void dozeOff();               // the sketch: left alone in the evening, screen on
+
+  // Coins and daily missions. Player-wide like the streak: newEgg() leaves them.
+  uint32_t coins = 0;
+  uint16_t coinsToday = 0;      // activity coins earned today (against the cap)
+  uint32_t coinDay = 0;         // the day coinsToday / missions / step coins belong to
+  uint8_t stepCoinK = 0;        // thousands of steps already paid today
+  uint8_t missionProg[MISSIONS_PER_DAY] = { 0, 0, 0 };
+  uint8_t missionDone = 0;      // bit per mission; bit 7 = the all-three bonus paid
+  uint32_t bedtimeDay = 0;      // the day the bedtime bonus was last paid
+  uint16_t coinFlash = 0;       // the sketch shows "+N" while coinFlashUntil runs
+  uint32_t coinFlashUntil = 0;
+  // Adds coins; capped = counts against COIN_DAILY_CAP. Returns what was added.
+  uint16_t earnCoins(uint16_t amount, bool capped);
+  bool spendCoins(uint32_t amount);
+  uint8_t missionAt(uint8_t slot) const;        // today's mission in slot 0..2
+  static uint8_t missionGoal(uint8_t m);        // the N in "do it N times"
+  uint8_t missionProgress(uint8_t slot) const;  // 0..goal
+  bool missionComplete(uint8_t slot) const { return missionDone & (1 << slot); }
+  void noteMission(uint8_t m, uint8_t amount);  // progress any of today's slots for m
+  uint16_t coinsCapLeft() const;
+
+  // Hats. Player-wide: a new egg keeps what was bought (and what is worn).
+  uint16_t hatsOwned = 0;       // bit per HatId
+  int8_t hatOn = -1;            // the hat being worn, -1 = none
+  // Where the player nudged the hat for THIS species: tops differ (BULBASAUR's
+  // highest point is its bulb, not its head), so a nudge belongs to a species
+  // and quietly resets when the creature evolves or a new one hatches.
+  int8_t hatDx = 0, hatDy = 0;
+  int16_t hatDex = 0;
+  static uint16_t hatPrice(uint8_t h);
+  bool ownsHat(uint8_t h) const { return h < HAT_COUNT && (hatsOwned & (1 << h)); }
+  bool buyHat(uint8_t h);       // false: unknown, already owned, or not enough coins
+  void wearHat(int8_t h);       // -1 takes it off; an unowned hat is ignored
+  void nudgeHat(int dx, int dy);
+  int hatOffX() const { return hatDex == speciesId ? hatDx : 0; }
+  int hatOffY() const { return hatDex == speciesId ? hatDy : 0; }
+
+  // Toys and decorations. Player-wide, like the hats.
+  uint16_t decorOwned = 0;      // bit per DecorId
+  int8_t slotL = -1, slotR = -1;  // what stands left / right of the creature
+  static uint16_t decorPrice(uint8_t d);
+  static bool isToy(int8_t d) { return d >= 0 && d < DEC_TOY_COUNT; }
+  bool ownsDecor(uint8_t d) const { return d < DEC_COUNT && (decorOwned & (1 << d)); }
+  bool buyDecor(uint8_t d);     // false: unknown, already owned, or not enough coins
+  // Tapping an item in the bag: puts it in the first free spot (left, then
+  // right, else it replaces the left one), or picks it up if it is out.
+  void placeDecor(uint8_t d);
+  bool toyOut() const { return isToy(slotL) || isToy(slotR); }
+  bool hasDecorOut(uint8_t d) const { return slotL == (int8_t)d || slotR == (int8_t)d; }
+
+  // Foods in the bag. Player-wide, like the coins.
+  uint8_t foodCount[FOOD_COUNT] = { 0 };
+  static const FoodInfo &foodInfo(uint8_t f);
+  bool buyFood(uint8_t f);      // one more serving; false without the coins or at the stack limit
+  bool eatFood(uint8_t f);      // false when there is none, or it cannot eat now
+
+  // Bath and sleep extras. Soap is used up, the brush is kept. Player-wide.
+  uint8_t soapCount = 0;
+  bool brushOwned = false;
+  uint32_t napEnd = 0;          // ageMinutes the nap ends at, 0 = not napping
+  uint32_t shineUntil = 0;      // millis: sparkles after brushing (not saved)
+  bool buySoap();
+  bool buyBrush();
+  bool bubbleBath();            // uses a soap: the bath plus joy and bond
+  bool brush();                 // needs the brush: joy, bond and a shine
+  void scrubDone(uint8_t spots);  // the scrub game finished: a bath plus joy
+  bool startNap();              // light off, wakes by itself after NAP_MINUTES
+  bool lullaby();               // put to bed with a song: bedtime plus joy
+  bool shining() const { return millis() < shineUntil; }
+
+  // Places. Player-wide.
+  uint32_t parkDay = 0;         // the day parkFinds counts
+  uint8_t parkFinds = 0;
+  uint32_t centerDay = 0;       // the day of the last free heal
+  uint8_t seedCount = 0;
+  uint32_t plantEpoch = 0;      // when the garden was planted (RTC), 0 = empty
+  uint32_t giftDay = 0;         // the day the last seasonal gift was handed out
+  uint8_t lastFind = 0;         // coins the last PARK_COINS found (for the screen)
+  ParkResult parkWalk();        // a walk in the park: tires a little, finds things
+  CenterResult centerHeal();    // cures sickness and grumpiness, +30 ENE
+  bool centerFreeToday() const { return centerDay != today(); }
+  bool buySeed();
+  bool plantSeed();             // needs a seed, an empty plot and the clock
+  bool gardenReady() const;
+  uint8_t gardenPercent() const;  // 0..100 grown
+  int8_t harvest();             // the FoodId it gave, or -1 when not ready
+  GiftKind holidayToday() const;  // which holiday the RTC date is, if any
+  GiftKind claimHolidayGift();  // hands today's gift over once; the screen says what
+  static void civilDate(uint32_t days, int &y, int &m, int &d);   // days since 1970 -> date
+  bool isDozeHour() const;
+
   // combat stats: real gen 1 base + level + IV + training
   uint16_t atkStat() const;
   uint16_t defStat() const;
@@ -276,9 +518,11 @@ public:
   void winBadge(uint8_t rg, uint8_t i, bool hard) {
     if (rg >= GYM_REGIONS) return;
     uint16_t bit = (uint16_t)1 << i;
+    bool isNew = !hasBadge(rg, i, hard);
     if (rg == 0) { if (hard) badgesHard |= bit; else badges |= bit; }
     else if (hard) badgesHardX[rg - 1] |= bit;
     else badgesX[rg - 1] |= bit;
+    if (isNew) earnCoins(COIN_BADGE, false);   // a rematch pays nothing
     save();
   }
   uint8_t badgeCountIn(uint8_t rg, bool hard) const {
@@ -509,6 +753,12 @@ private:
   void defTick(bool resting);       // calm forges defence (see pet.cpp)
   void snapshotForParty();          // copy into endedMon before newEgg() wipes it
   void checkMedals();
+  void notePlayed();          // any minigame: cures boredom and grumpiness
+  void rollCoinDay();         // a new day: reset the cap, the missions, the step coins
+  void notePlayedGame(uint8_t cat, uint16_t score);   // coins + missions for a game (cat: MINI_STAT_* or MINI_NO_STAT)
+  void noteOverfeed(uint8_t amount);
+  void wakeUp();              // waking applies the grumpiness from the light
+  void statusTick();          // per awake minute: sickness, boredom, dozing off
   void tick();
   void applyAutoSleep();
   void hatch();

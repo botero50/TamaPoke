@@ -133,6 +133,25 @@ static int16_t buf[256 * 2];  // interleaved stereo (L=R)
 static int16_t mono[256];
 static GbSynth gSyn;
 
+// The sleep menu's lullaby: Brahms' "Wiegenlied" (1868, public domain), soft
+// and once through. Written in Hz and turned into Game Boy notes on first use.
+struct LullabyNote { uint16_t hz, ms; };
+static const LullabyNote LULLABY_HZ[] = {
+  { 330, 250 }, { 330, 250 }, { 392, 1000 }, { 330, 250 }, { 330, 250 }, { 392, 1000 },
+  { 330, 250 }, { 392, 250 }, { 523, 500 }, { 494, 750 }, { 440, 250 }, { 440, 500 }, { 392, 500 },
+  { 294, 250 }, { 330, 250 }, { 349, 500 }, { 294, 500 }, { 294, 250 }, { 330, 250 }, { 349, 1000 },
+  { 294, 250 }, { 349, 250 }, { 494, 250 }, { 440, 250 }, { 392, 500 }, { 494, 500 }, { 523, 1500 },
+};
+#define LULLABY_N (sizeof(LULLABY_HZ) / sizeof(LULLABY_HZ[0]))
+static uint16_t hzToGb(uint16_t hz);
+static MusicNote gLullaby1[LULLABY_N];
+static const MusicNote gLullaby2[1] = { { 0, 2, 0, 0, 0, 60000 } };   // the second voice rests
+static void buildLullaby() {
+  if (gLullaby1[0].ms) return;
+  for (uint16_t i = 0; i < LULLABY_N; i++)
+    gLullaby1[i] = { hzToGb(LULLABY_HZ[i].hz), 2, 8, 0, 0, LULLABY_HZ[i].ms };
+}
+
 // The SFX tables are written in Hz; the synth speaks the Game Boy's frequency
 // register. Converting here means the cues did not have to be rewritten.
 static uint16_t hzToGb(uint16_t hz) {
@@ -244,11 +263,13 @@ static void audioTask(void *) {
     // 0 = the gym leader battle, 3 = the victory fanfare. Winning used to play
     // index 2, which is the WILD BATTLE theme -- so a win sounded like the fight
     // had started again.
-    const MusicTrack &t = MUSIC_TBL[(m == MUS_VICTORY) ? 3 : 0];
+    buildLullaby();
+    static const MusicTrack LULLABY = { gLullaby1, (uint16_t)LULLABY_N, gLullaby2, 1, "lullaby" };
+    const MusicTrack &t = (m == MUS_LULLABY) ? LULLABY : MUSIC_TBL[(m == MUS_VICTORY) ? 3 : 0];
     // start whichever channel is due
     if (clock >= at1) {
       if (mi1 >= t.n1) {                       // loop, or stop a one-shot
-        if (m == MUS_VICTORY) { gMusic = MUS_NONE; continue; }
+        if (m == MUS_VICTORY || m == MUS_LULLABY) { gMusic = MUS_NONE; continue; }
         mi1 = 0; at1 = clock;
       }
       const MusicNote &n = t.ch1[mi1++];
@@ -272,7 +293,7 @@ static void audioTask(void *) {
   }
 }
 
-void audioMusic(uint8_t id) { gMusic = (id < 3) ? id : MUS_NONE; }
+void audioMusic(uint8_t id) { gMusic = (id <= MUS_LULLABY) ? id : MUS_NONE; }
 
 void audioSetVolume(uint8_t v) { gVol = v > 100 ? 100 : v; }
 void audioSaveVolume() {

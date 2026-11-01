@@ -90,6 +90,9 @@ void Pet::newEgg() {
   mistakeCooldown = 0;
   sleeping = false;
   frozen = false;
+  sickness = SICK_NONE; sickDoses = 0; sickTicks = 0; lastDoseMinute = 0;
+  overfeed = 0; dirtyTicks = 0; lightOn = false; lightOnTicks = 0;
+  grumpy = false; boredTicks = 0;
   save();
 }
 
@@ -123,8 +126,10 @@ void Pet::syncClock(uint32_t nowEpoch) {
       if (ageMinutes >= 3) hatch();  // hatches while you are away
       continue;
     }
+    if (sleeping && napEnd && ageMinutes >= napEnd) { napEnd = 0; wakeUp(); sleepAuto = SLEEP_NONE; }
     if (sleeping) {  // rest: falls slowly and with a floor, same as live
-      energy = clamp100(energy + 6);
+      energy = clamp100(energy + (lightOn ? 3 : 6));
+      if (lightOn && lightOnTicks < 255) lightOnTicks++;
       if (ageMinutes % 2 == 0) {
         fullness = dropTo(fullness, 1, 30);
         joy = dropTo(joy, 1, 35);
@@ -136,6 +141,7 @@ void Pet::syncClock(uint32_t nowEpoch) {
     energy = dropTo(energy, 1, 15);
     hygiene = dropTo(hygiene, 1, 15);
     joy = dropTo(joy, 1, 15);
+    if (boredTicks < 0xFFFF) boredTicks++;  // nobody played with it meanwhile
   }
   if (!isEgg()) {
     if (!sleeping) {  // does not get dirty while sleeping
@@ -183,7 +189,15 @@ void Pet::tick() {
   // zero, with no mistakes or runaways). awake: food -2/min, hyg/joy -1/min.
   // Weight is still burned and rest counts toward DEF (see defTick).
   if (sleeping) {
-    energy = clamp100(energy + 6);
+    energy = clamp100(energy + (lightOn ? 3 : (hasDecorOut(DEC_BED) ? 7 : 6)));   // light on: badly; a bed: better
+    if (napEnd && ageMinutes >= napEnd) {   // the nap is over: up it gets, rested
+      napEnd = 0;
+      wakeUp();
+      sleepAuto = SLEEP_NONE;
+      pendingSave = true;
+      return;
+    }
+    if (lightOn && lightOnTicks < 255) lightOnTicks++;
     if (weight > 0 && ageMinutes % 3 == 0) weight--;
     if (ageMinutes % 2 == 0) {                 // ~4x slower than awake
       fullness = dropTo(fullness, 1, 30);
@@ -213,6 +227,8 @@ void Pet::tick() {
   if (fullness < 30) dJoy -= 2;
   if (hygiene < 30) dJoy -= 2;
   joy = clamp100(joy + dJoy);
+
+  statusTick();  // Fun Pack: sickness, boredom, dozing off with the light on
 
   // Mistake: leaving a stat in the gutter counts as a care
   // error (with a cooldown so the same mistake is not counted every minute)
@@ -536,6 +552,15 @@ void Pet::addSteps(uint32_t n) {
     stepsUnsaved = 0;
     pendingSave = true;
   }
+  rollCoinDay();
+  uint32_t k = stepCount / 1000;
+  if (k > COIN_STEP_CAP_K) k = COIN_STEP_CAP_K;
+  if (k > stepCoinK) {
+    earnCoins((uint16_t)((k - stepCoinK) * COIN_PER_1000_STEPS), false);
+    stepCoinK = (uint8_t)k;
+    pendingSave = true;
+  }
+  noteMission(MIS_STEPS, 0);
 }
 
 void Pet::setStepsToday(uint32_t n) {
@@ -557,6 +582,8 @@ void Pet::registerCare() {
   }
   lastCareDay = d;
   bondToday = 0;
+  earnCoins(COIN_DAILY_BONUS, false);
+  if (streak % 7 == 0) earnCoins(COIN_STREAK7_BONUS, false);
   if (streak > bestStreak) bestStreak = streak;
   bond = clamp100(bond + 4);
   uint16_t ms = (streak >= 100) ? 100 : (streak >= 30) ? 30
@@ -1038,6 +1065,7 @@ void Pet::feed() {
 void Pet::feedBerry(uint8_t color) {
   if (ceremony != CER_NONE) return;
   if (isEgg() || sleeping) return;
+  bool wasFull = fullness >= 90;
   if (lovesBerry(color)) {
     fullness = clamp100(fullness + 35);
     joy = clamp100(joy + 10);
@@ -1047,6 +1075,10 @@ void Pet::feedBerry(uint8_t color) {
   } else {
     fullness = clamp100(fullness + 25);
   }
+  if (wasFull) noteOverfeed(1);  // it was already full: a binge
+  if (lovesBerry(color)) noteMission(MIS_FEED_FAV, 1);
+  noteMission(MIS_FEED, 1);
+  earnCoins(1, true);
   eatUntil = millis() + EAT_ANIM_MS;
   registerCare();
   save();
@@ -1055,9 +1087,12 @@ void Pet::feedBerry(uint8_t color) {
 void Pet::feedCandy() {
   if (ceremony != CER_NONE) return;
   if (isEgg() || sleeping) return;
+  if (fullness >= 90) noteOverfeed(2);  // candy on a full stomach: worse
   fullness = clamp100(fullness + 10);
   joy = clamp100(joy + 12);
   weight = clamp100(weight + 12);  // treats take their toll
+  noteMission(MIS_FEED, 1);
+  earnCoins(1, true);
   eatUntil = millis() + EAT_ANIM_MS;
   registerCare();
   save();
@@ -1089,6 +1124,8 @@ uint8_t Pet::playResult(uint8_t score) {
   // ceiling.
   addBond((uint8_t)(2 + gain / 6));
   registerCare();
+  notePlayed();
+  notePlayedGame(MINI_STAT_DEF, score);
   save();
   return gain;
 }
@@ -1130,12 +1167,14 @@ uint8_t Pet::trainSpeed(uint16_t hits) {
   weight = burn > 0 ? burn : 0;
   joy = clamp100(joy + 4);
   if (hits > spdHi) spdHi = hits;
+  notePlayedGame(MINI_STAT_SPE, hits);
   // Training bonds, and it scales with the session: a token effort is worth the
   // base, a full one is worth more. The daily cap in addBond() still stops it
   // being farmed -- this changes how fast a good session gets there, not the
   // ceiling.
   addBond((uint8_t)(2 + gain / 6));
   registerCare();
+  notePlayed();
   save();
   return gain;
 }
@@ -1155,14 +1194,583 @@ uint8_t Pet::trainStrength(uint16_t hits) {
   joy = clamp100(joy + 6);
   if (hits >= 20) heartUntil = millis() + HEART_MS;
   if (hits > strHi) strHi = hits;   // record de golpes
+  notePlayedGame(MINI_STAT_ATK, hits);
   // Training bonds, and it scales with the session: a token effort is worth the
   // base, a full one is worth more. The daily cap in addBond() still stops it
   // being farmed -- this changes how fast a good session gets there, not the
   // ceiling.
   addBond((uint8_t)(2 + gain / 6));
   registerCare();
+  notePlayed();
   save();
   return gain;
+}
+
+// ---------- Fun Pack: the extra minigames ----------
+
+namespace {
+struct MiniReward {
+  uint8_t joyBase, joyPerScore, joyMax;  // joy = base + min(score*per, max)
+  uint8_t bond;
+  int8_t stat;                           // MINI_STAT_* or MINI_NO_STAT
+  uint8_t statDiv, statCap;              // gain = min(score/div, cap), IV ceiling still applies
+  uint8_t eneBase, eneDiv;               // cost = base + score/div
+  uint8_t foodDiv, foodCap;              // food = min(score/div, cap) (0 = none)
+  uint8_t weightPerScore;                // weight burned per point
+  uint8_t heartAt;                       // score that earns a heart
+};
+const MiniReward MINI_REWARDS[MINI_COUNT] = {
+  // joy        bond  stat            div cap  ene    food   wgt heart
+  { 4, 2, 20,   2,    MINI_NO_STAT,   1,  0,   3, 4,  0, 0,  0,  5 },  // LR
+  { 4, 2, 20,   2,    MINI_NO_STAT,   1,  0,   3, 4,  0, 0,  0,  5 },  // HL
+  { 4, 1, 16,   1,    MINI_STAT_DEF,  3,  8,   4, 4,  0, 0,  0,  6 },  // WHO
+  { 3, 1, 15,   1,    MINI_STAT_SPE,  4, 10,   6, 3,  3, 15, 1,  8 },  // DROP
+  { 3, 1, 15,   1,    MINI_STAT_ATK,  3, 12,   6, 3,  0, 0,  0,  8 },  // MOLE
+  { 3, 1, 15,   1,    MINI_STAT_SPE,  3, 12,   8, 2,  0, 0,  2,  8 },  // ROPE
+  { 6, 2, 30,   3,    MINI_NO_STAT,   1,  0,   6, 3,  0, 0,  1,  8 },  // DANCE
+  { 4, 2, 20,   2,    MINI_NO_STAT,   1,  0,   3, 4,  0, 0,  0,  5 },  // HIDE
+};
+}
+
+int8_t Pet::miniGameStat(uint8_t game) {
+  return game < MINI_COUNT ? MINI_REWARDS[game].stat : MINI_NO_STAT;
+}
+
+uint8_t Pet::applyMiniResult(uint8_t game, uint8_t score) {
+  if (ceremony != CER_NONE || isEgg() || game >= MINI_COUNT) return 0;
+  const MiniReward &r = MINI_REWARDS[game];
+  int joyGain = r.joyBase + min((int)score * r.joyPerScore, (int)r.joyMax);
+  if (grumpy) joyGain /= 2;  // grumpy: harder to cheer up today
+  uint8_t joyBefore = joy;
+  joy = clamp100((int)joy + joyGain);
+  uint8_t statGain = 0;
+  if (r.stat != MINI_NO_STAT) {
+    uint8_t want = score / r.statDiv;
+    if (want > r.statCap) want = r.statCap;
+    uint8_t *tr = r.stat == MINI_STAT_ATK ? &trAtk : (r.stat == MINI_STAT_DEF ? &trDef : &trSpe);
+    uint8_t cap = r.stat == MINI_STAT_ATK ? trMaxAtk() : (r.stat == MINI_STAT_DEF ? trMaxDef() : trMaxSpe());
+    uint8_t before = *tr;
+    *tr = (uint8_t)min<uint16_t>((uint16_t)before + want, cap);   // the IV sets the ceiling
+    statGain = *tr - before;
+  }
+  energy = dropTo(energy, r.eneBase + score / r.eneDiv, 5);
+  if (r.foodDiv) {
+    uint8_t food = score / r.foodDiv;
+    fullness = clamp100((int)fullness + (food > r.foodCap ? r.foodCap : food));
+  }
+  int burn = (int)weight - (int)score * r.weightPerScore;
+  weight = burn > 0 ? burn : 0;
+  if (score >= r.heartAt) heartUntil = millis() + HEART_MS;
+  if (score > miniHi[game]) miniHi[game] = score;
+  notePlayedGame((uint8_t)r.stat, score);
+  addBond(r.bond);
+  registerCare();
+  notePlayed();
+  save();
+  return r.stat != MINI_NO_STAT ? statGain : (uint8_t)(joy - joyBefore);
+}
+
+// ---------- Fun Pack: statuses (sickness, light, grumpy, bored) ----------
+
+void Pet::notePlayed() {
+  boredTicks = 0;
+  grumpy = false;
+}
+
+void Pet::noteOverfeed(uint8_t amount) {
+  uint8_t v = overfeed + amount;
+  overfeed = v > 9 ? 9 : v;
+  if (overfeed >= OVERFEED_SICK && !isSick()) {
+    sickness = SICK_STOMACH;
+    sickTicks = 0;
+    sickDoses = 0;
+  }
+}
+
+PillResult Pet::giveMedicine() {
+  if (isEgg() || ceremony != CER_NONE) return PILL_NOT_SICK;
+  PillResult res;
+  if (sickness == SICK_NONE) {
+    joy = clamp100((int)joy - 10);  // healthy: the medicine tastes awful
+    res = PILL_NOT_SICK;
+  } else if (sickness == SICK_STOMACH) {
+    sickness = SICK_NONE;
+    overfeed = 0;
+    res = PILL_CURED;
+  } else if (sickDoses >= 2) {
+    res = PILL_NEED_BATH;
+  } else if (sickDoses == 1 && ageMinutes - lastDoseMinute < COLD_DOSE_GAP_MIN) {
+    res = PILL_WAIT;
+  } else {
+    sickDoses++;
+    lastDoseMinute = ageMinutes;
+    if (sickDoses < 2) res = PILL_MORE;
+    else if (poops == 0 && hygiene >= 60) { sickness = SICK_NONE; res = PILL_CURED; }
+    else res = PILL_NEED_BATH;
+  }
+  if (sickness == SICK_NONE) { sickTicks = 0; sickDoses = 0; dirtyTicks = 0; }
+  save();
+  return res;
+}
+
+void Pet::wakeUp() {
+  sleeping = false;
+  if (lightOnTicks >= LIGHT_GRUMPY_TICKS) {  // slept badly with the light on
+    grumpy = true;
+    joy = clamp100((int)joy - 15);
+    if (energy > 70) energy = 70;
+  }
+  lightOn = false;
+  lightOnTicks = 0;
+}
+
+bool Pet::isDozeHour() const {
+  if (!lastSeenEpoch) return false;   // no clock, no evening
+  int h = (int)((lastSeenEpoch / 3600) % 24);
+  return h >= DOZE_START || h < DOZE_END;
+}
+
+void Pet::statusTick() {
+  if (ageMinutes % 30 == 0 && overfeed) overfeed--;
+  // dirty for too long -> a cold
+  if (poops >= 3 || hygiene < 15) {
+    if (dirtyTicks < 255) dirtyTicks++;
+    if (dirtyTicks >= DIRTY_SICK_TICKS && !isSick()) {
+      sickness = SICK_COLD;
+      sickTicks = 0;
+      sickDoses = 0;
+    }
+  } else {
+    dirtyTicks = 0;
+  }
+  if (isSick()) {
+    fullness = clamp100((int)fullness - 1);
+    joy = clamp100((int)joy - 1);
+    if (++sickTicks % SICK_MISTAKE_TICKS == 0) careMistakes++;
+  }
+  if (boredTicks < 0xFFFF && (!toyOut() || ageMinutes % 2 == 0)) boredTicks++;   // a toy keeps it company
+  if (isBored()) joy = clamp100((int)joy - 1);
+}
+
+// Left alone in the evening with the screen on, it nods off by itself -- with
+// the light still on. The sketch decides "left alone" (it owns lastInteract) and
+// calls this. The power button turning the screen off counts as switching the
+// light off (setScreenOff), so only a ball left glowing on the desk ends up here.
+// SLEEP_PLAYER keeps the screen coming back on from waking it: the player has
+// to deal with the light themselves.
+// ---------- coins and daily missions ----------
+
+void Pet::rollCoinDay() {
+  uint32_t d = today();
+  if (d == coinDay) return;
+  coinDay = d;
+  coinsToday = 0;
+  stepCoinK = 0;
+  memset(missionProg, 0, sizeof(missionProg));
+  missionDone = 0;
+  pendingSave = true;
+}
+
+uint16_t Pet::earnCoins(uint16_t amount, bool capped) {
+  rollCoinDay();
+  if (capped) {
+    uint16_t left = coinsToday < COIN_DAILY_CAP ? COIN_DAILY_CAP - coinsToday : 0;
+    if (amount > left) amount = left;
+    coinsToday += amount;
+  }
+  if (!amount) return 0;
+  uint32_t v = coins + amount;
+  coins = v > COIN_MAX ? COIN_MAX : v;
+  uint32_t now = millis();
+  coinFlash = (now < coinFlashUntil ? coinFlash : 0) + amount;
+  coinFlashUntil = now + 1800;
+  pendingSave = true;
+  return amount;
+}
+
+bool Pet::spendCoins(uint32_t amount) {
+  if (coins < amount) return false;
+  coins -= amount;
+  save();
+  return true;
+}
+
+uint16_t Pet::coinsCapLeft() const {
+  if (coinDay != today()) return COIN_DAILY_CAP;
+  return coinsToday < COIN_DAILY_CAP ? COIN_DAILY_CAP - coinsToday : 0;
+}
+
+uint8_t Pet::missionGoal(uint8_t m) {
+  switch (m) {
+    case MIS_FEED: return 3;
+    case MIS_PLAY: return 2;
+    case MIS_STEPS: return 20;   // in hundreds: 2 000 steps
+    case MIS_PET: return 3;
+    case MIS_SCORE: return 10;
+    default: return 1;
+  }
+}
+
+// Three different missions, the same all day: a small LCG seeded by the day.
+uint8_t Pet::missionAt(uint8_t slot) const {
+  uint32_t x = today() * 2654435761UL + 12345;
+  uint8_t pick[MISSIONS_PER_DAY];
+  uint8_t n = 0;
+  while (n < MISSIONS_PER_DAY) {
+    x = x * 1103515245UL + 12345;
+    uint8_t m = (uint8_t)((x >> 16) % MIS_COUNT);
+    bool dup = false;
+    for (uint8_t i = 0; i < n; i++) dup = dup || pick[i] == m;
+    if (!dup) pick[n++] = m;
+  }
+  return pick[slot % MISSIONS_PER_DAY];
+}
+
+uint8_t Pet::missionProgress(uint8_t slot) const {
+  if (slot >= MISSIONS_PER_DAY) return 0;
+  uint8_t m = missionAt(slot);
+  if (m == MIS_STEPS) {
+    uint32_t h = stepsToday() / 100;
+    return h > missionGoal(m) ? missionGoal(m) : (uint8_t)h;
+  }
+  return coinDay == today() ? missionProg[slot] : 0;
+}
+
+void Pet::noteMission(uint8_t m, uint8_t amount) {
+  if (isEgg() || ceremony != CER_NONE) return;
+  rollCoinDay();
+  for (uint8_t i = 0; i < MISSIONS_PER_DAY; i++) {
+    if (missionAt(i) != m || missionComplete(i)) continue;
+    uint8_t goal = missionGoal(m);
+    uint32_t v = (m == MIS_STEPS) ? stepsToday() / 100 : (uint32_t)missionProg[i] + amount;
+    missionProg[i] = v > goal ? goal : (uint8_t)v;
+    if (missionProg[i] >= goal) {
+      missionDone |= (uint8_t)(1 << i);
+      earnCoins(COIN_MISSION, false);
+    }
+    pendingSave = true;
+  }
+  if ((missionDone & 7) == 7 && !(missionDone & 0x80)) {
+    missionDone |= 0x80;
+    earnCoins(COIN_ALL_MISSIONS, false);
+  }
+}
+
+// A game finished: coins by score, and the missions it counts towards.
+void Pet::notePlayedGame(uint8_t cat, uint16_t score) {
+  uint16_t c = 1 + score / 10;
+  earnCoins(c > COIN_GAME_MAX ? COIN_GAME_MAX : c, true);
+  noteMission(MIS_PLAY, 1);
+  if (cat == (uint8_t)MINI_STAT_ATK) noteMission(MIS_TRAIN_ATK, 1);
+  else if (cat == (uint8_t)MINI_STAT_SPE) noteMission(MIS_TRAIN_SPE, 1);
+  else if (cat == (uint8_t)MINI_STAT_DEF) noteMission(MIS_TRAIN_DEF, 1);
+  if (score >= missionGoal(MIS_SCORE)) noteMission(MIS_SCORE, missionGoal(MIS_SCORE));
+}
+
+// ---------- hats ----------
+
+uint16_t Pet::hatPrice(uint8_t h) {
+  // About a day of good play for the simple ones, most of a week for the crown.
+  static const uint16_t PRICE[HAT_COUNT] = { 80, 80, 100, 120, 150, 150, 200, 200, 300, 500 };
+  return h < HAT_COUNT ? PRICE[h] : 0;
+}
+
+bool Pet::buyHat(uint8_t h) {
+  if (h >= HAT_COUNT || ownsHat(h)) return false;
+  if (!spendCoins(hatPrice(h))) return false;
+  hatsOwned |= (uint16_t)(1 << h);
+  save();
+  return true;
+}
+
+void Pet::wearHat(int8_t h) {
+  if (h >= HAT_COUNT) return;
+  if (h >= 0 && !ownsHat((uint8_t)h)) return;
+  hatOn = h < 0 ? -1 : h;
+  save();
+}
+
+void Pet::nudgeHat(int dx, int dy) {
+  if (hatDex != speciesId) { hatDx = hatDy = 0; hatDex = speciesId; }
+  int x = hatDx + dx, y = hatDy + dy;
+  hatDx = (int8_t)(x > HAT_NUDGE_MAX ? HAT_NUDGE_MAX : (x < -HAT_NUDGE_MAX ? -HAT_NUDGE_MAX : x));
+  hatDy = (int8_t)(y > HAT_NUDGE_MAX ? HAT_NUDGE_MAX : (y < -HAT_NUDGE_MAX ? -HAT_NUDGE_MAX : y));
+  save();
+}
+
+// ---------- toys and decorations ----------
+
+uint16_t Pet::decorPrice(uint8_t d) {
+  static const uint16_t PRICE[DEC_COUNT] = {
+    40, 90, 60, 70, 110, 120,      // ball, plush, duck, blocks, drum, kite
+    50, 60, 90, 150, 80, 70,       // plant, flowers, lamp, bed, gift, pumpkin
+  };
+  return d < DEC_COUNT ? PRICE[d] : 0;
+}
+
+bool Pet::buyDecor(uint8_t d) {
+  if (d >= DEC_COUNT || ownsDecor(d)) return false;
+  if (!spendCoins(decorPrice(d))) return false;
+  decorOwned |= (uint16_t)(1 << d);
+  save();
+  return true;
+}
+
+void Pet::placeDecor(uint8_t d) {
+  if (!ownsDecor(d)) return;
+  if (slotL == (int8_t)d) slotL = -1;
+  else if (slotR == (int8_t)d) slotR = -1;
+  else if (slotL < 0) slotL = (int8_t)d;
+  else if (slotR < 0) slotR = (int8_t)d;
+  else slotL = (int8_t)d;
+  save();
+}
+
+// ---------- foods ----------
+
+const FoodInfo &Pet::foodInfo(uint8_t f) {
+  static const FoodInfo T_[FOOD_COUNT] = {
+    // food joy  ene  wgt  price sweet
+    {  30,   5,   0,   2,  12, false },   // sandwich
+    {  45,  10,   0,   4,  20, false },   // curry
+    {  25,   5,  10,   0,  15, false },   // soup
+    {  20,   0,   0,   1,   8, false },   // rice ball
+    {  15,  25,   0,  15,  25, true  },   // cake
+    {   5,  12,   0,   5,   8, true  },   // cookie
+    {   8,  18,   0,   8,  12, true  },   // ice cream
+    {  10,   0,  20,   0,  12, false },   // milk
+    {   5,  10,   5,   2,   8, false },   // juice
+  };
+  return T_[f < FOOD_COUNT ? f : 0];
+}
+
+bool Pet::buyFood(uint8_t f) {
+  if (f >= FOOD_COUNT || foodCount[f] >= FOOD_STACK_MAX) return false;
+  if (!spendCoins(foodInfo(f).price)) return false;
+  foodCount[f]++;
+  save();
+  return true;
+}
+
+bool Pet::eatFood(uint8_t f) {
+  if (f >= FOOD_COUNT || !foodCount[f]) return false;
+  if (ceremony != CER_NONE || isEgg() || sleeping) return false;
+  const FoodInfo &fi = foodInfo(f);
+  if (fullness >= 90 && fi.food > 0) noteOverfeed(fi.sweet ? 2 : 1);   // already full: a binge
+  fullness = clamp100(fullness + fi.food);
+  joy = clamp100(joy + fi.joy);
+  energy = clamp100(energy + fi.energy);
+  weight = clamp100(weight + fi.weight);
+  foodCount[f]--;
+  eatUntil = millis() + EAT_ANIM_MS;
+  if (fi.joy >= 15) heartUntil = millis() + HEART_MS;
+  registerCare();
+  noteMission(MIS_FEED, 1);
+  earnCoins(1, true);
+  save();
+  return true;
+}
+
+// ---------- bath and sleep extras ----------
+
+bool Pet::buySoap() {
+  if (soapCount >= FOOD_STACK_MAX || !spendCoins(SOAP_PRICE)) return false;
+  soapCount++;
+  save();
+  return true;
+}
+
+bool Pet::buyBrush() {
+  if (brushOwned || !spendCoins(BRUSH_PRICE)) return false;
+  brushOwned = true;
+  save();
+  return true;
+}
+
+bool Pet::bubbleBath() {
+  if (!soapCount || isEgg() || sleeping || ceremony != CER_NONE) return false;
+  soapCount--;
+  clean();                       // the bath itself: poops, hygiene, mission, coin
+  joy = clamp100(joy + 10);
+  addBond(2);
+  heartUntil = millis() + HEART_MS;
+  save();
+  return true;
+}
+
+bool Pet::brush() {
+  if (!brushOwned || isEgg() || sleeping || ceremony != CER_NONE) return false;
+  joy = clamp100(joy + 5);
+  addBond(3);
+  heartUntil = millis() + HEART_MS;
+  shineUntil = millis() + SHINE_MS;
+  registerCare();
+  save();
+  return true;
+}
+
+void Pet::scrubDone(uint8_t spots) {
+  if (isEgg() || ceremony != CER_NONE) return;
+  clean();
+  uint8_t j = spots * 2;
+  joy = clamp100(joy + (j > 12 ? 12 : j));
+  heartUntil = millis() + HEART_MS;
+  save();
+}
+
+bool Pet::startNap() {
+  if (isEgg() || sleeping || ceremony != CER_NONE) return false;
+  sleeping = true;
+  lightOn = false;
+  lightOnTicks = 0;
+  napEnd = ageMinutes + NAP_MINUTES;
+  sleepAuto = SLEEP_PLAYER;
+  save();
+  return true;
+}
+
+bool Pet::lullaby() {
+  if (isEgg() || sleeping || ceremony != CER_NONE) return false;
+  toggleLight();                 // to bed with the light off (and the bedtime coins)
+  joy = clamp100(joy + 5);
+  save();
+  return true;
+}
+
+// ---------- places: the park, the Pokemon Center, the garden ----------
+
+ParkResult Pet::parkWalk() {
+  if (isEgg() || sleeping || ceremony != CER_NONE || energy < 15) return PARK_TIRED;
+  energy = dropTo(energy, PARK_WALK_ENERGY, 5);
+  joy = clamp100(joy + 3);
+  registerCare();
+  if (parkDay != today()) { parkDay = today(); parkFinds = 0; }
+  int r = random(100);
+  ParkResult res;
+  if (r < 30 && parkFinds < PARK_FINDS_PER_DAY) {       // something shiny in the grass
+    parkFinds++;
+    lastFind = (uint8_t)(2 + random(3));
+    earnCoins(lastFind, false);
+    res = PARK_COINS;
+  } else if (r < 55) {                                   // a wild berry
+    fullness = clamp100(fullness + 10);
+    joy = clamp100(joy + 5);
+    res = PARK_BERRY;
+  } else if (r < 85) {                                   // a wild Pokemon says hello
+    joy = clamp100(joy + 3);
+    addBond(1);
+    heartUntil = millis() + HEART_MS;
+    res = PARK_FRIEND;
+  } else {
+    res = PARK_NOTHING;
+  }
+  save();
+  return res;
+}
+
+CenterResult Pet::centerHeal() {
+  CenterResult res = CENTER_FREE;
+  if (!centerFreeToday()) {
+    if (!spendCoins(CENTER_PRICE)) return CENTER_NO_COINS;
+    res = CENTER_PAID;
+  }
+  centerDay = today();
+  sickness = SICK_NONE; sickTicks = 0; sickDoses = 0; overfeed = 0; dirtyTicks = 0;
+  grumpy = false;
+  energy = clamp100(energy + 30);
+  heartUntil = millis() + HEART_MS;
+  save();
+  return res;
+}
+
+bool Pet::buySeed() {
+  if (seedCount >= FOOD_STACK_MAX || !spendCoins(SEED_PRICE)) return false;
+  seedCount++;
+  save();
+  return true;
+}
+
+bool Pet::plantSeed() {
+  if (!seedCount || plantEpoch || !lastSeenEpoch) return false;
+  seedCount--;
+  plantEpoch = lastSeenEpoch;
+  save();
+  return true;
+}
+
+bool Pet::gardenReady() const {
+  return plantEpoch && lastSeenEpoch >= plantEpoch + GARDEN_GROW_SECS;
+}
+
+uint8_t Pet::gardenPercent() const {
+  if (!plantEpoch) return 0;
+  if (lastSeenEpoch <= plantEpoch) return 0;
+  uint32_t g = (lastSeenEpoch - plantEpoch) * 100UL / GARDEN_GROW_SECS;
+  return g > 100 ? 100 : (uint8_t)g;
+}
+
+int8_t Pet::harvest() {
+  if (!gardenReady()) return -1;
+  // fruit of the garden: mostly drinks and sweets, sometimes a meal
+  static const uint8_t CROP[8] = { FOOD_JUICE, FOOD_JUICE, FOOD_COOKIE, FOOD_ICECREAM,
+                                   FOOD_CAKE, FOOD_SANDWICH, FOOD_SOUP, FOOD_ONIGIRI };
+  uint8_t f = CROP[random(8)];
+  if (foodCount[f] < FOOD_STACK_MAX) foodCount[f]++;
+  plantEpoch = 0;
+  registerCare();
+  save();
+  return (int8_t)f;
+}
+
+// Howard Hinnant's days_from_civil, inverted: exact for any date after 1970.
+void Pet::civilDate(uint32_t days, int &y, int &m, int &d) {
+  int32_t z = (int32_t)days + 719468;
+  int32_t era = z / 146097;
+  uint32_t doe = (uint32_t)(z - era * 146097);
+  uint32_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  int32_t yy = (int32_t)yoe + era * 400;
+  uint32_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  uint32_t mp = (5 * doy + 2) / 153;
+  d = (int)(doy - (153 * mp + 2) / 5 + 1);
+  m = (int)(mp < 10 ? mp + 3 : mp - 9);
+  y = (int)(yy + (m <= 2));
+}
+
+GiftKind Pet::holidayToday() const {
+  if (!today()) return GIFT_NONE;
+  int y, m, d;
+  civilDate(today(), y, m, d);
+  if (m == 10 && d == 31) return GIFT_HALLOWEEN;
+  if (m == 12 && d >= 24 && d <= 26) return GIFT_CHRISTMAS;
+  if (m == 1 && d == 1) return GIFT_NEWYEAR;
+  if (m == 2 && d == 14) return GIFT_VALENTINE;
+  return GIFT_NONE;
+}
+
+// The gift is the holiday's item if it is not owned yet, else 20 coins.
+GiftKind Pet::claimHolidayGift() {
+  if (isEgg() || ceremony != CER_NONE) return GIFT_NONE;
+  GiftKind g = holidayToday();
+  if (g == GIFT_NONE || giftDay == today()) return GIFT_NONE;
+  giftDay = today();
+  switch (g) {
+    case GIFT_HALLOWEEN: if (!ownsDecor(DEC_PUMPKIN)) decorOwned |= 1 << DEC_PUMPKIN; else earnCoins(20, false); break;
+    case GIFT_CHRISTMAS: if (!ownsHat(HAT_SANTA)) hatsOwned |= 1 << HAT_SANTA; else earnCoins(20, false); break;
+    case GIFT_NEWYEAR:   if (!ownsHat(HAT_PARTY)) hatsOwned |= 1 << HAT_PARTY; else earnCoins(20, false); break;
+    case GIFT_VALENTINE: if (!ownsDecor(DEC_FLOWERS)) decorOwned |= 1 << DEC_FLOWERS; else earnCoins(20, false); break;
+    default: break;
+  }
+  save();
+  return g;
+}
+
+void Pet::dozeOff() {
+  if (isEgg() || ceremony != CER_NONE || sleeping || screenIsOff || !isDozeHour()) return;
+  sleeping = true;
+  sleepAuto = SLEEP_PLAYER;
+  lightOn = true;
+  lightOnTicks = 0;
+  save();
 }
 
 void Pet::play() {
@@ -1218,10 +1826,13 @@ void Pet::applyAutoSleep() {
 
 void Pet::setScreenOff(bool off) {
   screenIsOff = off;
+  // Turning the screen off is turning the light off: a Pokemon that dozed off
+  // with it on sleeps properly from here, and what it already lost stays lost.
+  if (off && sleeping) lightOn = false;
   // Coming back to the device is what wakes it -- only if the device is what
   // put it to sleep. A creature sent to bed with the light stays there.
   if (!off && sleeping && sleepAuto == SLEEP_AUTO) {
-    sleeping = false;
+    wakeUp();
     sleepAuto = SLEEP_NONE;
   }
   applyAutoSleep();
@@ -1231,7 +1842,21 @@ void Pet::setScreenOff(bool off) {
 void Pet::toggleLight() {
   if (ceremony != CER_NONE) return;
   if (isEgg()) return;
-  sleeping = !sleeping;
+  if (sleeping && lightOn) {   // dozed off by itself: light off, keeps sleeping
+    lightOn = false;
+  } else if (sleeping) {
+    wakeUp();
+    napEnd = 0;
+  } else {
+    sleeping = true;
+    lightOn = false;
+    lightOnTicks = 0;
+    // put to bed properly in the evening: once a day
+    if (isDozeHour() && today() && bedtimeDay != today()) {
+      bedtimeDay = today();
+      earnCoins(COIN_BEDTIME, false);
+    }
+  }
   // The player's hand beats the clock until morning: waking it at 23:00 must
   // not be undone a minute later by the auto-sleep, and neither must putting
   // it to bed early.
@@ -1243,6 +1868,11 @@ void Pet::clean() {
   if (ceremony != CER_NONE) return;
   poops = 0;
   hygiene = 100;
+  dirtyTicks = 0;
+  // the bath is the last step of curing a cold
+  if (sickness == SICK_COLD && sickDoses >= 2) { sickness = SICK_NONE; sickTicks = 0; sickDoses = 0; }
+  noteMission(MIS_BATH, 1);
+  earnCoins(1, true);
   addBond(1);
   registerCare();
   save();
@@ -1255,6 +1885,8 @@ void Pet::caress() {
   heartUntil = millis() + HEART_MS;
   addBond(1);
   registerCare();
+  noteMission(MIS_PET, 1);
+  earnCoins(1, true);
 }
 
 void Pet::eggTap() {
@@ -1266,7 +1898,7 @@ void Pet::eggTap() {
 PetMood Pet::mood() const {
   if (sleeping) return MOOD_SLEEPING;
   if (eating()) return MOOD_EATING;
-  if (lowestStat() < 25) return MOOD_SAD;
+  if (isSick() || lowestStat() < 25) return MOOD_SAD;
   return MOOD_HAPPY;
 }
 
@@ -1333,6 +1965,46 @@ void Pet::save() {
   prefs.putUShort("shi", strHi);
   prefs.putUShort("qhi", spdHi);
   prefs.putString("nick", nick);
+  // Fun Pack: new keys only, so an older save loads healthy and with no records
+  prefs.putBytes("mnhi", miniHi, sizeof(miniHi));
+  prefs.putUChar("sick", sickness);
+  prefs.putUChar("sdose", sickDoses);
+  prefs.putUInt("sdmin", lastDoseMinute);
+  prefs.putUShort("stick", sickTicks);
+  prefs.putUChar("ovf", overfeed);
+  prefs.putUChar("dirt", dirtyTicks);
+  prefs.putBool("lon", lightOn);
+  prefs.putUChar("lont", lightOnTicks);
+  prefs.putBool("grmp", grumpy);
+  prefs.putUShort("bord", boredTicks);
+  // coins and missions
+  prefs.putUInt("coin", coins);
+  prefs.putUShort("cntd", coinsToday);
+  prefs.putUInt("cnday", coinDay);
+  prefs.putUChar("stck", stepCoinK);
+  prefs.putBytes("msprg", missionProg, sizeof(missionProg));
+  prefs.putUChar("msdon", missionDone);
+  prefs.putUInt("bedd", bedtimeDay);
+  // hats
+  prefs.putUShort("hats", hatsOwned);
+  prefs.putChar("hton", hatOn);
+  prefs.putChar("htdx", hatDx);
+  prefs.putChar("htdy", hatDy);
+  prefs.putShort("htdex", hatDex);
+  // toys and decorations
+  prefs.putUShort("deco", decorOwned);
+  prefs.putChar("dslL", slotL);
+  prefs.putChar("dslR", slotR);
+  prefs.putBytes("food", foodCount, sizeof(foodCount));
+  prefs.putUChar("soap", soapCount);
+  prefs.putBool("brsh", brushOwned);
+  prefs.putUInt("napd", napEnd);
+  prefs.putUInt("pkday", parkDay);
+  prefs.putUChar("pkfnd", parkFinds);
+  prefs.putUInt("ctday", centerDay);
+  prefs.putUChar("seed", seedCount);
+  prefs.putUInt("plant", plantEpoch);
+  prefs.putUInt("gift", giftDay);
 }
 
 void Pet::load() {
@@ -1433,6 +2105,57 @@ void Pet::load() {
   }
   learnQCount = 0;      // rebuilt from lastLearnLevel by the next tick
   checkLearnGates();
+  // Fun Pack
+  memset(miniHi, 0, sizeof(miniHi));
+  if (prefs.getBytesLength("mnhi") == sizeof(miniHi)) prefs.getBytes("mnhi", miniHi, sizeof(miniHi));
+  sickness = prefs.getUChar("sick", SICK_NONE);
+  if (sickness > SICK_COLD) sickness = SICK_NONE;
+  sickDoses = prefs.getUChar("sdose", 0);
+  lastDoseMinute = prefs.getUInt("sdmin", 0);
+  sickTicks = prefs.getUShort("stick", 0);
+  overfeed = prefs.getUChar("ovf", 0);
+  dirtyTicks = prefs.getUChar("dirt", 0);
+  lightOn = prefs.getBool("lon", false);
+  lightOnTicks = prefs.getUChar("lont", 0);
+  grumpy = prefs.getBool("grmp", false);
+  boredTicks = prefs.getUShort("bord", 0);
+  coins = prefs.getUInt("coin", 0);
+  if (coins > COIN_MAX) coins = COIN_MAX;
+  coinsToday = prefs.getUShort("cntd", 0);
+  coinDay = prefs.getUInt("cnday", 0);
+  stepCoinK = prefs.getUChar("stck", 0);
+  memset(missionProg, 0, sizeof(missionProg));
+  if (prefs.getBytesLength("msprg") == sizeof(missionProg)) prefs.getBytes("msprg", missionProg, sizeof(missionProg));
+  missionDone = prefs.getUChar("msdon", 0);
+  bedtimeDay = prefs.getUInt("bedd", 0);
+  hatsOwned = prefs.getUShort("hats", 0) & ((1 << HAT_COUNT) - 1);
+  hatOn = prefs.getChar("hton", -1);
+  if (hatOn >= HAT_COUNT || (hatOn >= 0 && !ownsHat((uint8_t)hatOn))) hatOn = -1;
+  hatDx = prefs.getChar("htdx", 0);
+  hatDy = prefs.getChar("htdy", 0);
+  hatDex = prefs.getShort("htdex", 0);
+  decorOwned = prefs.getUShort("deco", 0) & ((1 << DEC_COUNT) - 1);
+  slotL = prefs.getChar("dslL", -1);
+  slotR = prefs.getChar("dslR", -1);
+  if (slotL >= DEC_COUNT || (slotL >= 0 && !ownsDecor((uint8_t)slotL))) slotL = -1;
+  if (slotR >= DEC_COUNT || (slotR >= 0 && !ownsDecor((uint8_t)slotR))) slotR = -1;
+  memset(foodCount, 0, sizeof(foodCount));
+  {   // shorter on a save from before a food was appended: the rest stay 0
+    size_t n = prefs.getBytesLength("food");
+    if (n) prefs.getBytes("food", foodCount, n < sizeof(foodCount) ? n : sizeof(foodCount));
+    for (int i = 0; i < FOOD_COUNT; i++) if (foodCount[i] > FOOD_STACK_MAX) foodCount[i] = FOOD_STACK_MAX;
+  }
+  soapCount = prefs.getUChar("soap", 0);
+  if (soapCount > FOOD_STACK_MAX) soapCount = FOOD_STACK_MAX;
+  brushOwned = prefs.getBool("brsh", false);
+  napEnd = prefs.getUInt("napd", 0);
+  parkDay = prefs.getUInt("pkday", 0);
+  parkFinds = prefs.getUChar("pkfnd", 0);
+  centerDay = prefs.getUInt("ctday", 0);
+  seedCount = prefs.getUChar("seed", 0);
+  if (seedCount > FOOD_STACK_MAX) seedCount = FOOD_STACK_MAX;
+  plantEpoch = prefs.getUInt("plant", 0);
+  giftDay = prefs.getUInt("gift", 0);
   // seeding: the current pet counts as raised (old saves)
   if (speciesId >= 1) registerSpecies(speciesId);
 }

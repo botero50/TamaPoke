@@ -45,7 +45,23 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "%s: %s", "PARALISIS", "QUEMADURA", "VENENO", "DORMIDO", "CONGELADO", "CONFUSION",
     "Has ganado!", "Has perdido...",
     "%s saca a %s", "Adelante, %s!", "GIMNASIOS", "MEDALLAS %u/8", "ENTRENADOR", "VELOCIDAD +%u", "toca: cambiar avatar", "%u en total", "NORMAL", "DIFICIL",
- "ELEGIDOS %u/%u", "LUCHAR", "BLOQUEADO", "POKEMON", "%s derrotado!", "MEDALLA NUEVA!", "VOL %u", "CAJA %u/%u", "cambiar con %s: elige hueco", "CAJA", "TRAER", "solo con un huevo", "COMBATE LAN", "CREAR", "UNIRSE", "buscando...", "listo!", "version distinta", "crear o unirse", "rival: %u mons", "el rival se fue", "esperando al rival...", "OTRA VEZ", "HUIR", "de que region viene el huevo", "%s +%u", "ya no puede entrenar mas", "ELIGE TU REGION", "RETIRAR", "Retirarla ya?", "la siguiente evoluciona un dia mas tarde", "evoluciona un dia mas tarde",   "FALTA PACK", "SOLTAR", "se va para siempre", "AL EQUIPO", "no se unira a tu equipo", "VOLUMEN", "IDIOMA", "INFO", "BRILLO", "PRUEBA", },
+ "ELEGIDOS %u/%u", "LUCHAR", "BLOQUEADO", "POKEMON", "%s derrotado!", "MEDALLA NUEVA!", "VOL %u", "CAJA %u/%u", "cambiar con %s: elige hueco", "CAJA", "TRAER", "solo con un huevo", "COMBATE LAN", "CREAR", "UNIRSE", "buscando...", "listo!", "version distinta", "crear o unirse", "rival: %u mons", "el rival se fue", "esperando al rival...", "OTRA VEZ", "HUIR", "de que region viene el huevo", "%s +%u", "ya no puede entrenar mas", "ELIGE TU REGION", "RETIRAR", "Retirarla ya?", "la siguiente evoluciona un dia mas tarde", "evoluciona un dia mas tarde",   "FALTA PACK", "SOLTAR", "se va para siempre", "AL EQUIPO", "no se unira a tu equipo", "VOLUMEN", "IDIOMA", "INFO", "BRILLO", "PRUEBA",
+    // Fun Pack
+    "IZQ/DER", "MAS/MENOS", "QUIEN ES?", "BAYAS", "TOPOS", "COMBA", "BAILE", "ESCONDITE", "Hacia donde mira?", "Mayor o menor?", "MAYOR", "MENOR", "Quien es ese Pokemon?", "Toca izq/der: mover", "Tocalos! No a Voltorb", "Toca para saltar!", "Toca al ritmo!", "PERFECTO", "BIEN", "FALLO", "Donde se esconde?", "ALEGRIA +%u", "DEFENSA +%u", "BIEN!", "NO...", "Le duele la tripa!", "Esta resfriado!", "Esta grunon...", "Se aburre...", "Zzz... apaga la luz!", "Esta malito!", "Ya esta mejor!", "Otra dosis luego", "Espera 10 min", "Ahora un bano!", "Puaj! No esta malo", "MAS JUEGOS", "MINIJUEGOS",
+    // Fun Pack
+    "SACO", "REFLEJOS", "PELOTA", "DIVERSION",
+    // coins and daily missions
+    "MONEDAS", "MISIONES DE HOY", "Dale de comer %u veces", "Su baya favorita", "Juega %u minijuegos", "Camina %u pasos", "Dale un bano", "Acaricialo %u veces", "Un juego de fuerza", "Un juego de velocidad", "Un juego de defensa", "Saca %u puntos", "Por jugar hoy: %u/%u", "Las 3: +%u extra", "COMO GANAR", "Jugar y cuidarlo", "+%u cada 1000 pasos", "Primer cuidado del dia +%u", "Cada mision +%u", "Medalla nueva +%u", "A dormir sin luz +%u", "La tienda llega pronto!",
+    // shop, bag and hats
+    "TIENDA", "MOCHILA", "SOMBREROS", "GORRA", "LAZO", "FLOR", "GORRO", "DE FIESTA", "DE PAJA", "DE BRUJA", "DE NAVIDAD", "CHISTERA", "CORONA", "COMPRAR", "NO", "TUYO", "Faltan monedas", "Comprado!", "PUESTO", "QUITAR SOMBRERO", "MOVER SOMBRERO", "Aun no tienes nada", "LISTO",
+    // toys and decorations
+    "JUGUETES", "DECORACION", "PUESTO", "PELOTA", "PELUCHE", "PATITO", "BLOQUES", "TAMBOR", "COMETA", "PLANTA", "FLORES", "LAMPARA", "CAMA", "REGALO", "CALABAZA",
+    // foods
+    "COMIDA", "COMIDAS", "DULCES", "BEBIDAS", "MEDICINA", "SANDWICH", "CURRY", "SOPA", "BOLA DE ARROZ", "PASTEL", "GALLETA", "HELADO", "LECHE", "ZUMO", "No te queda: ve a la tienda", "x%u",
+    // bath and sleep menus
+    "BANO", "DUCHA RAPIDA", "BANO DE BURBUJAS", "FROTAR", "CEPILLAR", "Frota las manchas!", "Reluciente!", "Necesitas jabon", "Compra un cepillo", "DORMIR", "A DORMIR", "SIESTA 30 MIN", "NANA", "CUIDADO", "JABON", "CEPILLO",
+    // places, garden, seasonal gifts
+    "SALIR", "PARQUE", "CENTRO POKEMON", "HUERTO", "PASEAR", "ENTRAR", "VOLVER", "CURAR", "Gratis hoy", "Esta como nuevo!", "Encontro %u monedas!", "Encontro una baya!", "Un %s te saluda!", "Que paseo tan bonito", "Esta muy cansado", "PLANTAR", "COSECHAR", "Compra semillas", "Creciendo... %u%%", "SEMILLA", "Cosechaste: %s", "Regalo de Halloween!", "Regalo de Navidad!", "Feliz Ano Nuevo!", "Regalo de San Valentin!", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -85,7 +101,23 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "You win!", "You lost...",
     "%s sends out %s", "Go, %s!", "GYMS", "BADGES %u/8", "TRAINER",
  "SPEED +%u", "tap: change avatar", "%u earned in all", "EASY", "HARD", "CHOSEN %u/%u", "FIGHT", "LOCKED", "POKEMON", "%s defeated!", "NEW BADGE!", "VOL %u", "BOX %u/%u", "swap with %s: pick a slot", "BOX", "BRING BACK", "only while an egg waits", "LAN BATTLE", "HOST", "JOIN", "searching...", "ready!", "different version", "host or join", "rival: %u mons", "the rival left", "waiting for the rival...", "AGAIN", "RUN", "where this egg comes from", "%s +%u", "trained as far as it can go", "CHOOSE A REGION", "RETIRE", "Retire it early?", "the next one evolves a day later", "evolves a day later",
-   "NEEDS PACK", "RELEASE", "gone for good", "TO PARTY", "it will not join your party", "VOLUME", "LANGUAGE", "ABOUT", "BRIGHTNESS", "TEST", },
+   "NEEDS PACK", "RELEASE", "gone for good", "TO PARTY", "it will not join your party", "VOLUME", "LANGUAGE", "ABOUT", "BRIGHTNESS", "TEST",
+    // Fun Pack
+    "LEFT/RIGHT", "HIGH/LOW", "WHO IS IT?", "BERRY DROP", "MOLE POP", "JUMP ROPE", "DANCE", "HIDE+SEEK", "Which way will it look?", "Higher or lower?", "HIGHER", "LOWER", "Who's that Pokemon?", "Tap left/right to move", "Tap them! Not Voltorb!", "Tap to jump!", "Tap on the beat!", "PERFECT", "GOOD", "MISS", "Where is it hiding?", "JOY +%u", "DEFENCE +%u", "YES!", "NOPE", "Tummy ache!", "Caught a cold!", "Grumpy...", "Bored...", "Zzz... lights on!", "Too sick to play!", "Feeling better!", "One more dose later", "Wait 10 minutes", "Now a bath!", "Yuck! Not sick", "MORE GAMES", "MINIGAMES",
+    // Fun Pack
+    "PUNCH BAG", "REACTION", "BALL GAME", "FUN",
+    // coins and daily missions
+    "COINS", "TODAY'S MISSIONS", "Feed it %u times", "Its favourite berry", "Play %u minigames", "Walk %u steps", "Give it a bath", "Pet it %u times", "A strength game", "A speed game", "A defence game", "Score %u points", "From play today: %u/%u", "All 3: +%u extra", "HOW TO EARN", "Play and care", "+%u per 1000 steps", "First care of the day +%u", "Each mission +%u", "New badge +%u", "Bedtime, light off +%u", "The shop is coming soon!",
+    // shop, bag and hats
+    "SHOP", "BAG", "HATS", "CAP", "BOW", "FLOWER", "BEANIE", "PARTY HAT", "STRAW HAT", "WITCH HAT", "SANTA HAT", "TOP HAT", "CROWN", "BUY", "NO", "OWNED", "Not enough coins", "Bought!", "WEARING", "TAKE HAT OFF", "MOVE HAT", "Nothing here yet", "DONE",
+    // toys and decorations
+    "TOYS", "DECORATION", "OUT", "BEACH BALL", "PLUSH", "RUBBER DUCK", "BLOCKS", "DRUM", "KITE", "PLANT", "FLOWERS", "LAMP", "BED", "GIFT", "PUMPKIN",
+    // foods
+    "FOOD", "MEALS", "SWEETS", "DRINKS", "MEDICINE", "SANDWICH", "CURRY", "SOUP", "RICE BALL", "CAKE", "COOKIE", "ICE CREAM", "MILK", "JUICE", "None left: try the shop", "x%u",
+    // bath and sleep menus
+    "BATH", "QUICK WASH", "BUBBLE BATH", "SCRUB", "BRUSH", "Rub the dirt off!", "Squeaky clean!", "You need soap", "Buy a brush first", "SLEEP", "BEDTIME", "30 MIN NAP", "LULLABY", "CARE", "SOAP", "BRUSH",
+    // places, garden, seasonal gifts
+    "GO OUT", "PARK", "POKEMON CENTER", "GARDEN", "WALK", "GO IN", "BACK", "HEAL", "Free today", "Good as new!", "It found %u coins!", "It found a berry!", "A wild %s says hi!", "What a nice walk", "Too tired", "PLANT", "HARVEST", "Buy some seeds", "Growing... %u%%", "SEED", "You picked: %s", "A Halloween gift!", "A Christmas gift!", "Happy New Year!", "A Valentine gift!", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -124,7 +156,23 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "%s: %s", "PARALYSIE", "BRULURE", "POISON", "ENDORMI", "GELE", "CONFUSION",
     "Gagne!", "Perdu...",
     "%s envoie %s", "Vas-y, %s!", "ARENES", "BADGES %u/8", "DRESSEUR", "VITESSE +%u", "touche: changer d'avatar", "%u au total", "NORMAL", "DIFFICILE", "CHOISIS %u/%u", "COMBATTRE", "VERROUILLE", "POKEMON", "%s vaincu!", "NOUVEAU BADGE!", "VOL %u", "BOITE %u/%u", "echanger avec %s: choisis", "BOITE", "RAMENER", "seulement avec un oeuf", "COMBAT LAN", "CREER", "REJOINDRE", "recherche...", "pret!", "version differente", "creer ou rejoindre", "rival: %u mons", "le rival est parti", "en attente du rival...", "ENCORE", "FUIR", "d ou vient cet oeuf", "%s +%u", "ne peut plus progresser", "CHOISIS TA REGION", "RETIRER", "Retirer maintenant?", "le suivant evolue un jour plus tard", "evolue un jour plus tard",
-   "PACK REQUIS", "RELACHER", "parti pour de bon", "A L EQUIPE", "ne rejoindra pas l equipe", "VOLUME", "LANGUE", "INFOS", "LUMINOSITE", "TEST", },
+   "PACK REQUIS", "RELACHER", "parti pour de bon", "A L EQUIPE", "ne rejoindra pas l equipe", "VOLUME", "LANGUE", "INFOS", "LUMINOSITE", "TEST",
+    // Fun Pack
+    "GAUCHE/DR", "PLUS/MOINS", "QUI EST-CE", "BAIES", "TAUPES", "CORDE", "DANSE", "CACHE", "Quel cote ?", "Plus ou moins ?", "PLUS", "MOINS", "Quel est ce Pokemon ?", "Touche gauche/droite", "Touche-les! Pas Voltorbe", "Touche pour sauter !", "Touche en rythme !", "PARFAIT", "BIEN", "RATE", "Ou se cache-t-il ?", "JOIE +%u", "DEFENSE +%u", "OUI !", "RATE", "Mal au ventre !", "Il est enrhume !", "Grognon...", "S'ennuie...", "Zzz... la lumiere !", "Trop malade !", "Ca va mieux !", "Encore une dose", "Attends 10 min", "Un bain maintenant !", "Beurk ! Pas malade", "PLUS DE JEUX", "MINI-JEUX",
+    // Fun Pack
+    "SAC", "REFLEXES", "BALLE", "AMUSEMENT",
+    // coins and daily missions
+    "PIECES", "MISSIONS DU JOUR", "Nourris-le %u fois", "Sa baie preferee", "Joue a %u mini-jeux", "Marche %u pas", "Donne-lui un bain", "Caresse-le %u fois", "Un jeu de force", "Un jeu de vitesse", "Un jeu de defense", "Marque %u points", "Jeu aujourd hui: %u/%u", "Les 3: +%u en plus", "COMMENT GAGNER", "Jouer et soigner", "+%u par 1000 pas", "Premier soin du jour +%u", "Chaque mission +%u", "Nouveau badge +%u", "Au lit sans lumiere +%u", "La boutique arrive bientot !",
+    // shop, bag and hats
+    "BOUTIQUE", "SAC", "CHAPEAUX", "CASQUETTE", "NOEUD", "FLEUR", "BONNET", "CHAPEAU FETE", "DE PAILLE", "DE SORCIERE", "PERE NOEL", "HAUT-DE-FORME", "COURONNE", "ACHETER", "NON", "A TOI", "Pas assez de pieces", "Achete !", "PORTE", "ENLEVER", "DEPLACER", "Rien pour l instant", "FINI",
+    // toys and decorations
+    "JOUETS", "DECORATION", "SORTI", "BALLON", "PELUCHE", "CANARD", "CUBES", "TAMBOUR", "CERF-VOLANT", "PLANTE", "FLEURS", "LAMPE", "LIT", "CADEAU", "CITROUILLE",
+    // foods
+    "NOURRITURE", "REPAS", "DOUCEURS", "BOISSONS", "MEDICAMENT", "SANDWICH", "CURRY", "SOUPE", "ONIGIRI", "GATEAU", "BISCUIT", "GLACE", "LAIT", "JUS", "Plus rien: va a la boutique", "x%u",
+    // bath and sleep menus
+    "BAIN", "DOUCHE", "BAIN MOUSSANT", "FROTTER", "BROSSER", "Frotte les taches !", "Tout propre !", "Il faut du savon", "Achete une brosse", "DODO", "AU LIT", "SIESTE 30 MIN", "BERCEUSE", "SOINS", "SAVON", "BROSSE",
+    // places, garden, seasonal gifts
+    "SORTIR", "PARC", "CENTRE POKEMON", "POTAGER", "PROMENER", "ENTRER", "RETOUR", "SOIGNER", "Gratuit aujourd hui", "Comme neuf !", "Il a trouve %u pieces !", "Il a trouve une baie !", "Un %s dit bonjour !", "Belle promenade", "Trop fatigue", "PLANTER", "RECOLTER", "Achete des graines", "Ca pousse... %u%%", "GRAINE", "Recolte: %s", "Cadeau d Halloween !", "Cadeau de Noel !", "Bonne annee !", "Cadeau de la St-Valentin !", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -163,7 +211,23 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "%s: %s", "PARALYSE", "VERBRANNT", "VERGIFTET", "SCHLAEFT", "GEFROREN", "VERWIRRT",
     "Gewonnen!", "Verloren...",
     "%s schickt %s", "Los, %s!", "ARENEN", "ORDEN %u/8", "TRAINER", "TEMPO +%u", "tippen: Avatar wechseln", "%u insgesamt", "NORMAL", "SCHWER", "GEWAEHLT %u/%u", "KAEMPFEN", "GESPERRT", "POKEMON", "%s besiegt!", "NEUER ORDEN!", "LAUT %u", "BOX %u/%u", "mit %s tauschen: waehle", "BOX", "ZURUECK", "nur mit einem Ei", "LAN KAMPF", "HOSTEN", "BEITRETEN", "suche...", "bereit!", "andere Version", "hosten oder beitreten", "Gegner: %u", "der Gegner ist weg", "warte auf den Gegner...", "NOCHMAL", "FLUCHT", "woher dieses Ei kommt", "%s +%u", "kann nicht weiter trainieren", "WAEHLE DEINE REGION", "VERABSCHIEDEN", "Jetzt verabschieden?", "das naechste entwickelt sich einen Tag spaeter", "entwickelt sich einen Tag spaeter",
-   "PACK FEHLT", "FREILASSEN", "fuer immer weg", "INS TEAM", "kommt nicht ins team", "LAUTSTAERKE", "SPRACHE", "INFO", "HELLIGKEIT", "TEST", },
+   "PACK FEHLT", "FREILASSEN", "fuer immer weg", "INS TEAM", "kommt nicht ins team", "LAUTSTAERKE", "SPRACHE", "INFO", "HELLIGKEIT", "TEST",
+    // Fun Pack
+    "LINKS/RE", "HOCH/TIEF", "WER IST ES", "BEEREN", "MAULWURF", "SEILSPRUNG", "TANZ", "VERSTECK", "Wohin schaut es?", "Hoeher oder tiefer?", "HOEHER", "TIEFER", "Wer ist das Pokemon?", "Links/rechts tippen", "Tippen! Nicht Voltobal", "Tippen zum Springen!", "Im Takt tippen!", "PERFEKT", "GUT", "DANEBEN", "Wo versteckt es sich?", "FREUDE +%u", "VERTEID. +%u", "JA!", "NEIN", "Bauchweh!", "Erkaeltet!", "Grummelig...", "Langweilt sich...", "Zzz... Licht aus!", "Zu krank!", "Geht besser!", "Spaeter noch eine", "10 Min warten", "Jetzt baden!", "Igitt! Nicht krank", "MEHR SPIELE", "MINISPIELE",
+    // Fun Pack
+    "SANDSACK", "REAKTION", "BALLSPIEL", "SPASS",
+    // coins and daily missions
+    "MUENZEN", "HEUTIGE AUFGABEN", "%u mal fuettern", "Seine Lieblingsbeere", "Spiele %u Minispiele", "Gehe %u Schritte", "Bade es", "Streichle es %u mal", "Ein Kraftspiel", "Ein Tempospiel", "Ein Abwehrspiel", "Erziele %u Punkte", "Heute durch Spiel: %u/%u", "Alle 3: +%u extra", "SO VERDIENST DU", "Spielen und pflegen", "+%u je 1000 Schritte", "Erste Pflege am Tag +%u", "Jede Aufgabe +%u", "Neuer Orden +%u", "Ins Bett, Licht aus +%u", "Der Laden kommt bald!",
+    // shop, bag and hats
+    "LADEN", "BEUTEL", "HUETE", "KAPPE", "SCHLEIFE", "BLUME", "MUETZE", "PARTYHUT", "STROHHUT", "HEXENHUT", "NIKOLAUSHUT", "ZYLINDER", "KRONE", "KAUFEN", "NEIN", "DEINS", "Zu wenig Muenzen", "Gekauft!", "TRAEGT", "HUT AB", "HUT VERSCHIEBEN", "Noch nichts da", "FERTIG",
+    // toys and decorations
+    "SPIELZEUG", "DEKORATION", "DRAUSSEN", "WASSERBALL", "KUSCHELTIER", "QUIETSCHENTE", "BAUKLOETZE", "TROMMEL", "DRACHEN", "PFLANZE", "BLUMEN", "LAMPE", "BETT", "GESCHENK", "KUERBIS",
+    // foods
+    "ESSEN", "MAHLZEITEN", "SUESSES", "GETRAENKE", "MEDIZIN", "SANDWICH", "CURRY", "SUPPE", "REISBALL", "KUCHEN", "KEKS", "EIS", "MILCH", "SAFT", "Keins mehr: zum Laden", "x%u",
+    // bath and sleep menus
+    "BAD", "DUSCHE", "SCHAUMBAD", "SCHRUBBEN", "BUERSTEN", "Reib den Dreck weg!", "Blitzsauber!", "Du brauchst Seife", "Kauf eine Buerste", "SCHLAFEN", "INS BETT", "NICKERCHEN 30 MIN", "SCHLAFLIED", "PFLEGE", "SEIFE", "BUERSTE",
+    // places, garden, seasonal gifts
+    "AUSGEHEN", "PARK", "POKEMON-CENTER", "GARTEN", "SPAZIEREN", "REINGEHEN", "ZURUECK", "HEILEN", "Heute gratis", "Wie neu!", "%u Muenzen gefunden!", "Eine Beere gefunden!", "Ein %s sagt hallo!", "Schoener Spaziergang", "Zu muede", "PFLANZEN", "ERNTEN", "Kauf Samen", "Waechst... %u%%", "SAMEN", "Geerntet: %s", "Halloween-Geschenk!", "Weihnachtsgeschenk!", "Frohes neues Jahr!", "Valentinsgeschenk!", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -202,7 +266,23 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "%s: %s", "PARALISI", "SCOTTATURA", "VELENO", "ADDORMENTATO", "CONGELATO", "CONFUSIONE",
     "Hai vinto!", "Hai perso...",
     "%s manda %s", "Vai, %s!", "PALESTRE", "MEDAGLIE %u/8", "ALLENATORE", "VELOCITA +%u", "tocca: cambia avatar", "%u in totale", "NORMALE", "DIFFICILE", "SCELTI %u/%u", "LOTTA", "BLOCCATO", "POKEMON", "%s sconfitto!", "NUOVA MEDAGLIA!", "VOL %u", "BOX %u/%u", "scambia con %s: scegli", "BOX", "RIPORTA", "solo con un uovo", "LOTTA LAN", "CREA", "ENTRA", "ricerca...", "pronto!", "versione diversa", "crea o entra", "rivale: %u mons", "il rivale se n' e andato", "in attesa del rivale...", "ANCORA", "FUGGI", "da quale regione viene l uovo", "%s +%u", "non puo allenarsi oltre", "SCEGLI LA REGIONE", "RITIRARE", "Ritirarla adesso?", "il prossimo evolve un giorno dopo", "evolve un giorno dopo",
-   "MANCA PACK", "LIBERA", "via per sempre", "AL GRUPPO", "non entrera nel gruppo", "VOLUME", "LINGUA", "INFO", "LUMINOSITA", "PROVA", },
+   "MANCA PACK", "LIBERA", "via per sempre", "AL GRUPPO", "non entrera nel gruppo", "VOLUME", "LINGUA", "INFO", "LUMINOSITA", "PROVA",
+    // Fun Pack
+    "SIN/DES", "PIU/MENO", "CHI E?", "BACCHE", "TALPE", "CORDA", "BALLO", "NASCONDINO", "Dove guardera?", "Piu alto o basso?", "PIU", "MENO", "Chi e quel Pokemon?", "Tocca sin/des", "Toccali! Non Voltorb", "Tocca per saltare!", "Tocca a ritmo!", "PERFETTO", "BENE", "MANCATO", "Dove si nasconde?", "GIOIA +%u", "DIFESA +%u", "SI!", "NO...", "Mal di pancia!", "Ha il raffreddore!", "Brontolone...", "Si annoia...", "Zzz... spegni luce!", "Troppo malato!", "Sta meglio!", "Ancora una dose", "Aspetta 10 min", "Ora un bagno!", "Bleah! Non malato", "ALTRI GIOCHI", "MINIGIOCHI",
+    // Fun Pack
+    "SACCO", "RIFLESSI", "PALLA", "DIVERTIMENTO",
+    // coins and daily missions
+    "MONETE", "MISSIONI DI OGGI", "Dagli da mangiare %u volte", "La sua bacca preferita", "Gioca %u minigiochi", "Cammina %u passi", "Fagli il bagno", "Accarezzalo %u volte", "Un gioco di forza", "Un gioco di velocita", "Un gioco di difesa", "Fai %u punti", "Dal gioco oggi: %u/%u", "Tutte e 3: +%u extra", "COME GUADAGNARE", "Giocare e curarlo", "+%u ogni 1000 passi", "Prima cura del giorno +%u", "Ogni missione +%u", "Nuova medaglia +%u", "A letto, luce spenta +%u", "Il negozio arriva presto!",
+    // shop, bag and hats
+    "NEGOZIO", "ZAINO", "CAPPELLI", "BERRETTO", "FIOCCO", "FIORE", "CUFFIA", "DA FESTA", "DI PAGLIA", "DA STREGA", "DI NATALE", "CILINDRO", "CORONA", "COMPRA", "NO", "TUO", "Monete insufficienti", "Comprato!", "INDOSSATO", "TOGLI CAPPELLO", "SPOSTA CAPPELLO", "Ancora niente", "FATTO",
+    // toys and decorations
+    "GIOCATTOLI", "DECORAZIONI", "FUORI", "PALLONE", "PELUCHE", "PAPERELLA", "CUBETTI", "TAMBURO", "AQUILONE", "PIANTA", "FIORI", "LAMPADA", "LETTO", "REGALO", "ZUCCA",
+    // foods
+    "CIBO", "PASTI", "DOLCI", "BEVANDE", "MEDICINA", "PANINO", "CURRY", "ZUPPA", "ONIGIRI", "TORTA", "BISCOTTO", "GELATO", "LATTE", "SUCCO", "Finito: vai al negozio", "x%u",
+    // bath and sleep menus
+    "BAGNO", "DOCCIA", "BAGNOSCHIUMA", "STROFINARE", "SPAZZOLARE", "Strofina le macchie!", "Pulitissimo!", "Serve sapone", "Compra una spazzola", "DORMIRE", "A NANNA", "PISOLINO 30 MIN", "NINNA NANNA", "CURA", "SAPONE", "SPAZZOLA",
+    // places, garden, seasonal gifts
+    "USCIRE", "PARCO", "CENTRO POKEMON", "ORTO", "PASSEGGIA", "ENTRA", "TORNA", "CURA", "Gratis oggi", "Come nuovo!", "Ha trovato %u monete!", "Ha trovato una bacca!", "Un %s ti saluta!", "Che bella passeggiata", "Troppo stanco", "PIANTA", "RACCOGLI", "Compra semi", "Cresce... %u%%", "SEME", "Raccolto: %s", "Regalo di Halloween!", "Regalo di Natale!", "Buon anno!", "Regalo di San Valentino!", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -241,7 +321,23 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "%s: %s", "PARALISIA", "QUEIMADURA", "VENENO", "A DORMIR", "CONGELADO", "CONFUSAO",
     "Ganhaste!", "Perdeste...",
     "%s envia %s", "Vai, %s!", "GINASIOS", "MEDALHAS %u/8", "TREINADOR", "VELOCIDADE +%u", "toca: mudar avatar", "%u no total", "NORMAL", "DIFICIL", "ESCOLHIDOS %u/%u", "LUTAR", "BLOQUEADO", "POKEMON", "%s derrotado!", "NOVA MEDALHA!", "VOL %u", "CAIXA %u/%u", "trocar com %s: escolhe", "CAIXA", "TRAZER", "so com um ovo", "COMBATE LAN", "CRIAR", "ENTRAR", "a procurar...", "pronto!", "versao diferente", "criar ou entrar", "rival: %u mons", "o rival saiu", "a esperar pelo rival...", "OUTRA VEZ", "FUGIR", "de que regiao vem o ovo", "%s +%u", "ja nao pode treinar mais", "ESCOLHE A REGIAO", "REFORMAR", "Reformar agora?", "o proximo evolui um dia depois", "evolui um dia depois",
-   "FALTA PACK", "SOLTAR", "vai para sempre", "A EQUIPA", "nao entrara na equipa", "VOLUME", "IDIOMA", "INFO", "BRILHO", "TESTE", },
+   "FALTA PACK", "SOLTAR", "vai para sempre", "A EQUIPA", "nao entrara na equipa", "VOLUME", "IDIOMA", "INFO", "BRILHO", "TESTE",
+    // Fun Pack
+    "ESQ/DIR", "MAIS/MENOS", "QUEM E?", "BAGAS", "TOUPEIRAS", "CORDA", "DANCA", "ESCONDE", "Para onde olha?", "Maior ou menor?", "MAIOR", "MENOR", "Quem e esse Pokemon?", "Toque esq/dir", "Toque! Nao o Voltorb", "Toque para pular!", "Toque no ritmo!", "PERFEITO", "BOM", "ERROU", "Onde se escondeu?", "ALEGRIA +%u", "DEFESA +%u", "ISSO!", "NAO...", "Dor de barriga!", "Esta resfriado!", "Rabugento...", "Entediado...", "Zzz... apague a luz!", "Doente demais!", "Melhorou!", "Mais uma dose", "Espere 10 min", "Agora um banho!", "Eca! Nao esta doente", "MAIS JOGOS", "MINIJOGOS",
+    // Fun Pack
+    "SACO", "REFLEXOS", "BOLA", "DIVERSAO",
+    // coins and daily missions
+    "MOEDAS", "MISSOES DE HOJE", "Alimente %u vezes", "Sua baga favorita", "Jogue %u minijogos", "Ande %u passos", "De um banho", "Faca carinho %u vezes", "Um jogo de forca", "Um jogo de velocidade", "Um jogo de defesa", "Faca %u pontos", "Jogando hoje: %u/%u", "As 3: +%u extra", "COMO GANHAR", "Brincar e cuidar", "+%u a cada 1000 passos", "Primeiro cuidado do dia +%u", "Cada missao +%u", "Insignia nova +%u", "Dormir sem luz +%u", "A loja chega em breve!",
+    // shop, bag and hats
+    "LOJA", "MOCHILA", "CHAPEUS", "BONE", "LACO", "FLOR", "GORRO", "DE FESTA", "DE PALHA", "DE BRUXA", "DE NATAL", "CARTOLA", "COROA", "COMPRAR", "NAO", "SEU", "Moedas insuficientes", "Comprado!", "USANDO", "TIRAR CHAPEU", "MOVER CHAPEU", "Nada ainda", "PRONTO",
+    // toys and decorations
+    "BRINQUEDOS", "DECORACAO", "FORA", "BOLA", "PELUCIA", "PATINHO", "BLOCOS", "TAMBOR", "PIPA", "PLANTA", "FLORES", "LUMINARIA", "CAMA", "PRESENTE", "ABOBORA",
+    // foods
+    "COMIDA", "REFEICOES", "DOCES", "BEBIDAS", "REMEDIO", "SANDUICHE", "CURRY", "SOPA", "BOLINHO", "BOLO", "BISCOITO", "SORVETE", "LEITE", "SUCO", "Acabou: va a loja", "x%u",
+    // bath and sleep menus
+    "BANHO", "DUCHA RAPIDA", "BANHO DE ESPUMA", "ESFREGAR", "ESCOVAR", "Esfregue a sujeira!", "Limpinho!", "Precisa de sabao", "Compre uma escova", "DORMIR", "HORA DE DORMIR", "SONECA 30 MIN", "CANCAO DE NINAR", "CUIDADOS", "SABAO", "ESCOVA",
+    // places, garden, seasonal gifts
+    "SAIR", "PARQUE", "CENTRO POKEMON", "HORTA", "PASSEAR", "ENTRAR", "VOLTAR", "CURAR", "Gratis hoje", "Novinho em folha!", "Achou %u moedas!", "Achou uma baga!", "Um %s diz oi!", "Que passeio bom", "Cansado demais", "PLANTAR", "COLHER", "Compre sementes", "Crescendo... %u%%", "SEMENTE", "Colheu: %s", "Presente de Halloween!", "Presente de Natal!", "Feliz Ano Novo!", "Presente de Namorados!", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -282,7 +378,23 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "你赢了!", "你输了...",
     "%s 派出了 %s", "上吧, %s!", "道馆", "徽章 %u/8", "训练家",
     "速度 +%u", "点击: 换头像", "共获得 %u", "简单", "困难", "已选 %u/%u", "战斗", "未解锁", "宝可梦", "%s 被打败了!", "新徽章!", "音量 %u", "箱子 %u/%u", "与 %s 交换: 选择格子", "箱子", "带回来", "仅在有蛋时可用", "局域网对战", "主机", "加入", "搜索中...", "准备好了!", "版本不同", "主机或加入", "对手: %u 只", "对手离开了", "等待对手...", "再来", "逃跑", "这颗蛋的来源", "%s +%u", "已训练到极限", "选择地区", "退役", "要提前退役吗?", "下一只晚一天进化", "晚一天进化",
-    "需要图包", "放生", "永远离开", "入队", "它不会加入你的队伍", "音量", "语言", "关于", "亮度", "测试", },
+    "需要图包", "放生", "永远离开", "入队", "它不会加入你的队伍", "音量", "语言", "关于", "亮度", "测试",
+    // Fun Pack
+    "左还是右", "大还是小", "我是谁", "接树果", "打地鼠", "跳绳", "跳舞", "捉迷藏", "它会看哪边?", "更大还是更小?", "更大", "更小", "这是哪只宝可梦?", "点左右移动", "快点! 别碰霹雳电球", "点击跳跃!", "跟着节拍点击!", "完美", "不错", "失误", "它躲在哪里?", "快乐 +%u", "防御 +%u", "答对了!", "错了...", "肚子疼!", "感冒了!", "心情不好...", "好无聊...", "Zzz... 请关灯!", "生病了不能玩!", "好多了!", "稍后再吃一次", "等10分钟", "现在洗个澡!", "好苦! 它没生病", "更多游戏", "小游戏",
+    // Fun Pack
+    "沙袋", "反应测试", "顶球", "娱乐",
+    // coins and daily missions
+    "金币", "今日任务", "喂食%u次", "喂它最爱的树果", "玩%u个小游戏", "走%u步", "给它洗澡", "抚摸%u次", "玩一个力量游戏", "玩一个速度游戏", "玩一个防御游戏", "得到%u分", "今日游戏: %u/%u", "全部完成: 额外+%u", "如何赚取", "玩耍和照顾", "每1000步 +%u", "每天第一次照顾 +%u", "每个任务 +%u", "新徽章 +%u", "关灯睡觉 +%u", "商店即将开放!",
+    // shop, bag and hats
+    "商店", "背包", "帽子", "鸭舌帽", "蝴蝶结", "花朵", "毛线帽", "派对帽", "草帽", "女巫帽", "圣诞帽", "礼帽", "皇冠", "购买", "不要", "已拥有", "金币不够", "买到了!", "戴着", "摘下帽子", "调整帽子", "还什么都没有", "完成",
+    // toys and decorations
+    "玩具", "装饰", "已摆放", "沙滩球", "毛绒玩具", "小黄鸭", "积木", "鼓", "风筝", "盆栽", "花束", "台灯", "小床", "礼物", "南瓜",
+    // foods
+    "食物", "正餐", "甜点", "饮料", "药", "三明治", "咖喱饭", "汤", "饭团", "蛋糕", "饼干", "冰淇淋", "牛奶", "果汁", "没有了: 去商店买", "x%u",
+    // bath and sleep menus
+    "洗澡", "冲澡", "泡泡浴", "搓洗", "梳毛", "把脏东西搓掉!", "干干净净!", "需要肥皂", "先买梳子", "睡觉", "去睡觉", "午睡30分钟", "摇篮曲", "护理", "肥皂", "梳子",
+    // places, garden, seasonal gifts
+    "出门", "公园", "宝可梦中心", "菜园", "散步", "进去", "回家", "治疗", "今天免费", "完全恢复了!", "找到了%u枚金币!", "找到了树果!", "%s 打招呼!", "散步真开心", "太累了", "种下", "收获", "去买种子", "生长中... %u%%", "种子", "收获了: %s", "万圣节礼物!", "圣诞礼物!", "新年快乐!", "情人节礼物!", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -322,7 +434,23 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "승리!", "패배...",
     "%s 의 %s 등장!", "가라, %s!", "체육관", "배지 %u/8", "트레이너",
     "속도 +%u", "누르기: 아바타 변경", "총 %u 획득", "쉬움", "어려움", "선택 %u/%u", "싸우기", "잠김", "포켓몬", "%s 쓰러뜨림!", "새 배지!", "볼륨 %u", "박스 %u/%u", "%s 와 교체: 칸 선택", "박스", "데려오기", "알이 있을 때만", "LAN 배틀", "호스트", "참가", "검색 중...", "준비 완료!", "버전 다름", "호스트 또는 참가", "상대: %u 마리", "상대가 나갔어요", "상대를 기다리는 중...", "다시", "도망", "이 알의 출신지", "%s +%u", "더 이상 훈련할 수 없어요", "지역 선택", "은퇴", "일찍 은퇴할까요?", "다음 아이는 하루 늦게 진화", "하루 늦게 진화",
-    "팩 필요", "놓아주기", "영영 이별", "파티로", "파티에 들어가지 않아요", "볼륨", "언어", "정보", "밝기", "테스트", },
+    "팩 필요", "놓아주기", "영영 이별", "파티로", "파티에 들어가지 않아요", "볼륨", "언어", "정보", "밝기", "테스트",
+    // Fun Pack
+    "왼쪽/오른쪽", "높게/낮게", "누구일까?", "열매 받기", "두더지", "줄넘기", "댄스", "숨바꼭질", "어느 쪽을 볼까?", "더 클까 작을까?", "크다", "작다", "이 포켓몬은 누구?", "좌우를 눌러 이동", "눌러! 찌리리공은 안돼", "눌러서 점프!", "박자에 맞춰 눌러!", "완벽", "좋아", "실패", "어디에 숨었을까?", "기쁨 +%u", "방어 +%u", "정답!", "아쉽다...", "배가 아파!", "감기에 걸렸어!", "기분이 나빠...", "심심해...", "Zzz... 불 꺼줘!", "아파서 못 놀아!", "다 나았어!", "나중에 한 번 더", "10분 기다려", "이제 목욕!", "으웩! 안 아파", "더 많은 게임", "미니게임",
+    // Fun Pack
+    "샌드백", "반응 속도", "공놀이", "놀이",
+    // coins and daily missions
+    "코인", "오늘의 미션", "먹이 %u번 주기", "좋아하는 열매 주기", "미니게임 %u번", "%u걸음 걷기", "목욕시키기", "%u번 쓰다듬기", "힘 게임 하기", "속도 게임 하기", "방어 게임 하기", "%u점 얻기", "오늘 놀이: %u/%u", "모두 완료: +%u 추가", "모으는 방법", "놀아주고 돌보기", "1000걸음마다 +%u", "하루 첫 돌봄 +%u", "미션마다 +%u", "새 배지 +%u", "불 끄고 재우기 +%u", "상점이 곧 열려요!",
+    // shop, bag and hats
+    "상점", "가방", "모자", "야구모자", "리본", "꽃", "비니", "파티 모자", "밀짚모자", "마녀 모자", "산타 모자", "실크해트", "왕관", "구매", "아니요", "보유", "코인이 부족해요", "구매 완료!", "착용 중", "모자 벗기", "모자 옮기기", "아직 아무것도 없어요", "완료",
+    // toys and decorations
+    "장난감", "장식", "배치됨", "비치볼", "인형", "고무오리", "블록", "북", "연", "화분", "꽃병", "램프", "침대", "선물", "호박",
+    // foods
+    "음식", "식사", "간식", "음료", "약", "샌드위치", "카레", "수프", "주먹밥", "케이크", "쿠키", "아이스크림", "우유", "주스", "다 떨어졌어요: 상점으로", "x%u",
+    // bath and sleep menus
+    "목욕", "샤워", "거품 목욕", "문지르기", "빗질", "얼룩을 문질러!", "반짝반짝!", "비누가 필요해요", "빗을 사세요", "잠자기", "재우기", "낮잠 30분", "자장가", "관리", "비누", "빗",
+    // places, garden, seasonal gifts
+    "외출", "공원", "포켓몬센터", "텃밭", "산책", "들어가기", "돌아가기", "치료", "오늘 무료", "완전히 회복했어요!", "코인 %u개를 찾았어요!", "열매를 찾았어요!", "%s 인사해요!", "즐거운 산책", "너무 피곤해요", "심기", "수확", "씨앗을 사세요", "자라는 중... %u%%", "씨앗", "수확: %s", "할로윈 선물!", "크리스마스 선물!", "새해 복 많이!", "발렌타인 선물!", },
 };
 
 // Medal names in their three lengths [language][medal].

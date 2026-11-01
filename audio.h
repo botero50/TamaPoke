@@ -28,7 +28,7 @@ enum Sfx : uint8_t {
 // this is not mixed with the effects -- the task plays the tune a note at a
 // time and hands the voice to any effect that arrives, resuming after. An
 // effect therefore always cuts through, which is what you want anyway.
-enum Music : uint8_t { MUS_NONE = 0, MUS_BATTLE, MUS_VICTORY };
+enum Music : uint8_t { MUS_NONE = 0, MUS_BATTLE, MUS_VICTORY, MUS_LULLABY };   // the lullaby plays once
 void audioMusic(uint8_t id);
 
 // 0..10. Stored, and applied as the square wave's amplitude; 0 is silence

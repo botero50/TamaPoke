@@ -32,6 +32,25 @@ const SaveField SAVE_FIELDS[] = {
   { "stps", SK_U32 },   { "sday", SK_U32 },
   { "medal", SK_U16 },  { "tmedal", SK_U16 }, { "mstone", SK_U16 },
   { "ghi", SK_U16 },    { "shi", SK_U16 },    { "qhi", SK_U16 },
+  // Fun Pack: the extra minigames' records and the statuses
+  { "mnhi", SK_BYTES }, { "sick", SK_U8 },    { "sdose", SK_U8 },
+  { "sdmin", SK_U32 },  { "stick", SK_U16 },  { "ovf", SK_U8 },
+  { "dirt", SK_U8 },    { "lon", SK_BOOL },   { "lont", SK_U8 },
+  { "grmp", SK_BOOL },  { "bord", SK_U16 },
+  // coins and daily missions
+  { "coin", SK_U32 },  { "cntd", SK_U16 },  { "cnday", SK_U32 },
+  { "stck", SK_U8 },   { "msprg", SK_BYTES }, { "msdon", SK_U8 },
+  { "bedd", SK_U32 },
+  // hats
+  { "hats", SK_U16 },   { "hton", SK_I8 },    { "htdx", SK_I8 },
+  { "htdy", SK_I8 },    { "htdex", SK_I16 },
+  // toys and decorations
+  { "deco", SK_U16 },   { "dslL", SK_I8 },    { "dslR", SK_I8 },
+  { "food", SK_BYTES },
+  { "soap", SK_U8 },    { "brsh", SK_BOOL },  { "napd", SK_U32 },
+  // places, the garden, seasonal gifts
+  { "pkday", SK_U32 },  { "pkfnd", SK_U8 },   { "ctday", SK_U32 },
+  { "seed", SK_U8 },    { "plant", SK_U32 },  { "gift", SK_U32 },
   // the banked creatures
   { "party", SK_BYTES }, { "box", SK_BYTES },
   // settings, so a restored device plays the way it did
