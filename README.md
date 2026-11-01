@@ -3,7 +3,7 @@
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://botero50.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
-![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.9-8A2BE2)
+![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.11-8A2BE2)
 ![Code](https://img.shields.io/badge/code-MIT-blue)
 ![Languages](https://img.shields.io/badge/languages-8-FFCB05)
 [![Stars](https://img.shields.io/github/stars/botero50/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/botero50/TamaPoke/stargazers)
@@ -45,6 +45,10 @@ This fork (**[botero50/TamaPoke](https://github.com/botero50/TamaPoke)**, branch
   harder as it goes. **Brushing teeth** for two minutes, twice a day.
 - **It talks**: little speech bubbles when it is hungry, sleepy, dirty, or happy.
 - **Parent settings**: a bedtime after which games stop, and a games-a-day limit.
+- **Out and about**: step adventures (walk with the ball to reach treasure stops),
+  fishing at the lake, and a kitchen that turns two foods into a better dish.
+- **Family**: a chores chart the parents tick, a piggy bank with weekly interest,
+  an alarm clock, and a diary of the last week. Popping bubbles in the shower.
 
 See the sections further down for the rules and the economy numbers.
 
@@ -420,6 +424,32 @@ in December-February). Only the sky changes.
   after which games, training and battles are refused until 6:00, and a limit of
   10/20/30 games a day. Tap a row to change it. It is not locked: it is a
   reminder for the family, not a security feature.
+
+### Out and about (phase 10)
+The map is a grid of eight places now.
+- **Adventure**: steps walked with the ball move it along a route of five stops
+  (300, 800, 1 500, 2 500 and 4 000 steps). Each stop is a chest of 2-5 coins, a
+  serving of food, two seeds or a wild Pokemon; the last one pays 10 coins and
+  opens the next route (forest path, sunny beach, mountain trail, volcano cave).
+- **Lake**: FISH casts; when the float dips, tap within 0.8 s. A Magikarp,
+  a Goldeen, an old boot, a rice ball, a shell (a seed) or now and then a pearl.
+  The first five catches a day pay (about 7 coins); after that it is just for fun.
+- **Kitchen**: cookie + juice = berry pie, soup + rice ball = stew, ice cream +
+  milk = parfait. Tap the pot to stir. Cooked dishes are better than shop food,
+  strengthen the bond, and are never sold.
+
+### Family (phase 11)
+- **Chores** (purse -> CHORES): make the bed, homework, tidy the room, help at
+  home, read, brush teeth. The parents tick what was done; each pays 4 coins once a day.
+- **Piggy bank** (purse -> PIGGY BANK): save 10 or 50 at a time; a week after the
+  first coin it pays 5% interest (at least 1, at most 20 a week). Take it out any time.
+- **Diary** (purse -> DIARY): a page a day for the last week -- meals, games,
+  baths, walks, fishing, study, chores, cooking, adventures, trophies, coins.
+- **Alarm** (settings, the fifth page): a time and ON/OFF. It wakes the screen,
+  plays a tune and says good morning; a tap stops it. With a parents' bedtime set,
+  it also says when it is time for bed.
+- **Shower bubbles**: in a quick wash, tap a bubble to pop it -- the first pop
+  turns the wash into a 10-second bubble game.
 
 ### The economy, checked
 `economy_test` plays thirty days through the real rules (missions, caps, steps):
