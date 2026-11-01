@@ -41,7 +41,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.11"
+#define FW_VERSION "3.14-funpack.14"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -236,6 +236,8 @@ uint8_t trophyPage = 0;
 bool choresOpen = false, piggyOpen = false, diaryOpen = false;   // more of the purse
 uint8_t diaryPage = 0;
 bool alarmRinging = false;   // the alarm clock is going off
+float gAccX = 0, gAccY = 0;  // the last accelerometer sample
+bool gAccFresh = false;
 bool shopOpen = false;
 bool bagOpen = false;
 bool hatAdjust = false;      // the hat-moving pad is up on the main screen
@@ -857,7 +859,10 @@ void loop() {
   // unevenly; StepDetector takes the timestamp and does not care.
   static StepDetector stepper;
   float ax, ay, az;
-  if (imuReadAccel(ax, ay, az)) pet.addSteps(stepper.feed(ax, ay, az, now));
+  if (imuReadAccel(ax, ay, az)) {
+    gAccX = ax; gAccY = ay; gAccFresh = true;   // the tilt maze reads the last sample
+    pet.addSteps(stepper.feed(ax, ay, az, now));
+  }
 
   // The link is pumped here rather than from the LAN screen, because it has to
   // keep running through the battle too: linkNowPoll() drains what the radio
@@ -931,7 +936,10 @@ void loop() {
   if (now - lastGiftCheck > 20000 && uiCurrentScreen() == SCR_MAIN && !screenOff) {
     lastGiftCheck = now;
     checkHolidayGift();
+    if (pet.claimBirthday()) { sfxPlay(SFX_VICTORY); fpShowToast(S_HAPPY_BIRTHDAY, UI_BAR_OK); }
+    else if (pet.claimFestivalTreat()) { sfxPlay(SFX_MEDAL); fpShowToast(S_FESTIVAL_TREAT, UI_BAR_OK); }
   }
+  if (pet.wishGrantedFlash) { pet.wishGrantedFlash = false; sfxPlay(SFX_MEDAL); fpShowToast(S_WISH_DONE, UI_BAR_OK); }
   // a trophy reached is announced on the main screen; homework ends on time
   static uint32_t lastTrophyCheck = 0;
   if (now - lastTrophyCheck > 5000 && uiCurrentScreen() == SCR_MAIN && !screenOff) {
@@ -1457,7 +1465,7 @@ void onSwipeV(int dir) {
   if (gameOpen) { leaveGame(); return; }
   if (sackOpen) { leaveSack(); return; }
   if (spdOpen) { leaveSpeed(); return; }
-  if (fpOpen) { fpLeave(); return; }
+  if (fpOpen) { if (fpGame != MINI_MAZE) fpLeave(); return; }   // the maze is steered by dragging
   if (galleryOpen) {
     if (galleryDetail) { galleryDetail = 0; galleryPmd.unload(); galleryDirty = true; return; }
     galleryRegion = (uint8_t)((galleryRegion + (dir > 0 ? 1 : GAL_REGIONS - 1)) % GAL_REGIONS);
@@ -1825,7 +1833,7 @@ void onSwipe(int dir) {
   }
   if (gameOpen) { leaveGame(); return; }   // swipe out, keeping what you earned
   if (spdOpen) { leaveSpeed(); return; }
-  if (fpOpen) { fpLeave(); return; }
+  if (fpOpen) { if (fpGame != MINI_MAZE) fpLeave(); return; }   // the maze is steered by dragging
   if (kbOpen) return;
   if (clockOpen) {   // settings: horizontal pages, circular; OK/cancel close it
     int p = (int)settingsPage + (dir > 0 ? -1 : 1);
@@ -4054,7 +4062,8 @@ void render() {
   gNight = h < 6 || h >= 20;   // by the clock only: a creature asleep at noon sleeps in daylight
   // drawScene covers the full 466x466: no fillScreen(BLACK) beforehand so
   // that an overlapping DMA flush never captures half-painted black (anti-flicker)
-  drawScene(sceneBiome(), millis(), gNight);
+  if (pet.sceneryPick == SCENERY_ROOM && !pet.ceremony) drawRoom(gNight);
+  else drawScene(sceneBiome(), millis(), gNight);
 
   if (pet.ceremony) {
     const DexEntry &d = DEX_TBL[pet.speciesId];
@@ -4106,6 +4115,7 @@ void render() {
     drawBathDuck();
     drawShine();
     drawWeather();
+    drawEvents();
     drawPoops();
     drawLightsOff();
     drawStepPlate();
@@ -4124,6 +4134,8 @@ void render() {
   if (pet.sleeping) drawSnore();
   drawDream();
   drawTalk();
+  drawWish();
+  drawBirthday();
 
   // food picker
   if (feedMenuUntil) {
@@ -8295,9 +8307,11 @@ const char *statusMsg() {
   if (pet.hygiene < 25) return T(S_NEEDS_BATH);
   if (pet.energy < 25) return T(S_EXHAUSTED);
   if (pet.joy < 25) return T(S_SAD);
+  if (pet.isLonely()) return T(S_ST_LONELY);
   if (pet.grumpy) return T(S_ST_GRUMPY);
   if (pet.isBored()) return T(S_ST_BORED);
   if (pet.weight > 60) return T(S_CHUBBY);
+  if (pet.isExcited()) return T(S_ST_EXCITED);
   if (pet.shiny && pet.ageMinutes < 15) return T(S_IS_SHINY);
   return T(S_HAPPY);
 }
@@ -8407,9 +8421,9 @@ enum : uint8_t { FP_CAT_ATK = 0, FP_CAT_SPE, FP_CAT_DEF, FP_CAT_FUN, FP_CAT_COUN
 // an entry is a MINI_* game, or one of the original three
 enum : uint8_t { FP_G_BAG = 100, FP_G_REACT, FP_G_BALL, FP_G_NONE = 255 };
 static const uint8_t FP_CATS[FP_CAT_COUNT][FPM_ROWS] = {
-  { FP_G_BAG,   MINI_MOLE,  FP_G_NONE,  FP_G_NONE },   // strength
-  { FP_G_REACT, MINI_DROP,  MINI_ROPE,  FP_G_NONE },   // speed
-  { FP_G_BALL,  MINI_WHO,   FP_G_NONE,  FP_G_NONE },   // defence
+  { FP_G_BAG,   MINI_MOLE,  MINI_MAZE,   FP_G_NONE },   // strength
+  { FP_G_REACT, MINI_DROP,  MINI_ROPE,   MINI_FLAPPY },  // speed
+  { FP_G_BALL,  MINI_WHO,   MINI_MEMORY, MINI_SIMON },   // defence
   { MINI_DANCE, MINI_HIDE,  MINI_LR,    MINI_HL   },   // fun: joy and bond
 };
 
@@ -8492,7 +8506,8 @@ static StrId fpGainFmt(uint8_t g) {
 
 static StrId fpTitle(uint8_t g) {
   static const StrId T_[MINI_COUNT] = {
-    S_GAME_LR, S_GAME_HL, S_GAME_WHO, S_GAME_DROP, S_GAME_MOLE, S_GAME_ROPE, S_GAME_DANCE, S_GAME_HIDE
+    S_GAME_LR, S_GAME_HL, S_GAME_WHO, S_GAME_DROP, S_GAME_MOLE, S_GAME_ROPE, S_GAME_DANCE, S_GAME_HIDE,
+    S_GAME_MEMORY, S_GAME_SIMON, S_GAME_FLAPPY, S_GAME_MAZE
   };
   return T_[g % MINI_COUNT];
 }
@@ -9269,6 +9284,10 @@ void startFunPackGame(uint8_t g) {
       for (uint8_t b = 0; b < 3; b++) fpBushSlot[b] = b;
       hideRound();
       break;
+    case MINI_MEMORY: memStart(); break;
+    case MINI_SIMON: fpLives = 3; simStart(); break;
+    case MINI_FLAPPY: flyStart(); break;
+    case MINI_MAZE: mazeStart(); break;
   }
   sfxPlay(SFX_TAP);
 }
@@ -9285,6 +9304,7 @@ void fpTap(int16_t x, int16_t y) {
     case MINI_ROPE: ropeTap(x, y); break;
     case MINI_DANCE: danceTap(x, y); break;
     case MINI_HIDE: hideTap(x, y); break;
+    default: fpTapPhase12(x, y); break;
   }
 }
 
@@ -9328,6 +9348,7 @@ void renderFunPack() {
     case MINI_ROPE: ropeRender(now); break;
     case MINI_DANCE: danceRender(now); break;
     case MINI_HIDE: hideRender(now); break;
+    default: fpRenderPhase12(now); break;
   }
   // a game that just finished drew nothing this frame: show the result now
   if (fpOverUntil) fpRenderResult();
@@ -9508,7 +9529,9 @@ void renderWallet() {
 static StrId hatName(uint8_t h) {
   static const StrId T_[HAT_COUNT] = {
     S_HAT_CAP, S_HAT_BOW, S_HAT_FLOWER, S_HAT_BEANIE, S_HAT_PARTY,
-    S_HAT_STRAW, S_HAT_WITCH, S_HAT_SANTA, S_HAT_TOPHAT, S_HAT_CROWN
+    S_HAT_STRAW, S_HAT_WITCH, S_HAT_SANTA, S_HAT_TOPHAT, S_HAT_CROWN,
+    S_HAT_CHEF, S_HAT_PIRATE, S_HAT_CATEARS, S_HAT_BUNNY, S_HAT_HEADPHONES,
+    S_HAT_GRAD, S_HAT_WREATH, S_HAT_HELMET, S_HAT_BERET, S_HAT_VIKING
   };
   return T_[h % HAT_COUNT];
 }
@@ -9610,10 +9633,17 @@ void hubTap(int16_t x, int16_t y) {
 // each category is a paged list. A category is a slice of one catalogue: the
 // hats, or a run of DecorId.
 
-enum : uint8_t { CAT_HATS = 0, CAT_TOYS, CAT_DECOR, CAT_FOOD, CAT_CARE, CAT_SCENE, CAT_COUNT };
-static const StrId CAT_NAME[CAT_COUNT] = { S_HATS, S_TOYS, S_DECOR, S_FOOD_TITLE, S_CARE, S_SCENERY };
+enum : uint8_t { CAT_HATS = 0, CAT_TOYS, CAT_DECOR, CAT_FOOD, CAT_CARE, CAT_SCENE, CAT_FURN, CAT_COUNT };
+static const StrId CAT_NAME[CAT_COUNT] = { S_HATS, S_TOYS, S_DECOR, S_FOOD_TITLE, S_CARE, S_SCENERY, S_FURNITURE };
+static StrId furnName(uint8_t f) {
+  static const StrId T_[FURN_COUNT] = {
+    S_FURN_WINDOW, S_FURN_CLOCK, S_FURN_PAINTING, S_FURN_SHELF, S_FURN_SOFA, S_FURN_TV, S_FURN_AQUARIUM,
+    S_FURN_BOOKCASE, S_FURN_FIREPLACE, S_FURN_RUG, S_FURN_PAPER_BLUE, S_FURN_PAPER_PINK, S_FURN_PAPER_MINT
+  };
+  return T_[f % FURN_COUNT];
+}
 static StrId sceneryName(uint8_t b) {   // in biome order
-  static const StrId T_[SCENERY_COUNT] = { S_SCN_MEADOW, S_SCN_BEACH, S_SCN_FOREST, S_SCN_VOLCANO, S_SCN_MOUNTAIN, S_SCN_SNOW, S_SCN_GRAVEYARD };
+  static const StrId T_[SCENERY_COUNT] = { S_SCN_MEADOW, S_SCN_BEACH, S_SCN_FOREST, S_SCN_VOLCANO, S_SCN_MOUNTAIN, S_SCN_SNOW, S_SCN_GRAVEYARD, S_SCN_ROOM };
   return T_[b % SCENERY_COUNT];
 }
 void startBath();
@@ -9622,7 +9652,7 @@ bool feedFromBag(uint8_t f);   // defined with the food menu
 
 static uint8_t catCount(uint8_t c) {
   return c == CAT_HATS ? HAT_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_COUNT - DEC_TOY_COUNT
-       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : 3;   // CARE: the soap, the brush, garden seeds
+       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : 3;   // CARE: the soap, the brush, garden seeds
 }
 static uint8_t catPages(uint8_t c) { return (catCount(c) + SHOP_PER_PAGE - 1) / SHOP_PER_PAGE; }
 // the catalogue id (HatId or DecorId) of item i in category c
@@ -9638,17 +9668,20 @@ static StrId decorName(uint8_t d) {
 static StrId foodName(uint8_t f);
 static const char *const *catIcon(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? SPR_CARE_SOAP : id == 1 ? SPR_CARE_BRUSH : SPR_PLACE_SEED;
-  if (c == CAT_SCENE) return SPR_PLACE_TREE;
+  if (c == CAT_SCENE) return id == SCENERY_ROOM ? SPR_FURN_WINDOW : SPR_PLACE_TREE;
+  if (c == CAT_FURN) return SPR_FURN[id];
   return c == CAT_HATS ? SPR_HATS[id] : c == CAT_FOOD ? SPR_FOODS[id] : SPR_DECOR[id];
 }
 static StrId catName(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? S_SOAP : id == 1 ? S_BRUSH_ITEM : S_SEED;
   if (c == CAT_SCENE) return sceneryName(id);
+  if (c == CAT_FURN) return furnName(id);
   return c == CAT_HATS ? hatName(id) : c == CAT_FOOD ? foodName(id) : decorName(id);
 }
 static uint16_t catPrice(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? SOAP_PRICE : id == 1 ? BRUSH_PRICE : SEED_PRICE;
   if (c == CAT_SCENE) return Pet::sceneryPrice(id);
+  if (c == CAT_FURN) return Pet::furnPrice(id);
   return c == CAT_HATS ? Pet::hatPrice(id) : c == CAT_FOOD ? Pet::foodInfo(id).price : Pet::decorPrice(id);
 }
 // Foods are bought by the serving: never "owned" in the shop, always buyable.
@@ -9656,15 +9689,18 @@ static bool catConsumable(uint8_t c, uint8_t id) { return c == CAT_FOOD || (c ==
 static bool catOwned(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? pet.soapCount > 0 : id == 1 ? pet.brushOwned : pet.seedCount > 0;
   if (c == CAT_SCENE) return pet.ownsScenery(id);
+  if (c == CAT_FURN) return pet.ownsFurn(id);
   return c == CAT_HATS ? pet.ownsHat(id) : c == CAT_FOOD ? pet.foodCount[id] > 0 : pet.ownsDecor(id);
 }
 static bool catInUse(uint8_t c, uint8_t id) {
   if (c == CAT_SCENE) return pet.sceneryPick == (int8_t)id;
+  if (c == CAT_FURN) return pet.furnPlaced(id);
   return c == CAT_HATS ? pet.hatOn == (int8_t)id : (c == CAT_FOOD || c == CAT_CARE) ? false : pet.hasDecorOut(id);
 }
 static bool catBuy(uint8_t c, uint8_t id) {
   if (c == CAT_CARE) return id == 0 ? pet.buySoap() : id == 1 ? pet.buyBrush() : pet.buySeed();
   if (c == CAT_SCENE) return pet.buyScenery(id);
+  if (c == CAT_FURN) return pet.buyFurn(id);
   return c == CAT_HATS ? pet.buyHat(id) : c == CAT_FOOD ? pet.buyFood(id) : pet.buyDecor(id);
 }
 // the row label: a food shows how many servings are in the bag
@@ -9680,6 +9716,7 @@ static const char *catLabel(uint8_t c, uint8_t id, char *buf, size_t n) {
 static void catUse(uint8_t c, uint8_t id) {
   if (c == CAT_HATS) pet.wearHat(pet.hatOn == (int8_t)id ? -1 : (int8_t)id);
   else if (c == CAT_SCENE) pet.pickScenery((int8_t)id);   // again: back to its own
+  else if (c == CAT_FURN) pet.placeFurn(id);              // and off to the room to see it
   else if (c == CAT_FOOD) { if (feedFromBag(id)) bagOpen = false; }   // eat it, and watch
   else if (c == CAT_CARE) {                                            // use it now
     if (id == 0 && !bathUntil && !pet.sleeping) { bagOpen = false; bathKind = 1; startBath(); }
@@ -9689,12 +9726,12 @@ static void catUse(uint8_t c, uint8_t id) {
   else pet.placeDecor(id);
 }
 
-#define CATL_ROW_Y(i) (PANEL_Y + 52 + (i) * 44)   // six categories
-#define CATL_ROW_H 40
+#define CATL_ROW_Y(i) (PANEL_Y + 52 + (i) * 38)   // seven categories
+#define CATL_ROW_H 35
 static void drawCatList(StrId title) {
   drawPanelBase();
   uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(title), UI_INK, 1, PANEL_W - 80);
-  static const char *const *const ICON[CAT_COUNT] = { SPR_HAT_CAP, SPR_DEC_BALL, SPR_DEC_PLANT, SPR_FOOD_SANDWICH, SPR_CARE_SOAP, SPR_PLACE_TREE };
+  static const char *const *const ICON[CAT_COUNT] = { SPR_HAT_CAP, SPR_DEC_BALL, SPR_DEC_PLANT, SPR_FOOD_SANDWICH, SPR_CARE_SOAP, SPR_PLACE_TREE, SPR_FURN_SOFA };
   for (int c = 0; c < CAT_COUNT; c++) {
     int y = CATL_ROW_Y(c);
     gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, CATL_ROW_H, 12, UI_BG_DAY);
@@ -10322,6 +10359,7 @@ uint32_t placeMsgUntil = 0;
 char placeMsg[48] = "";
 int16_t placeFriend = 0;          // the wild Pokemon met in the park, while it is shown
 ParkResult placeWalk = PARK_NOTHING;
+bool placeEgg = false;            // this walk found an Easter egg
 
 // ---------- the map button and the map ----------
 
@@ -10420,7 +10458,8 @@ static void parkScene(uint32_t now) {
   } else if (placeAnimUntil) {                                                  // the walk just ended: what it found
     placeAnimUntil = 0;
     char b[48];
-    switch (placeWalk) {
+    if (placeEgg) { placeEgg = false; placeSay(T(S_EASTER_EGG)); sfxPlay(SFX_MEDAL); }
+    else switch (placeWalk) {
       case PARK_COINS: snprintf(b, sizeof(b), T(S_PARK_COINS_FMT), pet.lastFind); sfxPlay(SFX_MEDAL); break;
       case PARK_BERRY: snprintf(b, sizeof(b), "%s", T(S_PARK_BERRY)); sfxPlay(SFX_EAT); break;
       case PARK_FRIEND: {
@@ -10551,6 +10590,7 @@ void placeTap(int16_t x, int16_t y) {
       if (placeAnimUntil) return;
       placeWalk = pet.parkWalk();
       if (placeWalk == PARK_TIRED) { sfxPlay(SFX_DENY); placeSay(T(S_TOO_TIRED)); return; }
+      placeEgg = pet.findEasterEgg();
       sfxPlay(SFX_TAP);
       placeMsgUntil = 0; placeFriend = 0;
       placeAnimUntil = millis() + 1800;
@@ -10607,7 +10647,7 @@ static uint8_t weatherToday() {   // 0 fair, 1 rain, 2 snow
 
 void drawWeather() {
   uint8_t w = weatherToday();
-  if (!w) return;
+  if (!w || pet.sceneryPick == SCENERY_ROOM) return;   // indoors: no rain on the carpet
   uint32_t now = millis();
   for (int i = 0; i < 36; i++) {
     int x = (i * 53 + (int)(now / (w == 1 ? 3 : 25))) % 466;
@@ -11123,8 +11163,15 @@ void checkTrophyToast() {
 uint32_t talkUntil = 0, talkNextAt = 30000;
 StrId talkMsg = S_TALK_HAPPY;
 
+static StrId wishTalk() {
+  static const StrId W[WISH_KINDS] = { S_TALK_HAPPY, S_WISH_FOOD_FMT, S_WISH_PLAY, S_WISH_PARK, S_WISH_BATH, S_WISH_FISH, S_WISH_PET };
+  return W[pet.wishKind % WISH_KINDS];
+}
+
 static StrId pickTalk() {
   if (pet.isSick()) return S_TALK_SICK;
+  if (pet.hasWish()) return wishTalk();
+  if (pet.isLonely()) return S_TALK_LONELY;
   if (pet.fullness < 30) return S_TALK_HUNGRY;
   if (pet.hygiene < 30 || pet.poops >= 2) return S_TALK_DIRTY;
   if (pet.energy < 25) return S_TALK_SLEEPY;
@@ -11147,7 +11194,9 @@ void drawTalk() {
   if (!talkUntil) return;
   if (now > talkUntil) { talkUntil = 0; talkNextAt = now + 45000 + random(30000); return; }
   // a speech bubble over the creature, with its tail pointing down at it
+  char wb[48];
   const char *m = T(talkMsg);
+  if (talkMsg == S_WISH_FOOD_FMT) { snprintf(wb, sizeof(wb), T(S_WISH_FOOD_FMT), T(foodName(pet.wishArg))); m = wb; }
   int w = uiTextWidth(UIF_SMALL, m) + 32;
   if (w > 300) w = 300;
   int x = CX - w / 2, y = 148;
@@ -11358,6 +11407,11 @@ void renderDiary() {
   uint16_t coins = pet.diaryCoins(diaryPage);
   if (coins) { snprintf(b, sizeof(b), T(S_D_COINS_FMT), (unsigned)coins); line(b); }
   if (!lines) line(T(S_D_EMPTY));
+  if (diaryPage == 0 && !pet.isEgg()) {
+    static const StrId PN[PERS_COUNT] = { S_PERS_PLAYFUL, S_PERS_LAZY, S_PERS_HUNGRY, S_PERS_SHY };
+    snprintf(b, sizeof(b), T(S_PERSONALITY_FMT), T(PN[pet.personality()]));
+    line(b);
+  }
   drawPageNav(diaryPage, pages);
   gfx->flush();
 }
@@ -11719,4 +11773,515 @@ void alarmPageTap(int16_t x, int16_t y) {
   pet.alarmDay = 0;                                        // a changed alarm may ring today
   pet.saveAlarm();
   sfxPlay(SFX_TAP);
+}
+
+// ===========================================================================
+// Phase 12: four more minigames, in the Fun Pack framework (fpScore, fpLives,
+// fpFinish, fpHeader). MEMORY and SIMON train DEFENCE, FLAPPY trains SPEED and
+// the tilt MAZE trains STRENGTH; their rewards are rows of MINI_REWARDS.
+// ===========================================================================
+
+// ---------- memory: find the pairs ----------
+
+#define MEM_COLS 4
+#define MEM_ROWS 3
+#define MEM_CARDS (MEM_COLS * MEM_ROWS)
+#define MEM_W 70
+#define MEM_H 58
+#define MEM_X(c) (CX - 2 * 76 + (c) * 76 + 3)
+#define MEM_Y(r) (132 + (r) * 66)
+#define MEM_GAME_MS 60000UL
+int16_t memDex[MEM_CARDS];
+uint8_t memState[MEM_CARDS];      // 0 face down, 1 face up (being looked at), 2 matched
+int8_t memFirst = -1, memSecond = -1;
+uint32_t memHideAt = 0;
+
+static void memDeal() {
+  int16_t picks[MEM_CARDS / 2];
+  for (int i = 0; i < MEM_CARDS / 2; i++) {
+    int16_t d = 0;
+    for (int t = 0; t < 60 && !d; t++) {
+      int16_t c = (int16_t)(1 + random(DEX_COUNT));
+      if (!regionAvailable(regionOfDex(c)) || !thumbs.get(c)) continue;
+      bool dup = false;
+      for (int j = 0; j < i; j++) if (picks[j] == c) dup = true;
+      if (!dup) d = c;
+    }
+    picks[i] = d ? d : (int16_t)(1 + i * 3);
+  }
+  for (int i = 0; i < MEM_CARDS; i++) { memDex[i] = picks[i / 2]; memState[i] = 0; }
+  for (int i = MEM_CARDS - 1; i > 0; i--) { int j = random(i + 1); int16_t t = memDex[i]; memDex[i] = memDex[j]; memDex[j] = t; }
+  memFirst = memSecond = -1;
+  memHideAt = 0;
+}
+
+void memStart() { memDeal(); fpEndAt = millis() + MEM_GAME_MS; }
+
+static void memTap(int16_t x, int16_t y) {
+  if (memSecond >= 0) return;                              // two are up: wait
+  for (int i = 0; i < MEM_CARDS; i++) {
+    int cx = MEM_X(i % MEM_COLS), cy = MEM_Y(i / MEM_COLS);
+    if (x < cx || x > cx + MEM_W || y < cy || y > cy + MEM_H || memState[i]) continue;
+    memState[i] = 1;
+    sfxPlay(SFX_TAP);
+    if (memFirst < 0) { memFirst = (int8_t)i; return; }
+    memSecond = (int8_t)i;
+    if (memDex[memFirst] == memDex[memSecond]) {         // a pair
+      memState[memFirst] = memState[memSecond] = 2;
+      memFirst = memSecond = -1;
+      fpPoint(2);
+      bool all = true;
+      for (int k = 0; k < MEM_CARDS; k++) if (memState[k] != 2) all = false;
+      if (all) { fpPoint(4); memDeal(); }                  // the whole board: a bonus, a new deal
+    } else memHideAt = millis() + 700;
+    return;
+  }
+}
+
+static void memRender(uint32_t now) {
+  if (fpReached(now, fpEndAt)) { fpFinish(MINI_MEMORY); return; }
+  if (memSecond >= 0 && memHideAt && fpReached(now, memHideAt)) {
+    memState[memFirst] = memState[memSecond] = 0;
+    memFirst = memSecond = -1;
+    memHideAt = 0;
+  }
+  drawGameScene();
+  fpHeader(MINI_MEMORY, S_MEMORY_HINT);
+  for (int i = 0; i < MEM_CARDS; i++) {
+    int cx = MEM_X(i % MEM_COLS), cy = MEM_Y(i / MEM_COLS);
+    if (memState[i]) {
+      gfx->fillRoundRect(cx, cy, MEM_W, MEM_H, 10, memState[i] == 2 ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : UI_WHITE);
+      gfx->drawRoundRect(cx, cy, MEM_W, MEM_H, 10, UI_INK);
+      fpThumb(memDex[i], cx + MEM_W / 2, cy + MEM_H / 2, 1, false);
+    } else {                                               // a card back: a little ball
+      gfx->fillRoundRect(cx, cy, MEM_W, MEM_H, 10, C565(0x4f, 0x93, 0xc4));
+      gfx->drawRoundRect(cx, cy, MEM_W, MEM_H, 10, UI_INK);
+      gfx->fillCircle(cx + MEM_W / 2, cy + MEM_H / 2, 13, UI_WHITE);
+      gfx->fillRect(cx + MEM_W / 2 - 13, cy + MEM_H / 2 - 13, 27, 13, UI_BAR_BAD);
+      gfx->drawCircle(cx + MEM_W / 2, cy + MEM_H / 2, 13, UI_INK);
+      gfx->drawFastHLine(cx + MEM_W / 2 - 13, cy + MEM_H / 2, 27, UI_INK);
+    }
+  }
+  fpTimeBar(now, fpEndAt, MEM_GAME_MS, 344);
+  gfx->flush();
+}
+
+// ---------- simon says: repeat the sequence ----------
+
+#define SIM_MAX 32
+#define SIM_R 44
+static const int16_t SIM_PX[4] = { CX, CX + 92, CX, CX - 92 };
+static const int16_t SIM_PY[4] = { 168, 252, 336, 252 };
+static const uint16_t SIM_COL[4] = { C565(0xe8, 0x50, 0x3a), C565(0x4f, 0x93, 0xc4), C565(0x58, 0xb8, 0x68), C565(0xff, 0xcb, 0x05) };
+static const uint8_t SIM_SFX[4] = { SFX_TAP, SFX_PLAY, SFX_EAT, SFX_HEART };
+uint8_t simSeq[SIM_MAX], simLen = 0, simPos = 0;
+bool simShowing = false;
+uint32_t simStepAt = 0;
+int8_t simLit = -1;
+uint32_t simLitUntil = 0;
+
+static uint16_t simStepMs() { return simLen < 5 ? 600 : simLen < 9 ? 480 : 380; }   // quicker as it grows
+
+static void simShow(uint32_t now) { simShowing = true; simPos = 0; simStepAt = now + 700; }
+
+void simStart() {
+  simLen = 1;
+  simSeq[0] = (uint8_t)random(4);
+  simLit = -1;
+  simShow(millis());
+}
+
+static void simTap(int16_t x, int16_t y) {
+  if (simShowing) return;
+  for (int i = 0; i < 4; i++) {
+    int dx = x - SIM_PX[i], dy = y - SIM_PY[i];
+    if (dx * dx + dy * dy > (SIM_R + 8) * (SIM_R + 8)) continue;
+    uint32_t now = millis();
+    simLit = (int8_t)i; simLitUntil = now + 250;
+    if (simSeq[simPos] != i) {                             // wrong: a life, and the same tune again
+      fpLoseLife(MINI_SIMON);
+      if (!fpOverUntil) simShow(now + 400);
+      return;
+    }
+    sfxPlay(SIM_SFX[i]);
+    if (++simPos >= simLen) {                              // the whole tune: one longer
+      fpScore = simLen;
+      if (simLen < SIM_MAX) simSeq[simLen++] = (uint8_t)random(4);
+      simShow(now + 300);
+    }
+    return;
+  }
+}
+
+static void simRender(uint32_t now) {
+  if (simShowing && fpReached(now, simStepAt)) {
+    if (simPos >= simLen) { simShowing = false; simPos = 0; }
+    else {
+      simLit = (int8_t)simSeq[simPos];
+      simLitUntil = now + simStepMs() - 120;
+      sfxPlay(SIM_SFX[simLit]);
+      simPos++;
+      simStepAt = now + simStepMs();
+    }
+  }
+  if (simLit >= 0 && fpReached(now, simLitUntil)) simLit = -1;
+  drawGameScene();
+  fpHeader(MINI_SIMON, simShowing ? S_SIMON_WATCH : S_SIMON_HINT);
+  for (int i = 0; i < 4; i++) {
+    bool lit = simLit == i;
+    gfx->fillCircle(SIM_PX[i], SIM_PY[i], SIM_R, lit ? lerp565(SIM_COL[i], UI_WHITE, 5, 8) : lerp565(SIM_COL[i], UI_INK, 2, 8));
+    gfx->drawCircle(SIM_PX[i], SIM_PY[i], SIM_R, UI_INK);
+    if (lit) gfx->drawCircle(SIM_PX[i], SIM_PY[i], SIM_R + 5, UI_WHITE);
+  }
+  fpDrawPet(CX, 290, PMD_IDLE, 1);
+  gfx->flush();
+}
+
+// ---------- flappy flight: tap to stay up, through the gaps ----------
+
+#define FLY_X 150
+#define FLY_TOP 104
+#define FLY_BOTTOM 372
+#define FLY_GAP 118
+#define FLY_PIPES 3
+#define FLY_PIPE_W 46
+float flyY = 230, flyV = 0;
+float flyPipeX[FLY_PIPES];
+int16_t flyGapY[FLY_PIPES];
+bool flyPassed[FLY_PIPES];
+uint32_t flyLastMs = 0, flySafeUntil = 0;
+
+static void flyResetPipes(uint32_t now) {
+  for (int i = 0; i < FLY_PIPES; i++) {
+    flyPipeX[i] = 420 + i * 170;
+    flyGapY[i] = (int16_t)(FLY_TOP + 40 + random(FLY_BOTTOM - FLY_TOP - FLY_GAP - 80));
+    flyPassed[i] = false;
+  }
+  flyY = 230; flyV = 0;
+  flyLastMs = now;
+  flySafeUntil = now + 1200;
+}
+
+void flyStart() { flyResetPipes(millis()); }
+
+static void flyTap(int16_t, int16_t) { flyV = -0.42f; sfxPlay(SFX_TAP); }
+
+static void flyRender(uint32_t now) {
+  uint32_t dt = now - flyLastMs;
+  if (dt > 60) dt = 60;
+  flyLastMs = now;
+  float speed = 0.12f + fpScore * 0.004f;                  // px per ms, faster as it goes
+  if (speed > 0.26f) speed = 0.26f;
+  bool safe = !fpReached(now, flySafeUntil);
+  if (!safe) {
+    flyV += 0.0012f * dt;
+    flyY += flyV * dt;
+  }
+  for (int i = 0; i < FLY_PIPES; i++) {
+    flyPipeX[i] -= speed * dt;
+    if (flyPipeX[i] < -FLY_PIPE_W) {                       // round again, a new gap
+      float far = 0;
+      for (int k = 0; k < FLY_PIPES; k++) if (flyPipeX[k] > far) far = flyPipeX[k];
+      flyPipeX[i] = far + 170;
+      flyGapY[i] = (int16_t)(FLY_TOP + 40 + random(FLY_BOTTOM - FLY_TOP - FLY_GAP - 80));
+      flyPassed[i] = false;
+    }
+    if (!flyPassed[i] && flyPipeX[i] + FLY_PIPE_W < FLY_X - 14) { flyPassed[i] = true; fpPoint(1); }
+  }
+  // a crash: the floor, the ceiling or a trunk
+  bool hit = flyY < FLY_TOP || flyY > FLY_BOTTOM;
+  for (int i = 0; i < FLY_PIPES && !hit; i++)
+    if (FLY_X + 14 > flyPipeX[i] && FLY_X - 14 < flyPipeX[i] + FLY_PIPE_W && (flyY - 12 < flyGapY[i] || flyY + 12 > flyGapY[i] + FLY_GAP)) hit = true;
+  if (hit && !safe) {
+    fpLoseLife(MINI_FLAPPY);
+    if (fpOverUntil) return;
+    flyResetPipes(now);
+  }
+  drawGameScene();
+  for (int i = 0; i < FLY_PIPES; i++) {                    // tree trunks, top and bottom
+    int x = (int)flyPipeX[i];
+    gfx->fillRect(x, FLY_TOP - 20, FLY_PIPE_W, flyGapY[i] - FLY_TOP + 20, C565(0x7e, 0x55, 0x30));
+    gfx->fillRect(x - 4, flyGapY[i] - 12, FLY_PIPE_W + 8, 12, C565(0x3c, 0x8a, 0x4c));
+    gfx->fillRect(x, flyGapY[i] + FLY_GAP, FLY_PIPE_W, FLY_BOTTOM + 40 - flyGapY[i] - FLY_GAP, C565(0x7e, 0x55, 0x30));
+    gfx->fillRect(x - 4, flyGapY[i] + FLY_GAP, FLY_PIPE_W + 8, 12, C565(0x3c, 0x8a, 0x4c));
+  }
+  if (!safe || (now / 120) % 2) fpThumb(pet.isEgg() ? 16 : pet.speciesId, FLY_X, (int)flyY, 1, false);
+  fpHeader(MINI_FLAPPY, S_FLAPPY_HINT);
+  gfx->flush();
+}
+
+// ---------- tilt maze: roll the berry to the flag ----------
+
+#define MZ_N 7
+#define MZ_CELL 35
+#define MZ_X0 (CX - MZ_N * MZ_CELL / 2)
+#define MZ_Y0 114
+#define MZ_GAME_MS 60000UL
+#define MZ_BALL_R 9
+uint8_t mzWalls[MZ_N][MZ_N];      // bit 0 right wall, bit 1 bottom wall
+float mzBX, mzBY, mzVX, mzVY;
+uint32_t mzLastMs = 0;
+// gAccX / gAccY / gAccFresh: the last accelerometer sample, kept by the loop
+
+// a perfect maze by depth-first carving from the top left
+static void mzBuild() {
+  for (int y = 0; y < MZ_N; y++) for (int x = 0; x < MZ_N; x++) mzWalls[y][x] = 3;
+  bool seen[MZ_N][MZ_N] = {};
+  int8_t stack[MZ_N * MZ_N][2];
+  int sp = 0;
+  stack[sp][0] = 0; stack[sp][1] = 0; sp++;
+  seen[0][0] = true;
+  while (sp) {
+    int cx = stack[sp - 1][0], cy = stack[sp - 1][1];
+    int opts[4], n = 0;
+    const int DX[4] = { 1, -1, 0, 0 }, DY[4] = { 0, 0, 1, -1 };
+    for (int d = 0; d < 4; d++) {
+      int nx = cx + DX[d], ny = cy + DY[d];
+      if (nx >= 0 && ny >= 0 && nx < MZ_N && ny < MZ_N && !seen[ny][nx]) opts[n++] = d;
+    }
+    if (!n) { sp--; continue; }
+    int d = opts[random(n)], nx = cx + DX[d], ny = cy + DY[d];
+    if (d == 0) mzWalls[cy][cx] &= ~1;
+    else if (d == 1) mzWalls[ny][nx] &= ~1;
+    else if (d == 2) mzWalls[cy][cx] &= ~2;
+    else mzWalls[ny][nx] &= ~2;
+    seen[ny][nx] = true;
+    stack[sp][0] = (int8_t)nx; stack[sp][1] = (int8_t)ny; sp++;
+  }
+  mzBX = MZ_X0 + MZ_CELL / 2; mzBY = MZ_Y0 + MZ_CELL / 2;
+  mzVX = mzVY = 0;
+}
+
+void mazeStart() { mzBuild(); fpEndAt = millis() + MZ_GAME_MS; mzLastMs = millis(); }
+
+static bool mzWallRight(int cx, int cy) { return cx >= MZ_N - 1 || (mzWalls[cy][cx] & 1); }
+static bool mzWallDown(int cx, int cy) { return cy >= MZ_N - 1 || (mzWalls[cy][cx] & 2); }
+
+// moves the berry one axis at a time, stopping at walls of its cell
+static void mzMove(float dx, float dy) {
+  int cx = (int)((mzBX - MZ_X0) / MZ_CELL), cy = (int)((mzBY - MZ_Y0) / MZ_CELL);
+  float left = MZ_X0 + cx * MZ_CELL, top = MZ_Y0 + cy * MZ_CELL;
+  float nx = mzBX + dx;
+  if (dx > 0 && nx + MZ_BALL_R > left + MZ_CELL && mzWallRight(cx, cy)) { nx = left + MZ_CELL - MZ_BALL_R; mzVX = 0; }
+  if (dx < 0 && nx - MZ_BALL_R < left && (cx == 0 || mzWallRight(cx - 1, cy))) { nx = left + MZ_BALL_R; mzVX = 0; }
+  // never cut a corner: stay inside the row while crossing into the next cell
+  if (nx > left + MZ_CELL || nx < left) mzBY = top + MZ_CELL / 2 + (mzBY - top - MZ_CELL / 2) * 0.5f;
+  mzBX = nx;
+  cx = (int)((mzBX - MZ_X0) / MZ_CELL);
+  left = MZ_X0 + cx * MZ_CELL;
+  float ny = mzBY + dy;
+  if (dy > 0 && ny + MZ_BALL_R > top + MZ_CELL && mzWallDown(cx, cy)) { ny = top + MZ_CELL - MZ_BALL_R; mzVY = 0; }
+  if (dy < 0 && ny - MZ_BALL_R < top && (cy == 0 || mzWallDown(cx, cy - 1))) { ny = top + MZ_BALL_R; mzVY = 0; }
+  if (ny > top + MZ_CELL || ny < top) mzBX = left + MZ_CELL / 2 + (mzBX - left - MZ_CELL / 2) * 0.5f;
+  mzBY = ny;
+}
+
+static void mazeTap(int16_t, int16_t) {}                    // steering is by tilt, or a held finger
+
+static void mazeRender(uint32_t now) {
+  if (fpReached(now, fpEndAt)) { fpFinish(MINI_MAZE); return; }
+  uint32_t dt = now - mzLastMs;
+  if (dt > 50) dt = 50;
+  mzLastMs = now;
+  // steer: a finger held on the board pulls the berry towards it; otherwise the tilt
+  float ax = 0, ay = 0;
+  if (wasPressed) {
+    float dx = tXl - mzBX, dy = tYl - mzBY, d = sqrtf(dx * dx + dy * dy);
+    if (d > 6) { ax = dx / d * 0.0016f; ay = dy / d * 0.0016f; }
+  } else if (gAccFresh) {
+    ax = -gAccX * 0.0022f;                                   // tilt towards a side: it rolls that way
+    ay = gAccY * 0.0022f;
+  }
+  mzVX = (mzVX + ax * dt) * 0.96f;
+  mzVY = (mzVY + ay * dt) * 0.96f;
+  for (int k = 0; k < 4; k++) mzMove(mzVX * dt / 4, mzVY * dt / 4);   // small steps: no tunnelling
+  int cx = (int)((mzBX - MZ_X0) / MZ_CELL), cy = (int)((mzBY - MZ_Y0) / MZ_CELL);
+  if (cx == MZ_N - 1 && cy == MZ_N - 1) { fpPoint(1); sfxPlay(SFX_MEDAL); mzBuild(); }   // the flag: a new maze
+  drawGameScene();
+  fpHeader(MINI_MAZE, S_MAZE_HINT);
+  gfx->fillRect(MZ_X0, MZ_Y0, MZ_N * MZ_CELL, MZ_N * MZ_CELL, C565(0xf0, 0xe4, 0xc0));
+  uint16_t wall = C565(0x7e, 0x55, 0x30);
+  gfx->fillRect(MZ_X0 - 3, MZ_Y0 - 3, MZ_N * MZ_CELL + 6, 3, wall);
+  gfx->fillRect(MZ_X0 - 3, MZ_Y0, 3, MZ_N * MZ_CELL + 3, wall);
+  for (int y = 0; y < MZ_N; y++) for (int x = 0; x < MZ_N; x++) {
+    int px = MZ_X0 + x * MZ_CELL, py = MZ_Y0 + y * MZ_CELL;
+    if (mzWalls[y][x] & 1) gfx->fillRect(px + MZ_CELL - 2, py - 2, 4, MZ_CELL + 4, wall);
+    if (mzWalls[y][x] & 2) gfx->fillRect(px - 2, py + MZ_CELL - 2, MZ_CELL + 4, 4, wall);
+  }
+  drawMap(SPR_PLACE_FLAG, 16, MZ_X0 + (MZ_N - 1) * MZ_CELL + 3, MZ_Y0 + (MZ_N - 1) * MZ_CELL + 3, 2, false);
+  gfx->fillCircle((int)mzBX, (int)mzBY, MZ_BALL_R, UI_BAR_BAD);
+  gfx->drawCircle((int)mzBX, (int)mzBY, MZ_BALL_R, UI_INK);
+  gfx->fillCircle((int)mzBX - 3, (int)mzBY - 3, 2, UI_WHITE);
+  fpTimeBar(now, fpEndAt, MZ_GAME_MS, 372);
+  gfx->flush();
+}
+
+// ---------- the framework's entry points for these four ----------
+
+bool fpTapPhase12(int16_t x, int16_t y) {
+  switch (fpGame) {
+    case MINI_MEMORY: memTap(x, y); return true;
+    case MINI_SIMON: simTap(x, y); return true;
+    case MINI_FLAPPY: flyTap(x, y); return true;
+    case MINI_MAZE: mazeTap(x, y); return true;
+  }
+  return false;
+}
+
+bool fpRenderPhase12(uint32_t now) {
+  switch (fpGame) {
+    case MINI_MEMORY: memRender(now); return true;
+    case MINI_SIMON: simRender(now); return true;
+    case MINI_FLAPPY: flyRender(now); return true;
+    case MINI_MAZE: mazeRender(now); return true;
+  }
+  return false;
+}
+
+// ===========================================================================
+// Phase 13: the room. The free MY ROOM scenery draws a wall and a wooden floor
+// instead of the landscape, with the furniture the player put out: two pieces
+// on the wall, two standing at the back, a rug under the creature, and the
+// wallpaper. The rules live in Pet (buyFurn / placeFurn).
+// ===========================================================================
+
+#define ROOM_WALL_Y 228               // where the wall meets the floor
+#define ROOM_WALL_LX 150             // clear of the step plate and the map button
+#define ROOM_WALL_RX 316
+#define ROOM_BACK_LX 122
+#define ROOM_BACK_RX 344
+
+void drawRoom(bool night) {
+  uint16_t wall = C565(0xf4, 0xe8, 0xd0), accent = C565(0xe6, 0xd2, 0xb0);
+  if (pet.wallpaper == FURN_PAPER_BLUE) { wall = C565(0xc4, 0xdc, 0xf4); accent = C565(0xa8, 0xc8, 0xec); }
+  else if (pet.wallpaper == FURN_PAPER_PINK) { wall = C565(0xf8, 0xd4, 0xdc); accent = C565(0xf0, 0xb8, 0xc8); }
+  else if (pet.wallpaper == FURN_PAPER_MINT) { wall = C565(0xd0, 0xf0, 0xe0); accent = C565(0xb4, 0xe2, 0xcc); }
+  if (night) { wall = lerp565(wall, C565(0x20, 0x28, 0x48), 4, 8); accent = lerp565(accent, C565(0x20, 0x28, 0x48), 4, 8); }
+  gfx->fillRect(0, 0, 466, ROOM_WALL_Y, wall);
+  for (int x = 18; x < 466; x += 36) gfx->fillRect(x, 0, 10, ROOM_WALL_Y, accent);     // stripes
+  gfx->fillRect(0, ROOM_WALL_Y - 10, 466, 10, night ? C565(0x50, 0x3c, 0x30) : C565(0xb0, 0x7a, 0x45));   // skirting
+  uint16_t wood = night ? C565(0x5a, 0x40, 0x2c) : C565(0xc8, 0x9a, 0x60);
+  gfx->fillRect(0, ROOM_WALL_Y, 466, 312 - ROOM_WALL_Y, wood);
+  for (int y = ROOM_WALL_Y + 14; y < 312; y += 16) gfx->drawFastHLine(0, y, 466, lerp565(wood, UI_INK, 1, 6));
+  for (int k = 0; k < 12; k++) gfx->drawFastVLine((k * 83 + (k % 3) * 40) % 466, ROOM_WALL_Y + (k % 5) * 16, 16, lerp565(wood, UI_INK, 1, 6));
+  if (pet.rugOn) {
+    fpEllipse(CX, PET_GROUND - 2, 120, 16, C565(0xe8, 0x50, 0x3a));
+    fpEllipse(CX, PET_GROUND - 2, 100, 11, C565(0xff, 0xcb, 0x05));
+    fpEllipse(CX, PET_GROUND - 2, 82, 7, C565(0xe8, 0x50, 0x3a));
+  }
+  // on the wall
+  const int8_t wallSpot[2] = { pet.furnWallL, pet.furnWallR };
+  for (int k = 0; k < 2; k++) {
+    if (wallSpot[k] < 0) continue;
+    const char *const *m = SPR_FURN[wallSpot[k]];
+    int cx = k ? ROOM_WALL_RX : ROOM_WALL_LX;
+    if (wallSpot[k] == FURN_WINDOW && night) {             // the night outside
+      drawMap(m, 16, cx - 24, 110, 3, false);
+      gfx->fillRect(cx - 15, 116, 33, 25, C565(0x18, 0x20, 0x40));
+      gfx->fillCircle(cx + 8, 124, 4, UI_WHITE);
+    } else drawMap(m, 16, cx - 24, 110, 3, false);
+  }
+  // standing at the back
+  const int8_t backSpot[2] = { pet.furnBackL, pet.furnBackR };
+  for (int k = 0; k < 2; k++) {
+    if (backSpot[k] < 0) continue;
+    const char *const *m = SPR_FURN[backSpot[k]];
+    int cx = k ? ROOM_BACK_RX : ROOM_BACK_LX;
+    drawMap(m, 16, cx - 32, ROOM_WALL_Y + 18 - (mapBottomRow(m) + 1) * 4, 4, false);
+    if (backSpot[k] == FURN_FIREPLACE) {                   // the fire flickers
+      int f = (int)(millis() / 120) % 3;
+      gfx->fillCircle(cx - 2 + f, ROOM_WALL_Y - 12, 5 + f, UI_BAR_WARN);
+    }
+  }
+}
+
+// ===========================================================================
+// Phase 14: a livelier pet. Its wish floats in a thought cloud beside it, a
+// birthday brings confetti for the day, and the Easter week and the summer
+// festival dress the main screen. The rules live in Pet (wishTick / grantWish,
+// claimBirthday, eventToday); family_test drives them.
+// ===========================================================================
+
+static bool mainSceneQuiet() {
+  return !pet.isEgg() && !pet.sleeping && !pet.ceremony && !bathUntil && uiCurrentScreen() == SCR_MAIN;
+}
+
+void drawWish() {
+  if (!pet.hasWish() || !mainSceneQuiet()) return;
+  uint32_t now = millis();
+  int bob = (int)(sinf(now * 0.003f) * 3);
+  int cx = CX + 104, cy = 196 + bob;
+  gfx->fillCircle(CX + 52, 250 + bob, 4, UI_WHITE);           // the little trail of a thought
+  gfx->fillCircle(CX + 68, 232 + bob, 7, UI_WHITE);
+  gfx->fillCircle(cx, cy, 27, UI_WHITE);
+  gfx->drawCircle(cx, cy, 27, UI_INK);
+  const char *const *ic = nullptr;
+  switch (pet.wishKind) {
+    case WISH_FOOD: ic = SPR_FOODS[pet.wishArg % FOOD_COUNT]; break;
+    case WISH_PLAY: ic = SPR_DEC_BALL; break;
+    case WISH_PARK: ic = SPR_PLACE_TREE; break;
+    case WISH_BATH: ic = SPR_CARE_SOAP; break;
+    case WISH_FISH: ic = SPR_PLACE_FISH; break;
+    default: break;
+  }
+  if (ic) drawMap(ic, 16, cx - 16, cy - 16, 2, false);
+  else drawMap(SPR_HEART, 32, cx - 16, cy - 16, 1, false);     // a cuddle
+}
+
+void drawBirthday() {
+  uint8_t months = pet.birthdayMonths();
+  if (!months || !mainSceneQuiet()) return;
+  uint32_t now = millis();
+  static const uint16_t COL[5] = { C565(0xe8, 0x50, 0x3a), C565(0x4f, 0x93, 0xc4), C565(0xff, 0xcb, 0x05), C565(0x58, 0xb8, 0x68), C565(0xc0, 0x70, 0xe0) };
+  for (int i = 0; i < 28; i++) {                              // confetti
+    int x = (i * 67 + (int)(sinf(now * 0.002f + i) * 10)) % 466;
+    int y = 104 + (i * 41 + (int)(now / 18)) % 200;
+    gfx->fillRect(x, y, 4, 6, COL[i % 5]);
+  }
+  char b[24];
+  snprintf(b, sizeof(b), T(S_BIRTHDAY_FMT), (unsigned)months);
+  int w = uiTextWidth(UIF_SMALL, b) + 56;
+  gfx->fillRoundRect(CX - w / 2, 108, w, 34, 14, UI_WHITE);
+  gfx->drawRoundRect(CX - w / 2, 108, w, 34, 14, UI_INK);
+  drawMap(SPR_FOOD_CAKE, 16, CX - w / 2 + 8, 110, 2, false);
+  uiText(UIF_SMALL, CX - w / 2 + 46, 132, b, UI_INK, 0);
+}
+
+void drawEvents() {
+  if (pet.isEgg() || pet.sceneryPick == SCENERY_ROOM) return;
+  EventId e = pet.eventToday();
+  uint32_t now = millis();
+  if (e == EVENT_EASTER) {                                    // eggs hidden in the grass
+    static const int16_t EX[5] = { 70, 150, 318, 396, 230 };
+    static const uint16_t EC[5] = { C565(0xf0, 0x8a, 0xa4), C565(0x7c, 0xc4, 0xea), C565(0xff, 0xd9, 0x5e), C565(0x8f, 0xd6, 0xb4), C565(0xc0, 0x90, 0xe8) };
+    for (int i = 0; i < 4; i++) {
+      int x = EX[i], y = PET_GROUND - 4 + (i % 2) * 4;
+      fpEllipse(x, y, 7, 10, EC[i]);
+      gfx->drawFastHLine(x - 6, y, 13, UI_WHITE);
+    }
+  } else if (e == EVENT_SUMMER) {                             // a string of lanterns, fireworks at night
+    for (int x = 30; x < 436; x += 4) {
+      float t = (x - 30) / 406.0f;
+      gfx->fillRect(x, 112 + (int)(sinf(t * 3.14159f) * 22), 3, 2, UI_INK);
+    }
+    static const uint16_t LC[3] = { C565(0xe8, 0x50, 0x3a), C565(0xff, 0xcb, 0x05), C565(0xf0, 0x8a, 0xa4) };
+    for (int k = 0; k < 9; k++) {
+      int x = 60 + k * 43;
+      float t = (x - 30) / 406.0f;
+      int y = 120 + (int)(sinf(t * 3.14159f) * 22);
+      gfx->fillRoundRect(x - 7, y, 14, 18, 5, LC[k % 3]);
+      gfx->fillRect(x - 3, y - 2, 7, 3, UI_INK);
+    }
+    if (gNight) {
+      uint32_t ph = now % 2400;
+      if (ph < 900) {
+        int fx = 110 + (int)((now / 2400) * 97 % 250), fy = 170 + (int)((now / 2400) * 53 % 40);
+        int r = (int)(ph / 12);
+        for (int a = 0; a < 12; a++) {
+          float ang = a * 0.5236f;
+          gfx->fillCircle(fx + (int)(cosf(ang) * r), fy + (int)(sinf(ang) * r), 2, LC[a % 3]);
+        }
+      }
+    }
+  }
 }
