@@ -51,6 +51,11 @@ const SaveField SAVE_FIELDS[] = {
   // places, the garden, seasonal gifts
   { "pkday", SK_U32 },  { "pkfnd", SK_U8 },   { "ctday", SK_U32 },
   { "seed", SK_U8 },    { "plant", SK_U32 },  { "gift", SK_U32 },
+  // capsules, scenery, trophies, teeth, study, quiz, parent limits
+  { "capd", SK_U32 },   { "capn", SK_U8 },    { "scnO", SK_U8 },    { "scnP", SK_I8 },
+  { "tly", SK_BYTES },  { "cnern", SK_U32 },  { "trph", SK_U16 },
+  { "tthd", SK_U32 },   { "tthn", SK_U8 },    { "stdd", SK_U32 },   { "stdn", SK_U8 },
+  { "qzhi", SK_U8 },    { "pbed", SK_U8 },    { "pgam", SK_U8 },    { "gmtd", SK_U8 },
   // the banked creatures
   { "party", SK_BYTES }, { "box", SK_BYTES },
   // settings, so a restored device plays the way it did

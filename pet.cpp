@@ -1078,6 +1078,7 @@ void Pet::feedBerry(uint8_t color) {
   if (wasFull) noteOverfeed(1);  // it was already full: a binge
   if (lovesBerry(color)) noteMission(MIS_FEED_FAV, 1);
   noteMission(MIS_FEED, 1);
+  bumpTally(TALLY_MEALS);
   earnCoins(1, true);
   eatUntil = millis() + EAT_ANIM_MS;
   registerCare();
@@ -1092,6 +1093,7 @@ void Pet::feedCandy() {
   joy = clamp100(joy + 12);
   weight = clamp100(weight + 12);  // treats take their toll
   noteMission(MIS_FEED, 1);
+  bumpTally(TALLY_MEALS);
   earnCoins(1, true);
   eatUntil = millis() + EAT_ANIM_MS;
   registerCare();
@@ -1368,6 +1370,7 @@ void Pet::rollCoinDay() {
   stepCoinK = 0;
   memset(missionProg, 0, sizeof(missionProg));
   missionDone = 0;
+  gamesToday = 0;
   pendingSave = true;
 }
 
@@ -1379,6 +1382,7 @@ uint16_t Pet::earnCoins(uint16_t amount, bool capped) {
     coinsToday += amount;
   }
   if (!amount) return 0;
+  coinsEarned += amount;
   uint32_t v = coins + amount;
   coins = v > COIN_MAX ? COIN_MAX : v;
   uint32_t now = millis();
@@ -1461,6 +1465,8 @@ void Pet::notePlayedGame(uint8_t cat, uint16_t score) {
   uint16_t c = 1 + score / 10;
   earnCoins(c > COIN_GAME_MAX ? COIN_GAME_MAX : c, true);
   noteMission(MIS_PLAY, 1);
+  bumpTally(TALLY_GAMES);
+  if (gamesToday < 255) gamesToday++;
   if (cat == (uint8_t)MINI_STAT_ATK) noteMission(MIS_TRAIN_ATK, 1);
   else if (cat == (uint8_t)MINI_STAT_SPE) noteMission(MIS_TRAIN_SPE, 1);
   else if (cat == (uint8_t)MINI_STAT_DEF) noteMission(MIS_TRAIN_DEF, 1);
@@ -1557,6 +1563,7 @@ bool Pet::eatFood(uint8_t f) {
   if (ceremony != CER_NONE || isEgg() || sleeping) return false;
   const FoodInfo &fi = foodInfo(f);
   if (fullness >= 90 && fi.food > 0) noteOverfeed(fi.sweet ? 2 : 1);   // already full: a binge
+  bumpTally(TALLY_MEALS);
   fullness = clamp100(fullness + fi.food);
   joy = clamp100(joy + fi.joy);
   energy = clamp100(energy + fi.energy);
@@ -1642,6 +1649,7 @@ bool Pet::lullaby() {
 ParkResult Pet::parkWalk() {
   if (isEgg() || sleeping || ceremony != CER_NONE || energy < 15) return PARK_TIRED;
   energy = dropTo(energy, PARK_WALK_ENERGY, 5);
+  bumpTally(TALLY_WALKS);
   joy = clamp100(joy + 3);
   registerCare();
   if (parkDay != today()) { parkDay = today(); parkFinds = 0; }
@@ -1717,9 +1725,172 @@ int8_t Pet::harvest() {
   uint8_t f = CROP[random(8)];
   if (foodCount[f] < FOOD_STACK_MAX) foodCount[f]++;
   plantEpoch = 0;
+  bumpTally(TALLY_HARVEST);
   registerCare();
   save();
   return (int8_t)f;
+}
+
+// ---------- the capsule machine ----------
+
+CapsuleResult Pet::spinCapsule() {
+  if (capDay != today()) { capDay = today(); capSpins = 0; }
+  if (capSpins >= CAPSULES_PER_DAY) return CAP_LIMIT;
+  if (!spendCoins(CAPSULE_PRICE)) return CAP_NO_COINS;
+  capSpins++;
+  bumpTally(TALLY_CAPSULE);
+  int r = random(100);
+  CapsuleResult res;
+  if (r < 10) {                                          // the rare one: a hat or decoration not owned yet
+    uint8_t free[HAT_COUNT + DEC_COUNT], n = 0;
+    for (uint8_t h = 0; h < HAT_COUNT; h++) if (!ownsHat(h)) free[n++] = h;
+    for (uint8_t d = 0; d < DEC_COUNT; d++) if (!ownsDecor(d)) free[n++] = 100 + d;
+    if (n) {
+      uint8_t pick = free[random(n)];
+      if (pick >= 100) { decorOwned |= 1 << (pick - 100); capWhat = pick - 100; res = CAP_DECOR; }
+      else { hatsOwned |= 1 << pick; capWhat = pick; res = CAP_HAT; }
+    } else {                                             // owns everything: a big coin prize
+      capWhat = 50; earnCoins(50, false); res = CAP_COINS;
+    }
+  } else if (r < 50) {                                   // a serving of food
+    uint8_t f = (uint8_t)random(FOOD_COUNT);
+    if (foodCount[f] < FOOD_STACK_MAX) foodCount[f]++;
+    capWhat = f; res = CAP_FOOD;
+  } else if (r < 60) {
+    if (soapCount < FOOD_STACK_MAX) soapCount += soapCount + 2 > FOOD_STACK_MAX ? 1 : 2;
+    capWhat = 2; res = CAP_SOAP;
+  } else if (r < 70) {
+    if (seedCount < FOOD_STACK_MAX) seedCount += seedCount + 2 > FOOD_STACK_MAX ? 1 : 2;
+    capWhat = 2; res = CAP_SEED;
+  } else {                                               // coins back: 10..40
+    capWhat = (uint16_t)(10 + random(31));
+    earnCoins(capWhat, false);
+    res = CAP_COINS;
+  }
+  save();
+  return res;
+}
+
+// ---------- scenery ----------
+
+uint16_t Pet::sceneryPrice(uint8_t b) {
+  // meadow, beach, forest, volcano, mountain, snow, graveyard
+  static const uint16_t PRICE[SCENERY_COUNT] = { 100, 120, 120, 180, 150, 150, 200 };
+  return PRICE[b % SCENERY_COUNT];
+}
+
+bool Pet::buyScenery(uint8_t b) {
+  if (b >= SCENERY_COUNT || ownsScenery(b)) return false;
+  if (!spendCoins(sceneryPrice(b))) return false;
+  sceneryOwned |= 1 << b;
+  save();
+  return true;
+}
+
+void Pet::pickScenery(int8_t b) {
+  if (b >= 0 && !ownsScenery((uint8_t)b)) return;
+  sceneryPick = (b == sceneryPick) ? -1 : b;
+  save();
+}
+
+// ---------- trophies ----------
+
+void Pet::bumpTally(uint8_t t, uint16_t n) {
+  if (t >= TALLY_COUNT) return;
+  uint32_t v = (uint32_t)tally[t] + n;
+  tally[t] = v > 60000 ? 60000 : (uint16_t)v;
+  pendingSave = true;
+}
+
+static uint8_t bitCount16(uint16_t v) { uint8_t n = 0; while (v) { n += v & 1; v >>= 1; } return n; }
+
+void Pet::trophyProgress(uint8_t t, uint32_t &cur, uint32_t &goal) const {
+  switch (t) {
+    case TRO_MEALS:   cur = tally[TALLY_MEALS];   goal = 100; break;
+    case TRO_GAMES:   cur = tally[TALLY_GAMES];   goal = 50;  break;
+    case TRO_BATHS:   cur = tally[TALLY_BATHS];   goal = 30;  break;
+    case TRO_WALKS:   cur = tally[TALLY_WALKS];   goal = 25;  break;
+    case TRO_HARVEST: cur = tally[TALLY_HARVEST]; goal = 5;   break;
+    case TRO_COINS:   cur = coinsEarned;          goal = 1000; break;
+    case TRO_HATS:    cur = bitCount16(hatsOwned); goal = 5;  break;
+    case TRO_DECOR:   cur = bitCount16(decorOwned); goal = 6; break;
+    case TRO_STREAK:  cur = bestStreak > streak ? bestStreak : streak; goal = 7; break;
+    case TRO_LEVEL:   cur = isEgg() ? 0 : level(); goal = 20; break;
+    case TRO_STUDY:   cur = tally[TALLY_STUDY];   goal = 10;  break;
+    case TRO_TEETH:   cur = tally[TALLY_TEETH];   goal = 14;  break;
+    case TRO_PERFECT: cur = tally[TALLY_PERFECT]; goal = 1;   break;
+    case TRO_CAPSULE: cur = tally[TALLY_CAPSULE]; goal = 10;  break;
+    default: cur = 0; goal = 1; break;
+  }
+  if (cur > goal) cur = goal;
+}
+
+int8_t Pet::checkTrophies() {
+  for (uint8_t t = 0; t < TRO_COUNT; t++) {
+    if (hasTrophy(t)) continue;
+    uint32_t c, g;
+    trophyProgress(t, c, g);
+    if (c < g) continue;
+    trophies |= 1 << t;
+    earnCoins(TROPHY_COINS, false);
+    save();
+    return (int8_t)t;
+  }
+  return -1;
+}
+
+// ---------- teeth, homework, the quiz, parent limits ----------
+
+bool Pet::teethDone() {
+  if (isEgg() || sleeping || ceremony != CER_NONE) return false;
+  if (teethDay != today()) { teethDay = today(); teethToday = 0; }
+  if (teethToday >= TEETH_PER_DAY) return false;
+  teethToday++;
+  hygiene = clamp100(hygiene + 5);
+  joy = clamp100(joy + 3);
+  addBond(1);
+  bumpTally(TALLY_TEETH);
+  earnCoins(1, true);
+  registerCare();
+  save();
+  return true;
+}
+
+uint8_t Pet::studyDone(uint8_t minutes) {
+  if (isEgg() || ceremony != CER_NONE) return 0;
+  if (studyDay != today()) { studyDay = today(); studyToday = 0; }
+  joy = clamp100(joy + 2);
+  addBond(2);
+  bumpTally(TALLY_STUDY);
+  uint8_t c = 0;
+  if (studyToday < STUDY_PER_DAY) {      // a reward for the work, not a coin farm
+    studyToday++;
+    c = (uint8_t)earnCoins(minutes / 5, false);
+  }
+  registerCare();
+  save();
+  return c;
+}
+
+uint8_t Pet::quizDone(uint8_t correct) {
+  if (correct > QUIZ_QUESTIONS) correct = QUIZ_QUESTIONS;
+  if (correct > quizHi) quizHi = correct;
+  if (correct == QUIZ_QUESTIONS) bumpTally(TALLY_PERFECT);
+  joy = clamp100(joy + correct / 2);
+  if (correct >= 7) addBond(1);
+  uint16_t before = coinsToday;
+  notePlayedGame(MINI_NO_STAT, (uint16_t)correct * 5);   // a perfect round pays like a good game
+  save();
+  return (uint8_t)(coinsToday - before);
+}
+
+ParentBlock Pet::parentBlock() const {
+  if (parentBed && lastSeenEpoch) {
+    int h = (int)((lastSeenEpoch / 3600) % 24);
+    if (h >= parentBed || h < 6) return PB_BEDTIME;
+  }
+  if (parentGames && coinDay == today() && gamesToday >= parentGames) return PB_LIMIT;
+  return PB_NONE;
 }
 
 // Howard Hinnant's days_from_civil, inverted: exact for any date after 1970.
@@ -1872,6 +2043,7 @@ void Pet::clean() {
   // the bath is the last step of curing a cold
   if (sickness == SICK_COLD && sickDoses >= 2) { sickness = SICK_NONE; sickTicks = 0; sickDoses = 0; }
   noteMission(MIS_BATH, 1);
+  bumpTally(TALLY_BATHS);
   earnCoins(1, true);
   addBond(1);
   registerCare();
@@ -2005,6 +2177,21 @@ void Pet::save() {
   prefs.putUChar("seed", seedCount);
   prefs.putUInt("plant", plantEpoch);
   prefs.putUInt("gift", giftDay);
+  prefs.putUInt("capd", capDay);
+  prefs.putUChar("capn", capSpins);
+  prefs.putUChar("scnO", sceneryOwned);
+  prefs.putChar("scnP", sceneryPick);
+  prefs.putBytes("tly", tally, sizeof(tally));
+  prefs.putUInt("cnern", coinsEarned);
+  prefs.putUShort("trph", trophies);
+  prefs.putUInt("tthd", teethDay);
+  prefs.putUChar("tthn", teethToday);
+  prefs.putUInt("stdd", studyDay);
+  prefs.putUChar("stdn", studyToday);
+  prefs.putUChar("qzhi", quizHi);
+  prefs.putUChar("pbed", parentBed);
+  prefs.putUChar("pgam", parentGames);
+  prefs.putUChar("gmtd", gamesToday);
 }
 
 void Pet::load() {
@@ -2156,6 +2343,26 @@ void Pet::load() {
   if (seedCount > FOOD_STACK_MAX) seedCount = FOOD_STACK_MAX;
   plantEpoch = prefs.getUInt("plant", 0);
   giftDay = prefs.getUInt("gift", 0);
+  capDay = prefs.getUInt("capd", 0);
+  capSpins = prefs.getUChar("capn", 0);
+  sceneryOwned = prefs.getUChar("scnO", 0) & ((1 << SCENERY_COUNT) - 1);
+  sceneryPick = prefs.getChar("scnP", -1);
+  if (sceneryPick >= SCENERY_COUNT) sceneryPick = -1;
+  {
+    size_t n = prefs.getBytesLength("tly");   // shorter from an older build: the rest stay 0
+    if (n) prefs.getBytes("tly", tally, n < sizeof(tally) ? n : sizeof(tally));
+  }
+  coinsEarned = prefs.getUInt("cnern", 0);
+  trophies = prefs.getUShort("trph", 0) & ((1 << TRO_COUNT) - 1);
+  teethDay = prefs.getUInt("tthd", 0);
+  teethToday = prefs.getUChar("tthn", 0);
+  studyDay = prefs.getUInt("stdd", 0);
+  studyToday = prefs.getUChar("stdn", 0);
+  quizHi = prefs.getUChar("qzhi", 0);
+  parentBed = prefs.getUChar("pbed", 0);
+  if (parentBed && (parentBed < PARENT_BED_MIN || parentBed > PARENT_BED_MAX)) parentBed = 0;
+  parentGames = prefs.getUChar("pgam", 0);
+  gamesToday = prefs.getUChar("gmtd", 0);
   // seeding: the current pet counts as raised (old saves)
   if (speciesId >= 1) registerSpecies(speciesId);
 }

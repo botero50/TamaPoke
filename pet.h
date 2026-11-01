@@ -145,6 +145,38 @@ enum CenterResult : uint8_t { CENTER_FREE = 0, CENTER_PAID, CENTER_NO_COINS };
 // Seasonal gifts, by the RTC date. GIFT_NONE when today is no holiday or the
 // gift was already handed out today.
 enum GiftKind : uint8_t { GIFT_NONE = 0, GIFT_HALLOWEEN, GIFT_CHRISTMAS, GIFT_NEWYEAR, GIFT_VALENTINE };
+
+// The capsule machine in the store: a surprise for coins. What comes out is
+// worth about the price on average (see coins_test), with a small chance of
+// a hat or decoration not owned yet. A few a day, so it cannot eat the purse.
+#define CAPSULE_PRICE 30
+#define CAPSULES_PER_DAY 3
+enum CapsuleResult : uint8_t { CAP_NO_COINS = 0, CAP_LIMIT, CAP_HAT, CAP_DECOR, CAP_FOOD, CAP_SOAP, CAP_SEED, CAP_COINS };
+// Scenery: the main screen's backdrop. The creature's own biome is free; the
+// others are bought once and picked from the bag. A bit per biome (0..6).
+#define SCENERY_COUNT 7
+// Trophies: lifetime goals, each pays TROPHY_COINS once. Append at the END:
+// a bit each in NVS. The tallies they count are a byte blob, also append-only.
+enum TallyId : uint8_t {
+  TALLY_MEALS = 0, TALLY_GAMES, TALLY_BATHS, TALLY_WALKS, TALLY_HARVEST,
+  TALLY_STUDY, TALLY_TEETH, TALLY_PERFECT, TALLY_CAPSULE,
+  TALLY_COUNT
+};
+enum TrophyId : uint8_t {
+  TRO_MEALS = 0, TRO_GAMES, TRO_BATHS, TRO_WALKS, TRO_HARVEST, TRO_COINS, TRO_HATS,
+  TRO_DECOR, TRO_STREAK, TRO_LEVEL, TRO_STUDY, TRO_TEETH, TRO_PERFECT, TRO_CAPSULE,
+  TRO_COUNT
+};
+static_assert(TRO_COUNT <= 16, "trophies needs a bit each");
+#define TROPHY_COINS 10
+// Brushing teeth (bath menu), homework time and the math quiz (the school).
+#define TEETH_PER_DAY 2
+#define STUDY_PER_DAY 3          // homework sessions that pay, a day
+#define QUIZ_QUESTIONS 10
+// Parent limits: a bedtime after which games are refused, and a games-a-day limit.
+#define PARENT_BED_MIN 19
+#define PARENT_BED_MAX 22
+enum ParentBlock : uint8_t { PB_NONE = 0, PB_BEDTIME, PB_LIMIT };
 struct FoodInfo {
   int8_t food, joy, energy, weight;   // what one serving does
   uint8_t price;
@@ -416,6 +448,42 @@ public:
   GiftKind holidayToday() const;  // which holiday the RTC date is, if any
   GiftKind claimHolidayGift();  // hands today's gift over once; the screen says what
   static void civilDate(uint32_t days, int &y, int &m, int &d);   // days since 1970 -> date
+
+  // Capsules, scenery, trophies (phase 8). Player-wide.
+  uint32_t capDay = 0;
+  uint8_t capSpins = 0;         // capsules turned today
+  uint16_t capWhat = 0;         // what the last capsule gave: the item id, or the coins
+  CapsuleResult spinCapsule();
+  uint8_t capsulesLeft() const { return capDay == today() ? (capSpins < CAPSULES_PER_DAY ? CAPSULES_PER_DAY - capSpins : 0) : CAPSULES_PER_DAY; }
+  uint8_t sceneryOwned = 0;     // bit per biome
+  int8_t sceneryPick = -1;      // the backdrop chosen, -1 = the creature's own
+  static uint16_t sceneryPrice(uint8_t b);
+  bool ownsScenery(uint8_t b) const { return b < SCENERY_COUNT && (sceneryOwned & (1 << b)); }
+  bool buyScenery(uint8_t b);
+  void pickScenery(int8_t b);   // an unowned one is ignored; picking the one in use puts it back
+  uint16_t tally[TALLY_COUNT] = { 0 };
+  uint32_t coinsEarned = 0;     // every coin ever earned (a trophy)
+  uint16_t trophies = 0;        // bit per TrophyId
+  void bumpTally(uint8_t t, uint16_t n = 1);
+  void trophyProgress(uint8_t t, uint32_t &cur, uint32_t &goal) const;
+  bool hasTrophy(uint8_t t) const { return t < TRO_COUNT && (trophies & (1 << t)); }
+  int8_t checkTrophies();       // awards the first newly reached one, -1 if none
+
+  // Teeth, study, quiz, parent limits (phase 9).
+  uint32_t teethDay = 0;
+  uint8_t teethToday = 0;
+  bool teethDone();             // a full brushing: false when already done twice today
+  uint8_t teethLeftToday() const { return teethDay == today() ? (teethToday < TEETH_PER_DAY ? TEETH_PER_DAY - teethToday : 0) : TEETH_PER_DAY; }
+  uint32_t studyDay = 0;
+  uint8_t studyToday = 0;
+  uint8_t studyDone(uint8_t minutes);   // coins paid (0 past STUDY_PER_DAY)
+  uint8_t quizHi = 0;
+  uint8_t quizDone(uint8_t correct);    // coins paid
+  uint8_t parentBed = 0;        // 0 off, else the hour games stop (until 6:00)
+  uint8_t parentGames = 0;      // 0 off, else games a day
+  uint8_t gamesToday = 0;
+  ParentBlock parentBlock() const;
+  void saveParentLimits() { save(); }   // the settings page changed them
   bool isDozeHour() const;
 
   // combat stats: real gen 1 base + level + IV + training
