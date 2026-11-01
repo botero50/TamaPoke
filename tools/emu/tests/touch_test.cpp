@@ -34,6 +34,11 @@ void setup();
 void loop();
 extern Pet pet;   // defined in the sketch
 extern bool trainOpen, sackOpen, gameOpen, menuOpen, cardOpen, movePickOpen, spdOpen;
+extern uint8_t fpMenuCat, fpGame;
+extern bool fpOpen, missionsOpen, walletOpen, hubOpen, shopOpen, bagOpen, hatAdjust;
+extern int8_t shopConfirm, shopCat, bagCat, foodCat;
+extern bool foodOpen, bathOpen, sleepOpen, scrubOpen, mapOpen;
+extern uint8_t placeScene;
 extern uint8_t movePickSlot, movePickPage;
 extern bool battleOpen, btlOver, btlWon;
 extern Combatant btlYou, btlFoe;
@@ -150,23 +155,181 @@ int main(int argc, char **argv) {
   if (!trainOpen) { printf("FAIL: train icon did not open the submenu\n"); return 1; }
   printf("PASS: 5th icon opens the training submenu\n");
 
+  // Each row opens its category's list; the first game there is the original
+  // trainer. List rows sit at FPM_ROW_Y(i) = 132 + 64 i, so +28 is mid-row.
   click(233, 178);                       // row 0 == STRENGTH == TRAIN_ROW_Y(0)+28
-  if (!sackOpen) { printf("FAIL: STRENGTH row did not start the sack\n"); return 1; }
-  printf("PASS: STRENGTH routes to the punching bag\n");
+  if (fpMenuCat != 1) { printf("FAIL: STRENGTH row did not open its games\n"); return 1; }
+  click(233, 160);
+  if (!sackOpen) { printf("FAIL: STRENGTH list did not start the sack\n"); return 1; }
+  printf("PASS: STRENGTH -> list -> the punching bag\n");
   sackOpen = false;
 
   click(tbx, tby);
   click(233, 242);                       // row 1 == SPEED == TRAIN_ROW_Y(1)+28
-  if (!spdOpen) { printf("FAIL: SPEED row did not start the reaction test\n"); return 1; }
-  printf("PASS: SPEED routes to the reaction test\n");
+  if (fpMenuCat != 2) { printf("FAIL: SPEED row did not open its games\n"); return 1; }
+  click(233, 160);
+  if (!spdOpen) { printf("FAIL: SPEED list did not start the reaction test\n"); return 1; }
+  printf("PASS: SPEED -> list -> the reaction test\n");
   spdOpen = false;
 
   click(tbx, tby);
-  click(233, 306);                       // row 2 == DEFENCE -> the ball game
-  if (!gameOpen) { printf("FAIL: DEFENCE row did not start the ball game\n"); return 1; }
-  printf("PASS: DEFENCE routes to the ball game\n");
+  click(233, 306);                       // row 2 == DEFENCE
+  if (fpMenuCat != 3) { printf("FAIL: DEFENCE row did not open its games\n"); return 1; }
+  click(233, 160);
+  if (!gameOpen) { printf("FAIL: DEFENCE list did not start the ball game\n"); return 1; }
+  printf("PASS: DEFENCE -> list -> the ball game\n");
   gameOpen = false;
+
+  // Starting a game draws random numbers, and the gym fight further down is only
+  // a sweep on the seed it has always had -- so put the stream back afterwards.
+  uint32_t seedBefore = g_seed;
+  click(tbx, tby);
+  click(233, 370);                       // row 3 == FUN == TRAIN_ROW_Y(3)+28
+  if (fpMenuCat != 4) { printf("FAIL: FUN row did not open its games\n"); return 1; }
+  click(233, 160 + 64);                  // second entry: hide and seek
+  if (!fpOpen || fpGame != MINI_HIDE) { printf("FAIL: FUN list did not start hide and seek\n"); return 1; }
+  printf("PASS: FUN -> list -> hide and seek\n");
+  fpOpen = false;
+  g_seed = seedBefore;
+
+  click(tbx, tby);
+  click(233, 178);
+  click(20, 233);                        // outside the list: back to the categories
+  if (fpMenuCat || !trainOpen) { printf("FAIL: tapping outside a list did not go back\n"); return 1; }
+  printf("PASS: outside a list goes back to the categories\n");
   trainOpen = false;
+
+  // the two top buttons: missions on the left, the purse on the right
+  click(100, 72);
+  if (!missionsOpen) { printf("FAIL: the left top button did not open the missions\n"); return 1; }
+  click(233, 233);
+  if (missionsOpen) { printf("FAIL: a tap did not close the missions\n"); return 1; }
+  click(366, 72);
+  if (!hubOpen) { printf("FAIL: the right top button did not open the shop hub\n"); return 1; }
+  click(20, 233);                        // outside the panel closes it
+  if (hubOpen || menuOpen) { printf("FAIL: a tap outside did not close the hub cleanly\n"); return 1; }
+  printf("PASS: the top buttons open the missions and the shop hub\n");
+
+  // hub -> shop -> buy the cap -> it goes straight on
+  pet.coins = 1000; pet.hatsOwned = 0; pet.hatOn = -1;
+  click(366, 72);
+  click(233, 76 + 84 + 30);              // hub row 0: SHOP
+  if (!shopOpen) { printf("FAIL: SHOP row did not open the shop\n"); return 1; }
+  // shop and bag rows sit at SHOP_ROW_Y(i) = 146 + 54 i, so +24 is mid-row
+  click(233, 146 + 24);                  // category 0: HATS
+  if (shopCat != 0) { printf("FAIL: HATS did not open the hats\n"); return 1; }
+  click(233, 146 + 24);                  // hats row 0: the cap
+  if (shopConfirm != HAT_CAP) { printf("FAIL: tapping a hat did not ask to buy it\n"); return 1; }
+  click(163, 307);                       // BUY
+  if (!pet.ownsHat(HAT_CAP) || pet.hatOn != HAT_CAP || pet.coins != 1000 - Pet::hatPrice(HAT_CAP)) {
+    printf("FAIL: BUY did not buy and wear the cap\n"); return 1;
+  }
+  printf("PASS: shop -> hats -> confirm -> the cap is bought and worn\n");
+  click(20, 233);                        // outside: back to the categories
+  if (!shopOpen || shopCat != -1) { printf("FAIL: tapping outside did not go back to the categories\n"); return 1; }
+  pet.decorOwned = 0; pet.slotL = pet.slotR = -1;
+  click(233, 146 + 54 + 24);             // category 1: TOYS
+  click(233, 146 + 24);                  // toys row 0: the ball
+  click(163, 307);                       // BUY
+  if (!pet.ownsDecor(DEC_BALL) || pet.slotL != DEC_BALL) { printf("FAIL: buying the ball did not put it out\n"); return 1; }
+  printf("PASS: shop -> toys -> the ball is bought and set down\n");
+  click(20, 233);
+  click(20, 233);                        // and outside again closes the shop
+  if (shopOpen) { printf("FAIL: tapping outside the categories did not close the shop\n"); return 1; }
+
+  // hub -> bag -> move the hat with the pad
+  click(366, 72);
+  click(233, 76 + 84 + 72 + 30);         // hub row 1: BAG
+  if (!bagOpen) { printf("FAIL: BAG row did not open the bag\n"); return 1; }
+  click(233, 146 + 24);                  // category 0: HATS
+  click(233, 146 + 24);                  // bag row 0: move the hat
+  if (!hatAdjust) { printf("FAIL: MOVE HAT did not open the pad\n"); return 1; }
+  click(233, 372 - 48);                  // up arrow
+  if (pet.hatOffY() != -4) { printf("FAIL: the up arrow did not move the hat (%d)\n", pet.hatOffY()); return 1; }
+  click(233, 372);                       // DONE
+  if (hatAdjust) { printf("FAIL: DONE did not close the pad\n"); return 1; }
+  printf("PASS: bag -> move hat -> the pad nudges it and closes\n");
+
+  // the food menu: a free berry in one tap, a curry from MEALS
+  {
+    int fbx, fby; uiButtonAt(0, &fbx, &fby, nullptr);   // the food button, 1st of 4
+    pet.fullness = 30; pet.sleeping = false;
+    click(fbx, fby);
+    if (!foodOpen) { printf("FAIL: the food button did not open the food menu\n"); return 1; }
+    uint8_t before = pet.fullness;
+    click(81 + 76 + 32, 76 + 46 + 23);     // quick row, 2nd: the blue berry
+    if (foodOpen || pet.fullness <= before) { printf("FAIL: a quick berry did not feed and close\n"); return 1; }
+    printf("PASS: food -> a free berry in one tap\n");
+    pump(80);                              // let the eating animation end
+    pet.foodCount[FOOD_CURRY] = 1;
+    click(fbx, fby);
+    click(233, 76 + 46 + 52 + 23);         // row 1: MEALS
+    if (foodCat != 0) { printf("FAIL: MEALS did not open the meals\n"); return 1; }
+    click(233, 76 + 46 + 52 + 23);         // meals row 1: the curry
+    if (foodOpen || pet.foodCount[FOOD_CURRY] != 0) { printf("FAIL: tapping the curry did not eat it\n"); return 1; }
+    printf("PASS: food -> meals -> the curry is eaten from the bag\n");
+  }
+
+  // the bath and sleep menus (rows at 122 + 52 i, so +23 is mid-row)
+  {
+    pump(80);
+    int bbx, bby; uiButtonAt(2, &bbx, &bby, nullptr);   // the bath button, 3rd of 4
+    pet.poops = 2; pet.hygiene = 30;
+    click(bbx, bby);
+    if (!bathOpen) { printf("FAIL: the bath button did not open the bath menu\n"); return 1; }
+    pet.soapCount = 0;
+    click(233, 122 + 52 + 23);             // BUBBLE BATH without soap
+    if (!bathOpen) { printf("FAIL: a bubble bath without soap should be refused\n"); return 1; }
+    click(233, 122 + 23);                  // QUICK WASH
+    if (bathOpen) { printf("FAIL: QUICK WASH did not start the bath\n"); return 1; }
+    pump(130);                             // the 3 s bath plays out
+    if (pet.poops != 0 || pet.hygiene != 100) { printf("FAIL: the quick wash did not clean it\n"); return 1; }
+    printf("PASS: bath -> quick wash cleans it; no soap, no bubble bath\n");
+
+    int lbx, lby; uiButtonAt(1, &lbx, &lby, nullptr);   // the light button, 2nd of 4
+    pet.sleeping = false;
+    click(lbx, lby);
+    if (!sleepOpen || pet.sleeping) { printf("FAIL: awake, the light button should open the sleep menu\n"); return 1; }
+    click(233, 122 + 52 + 23);             // the 30 min nap
+    if (!pet.sleeping || pet.lightOn || !pet.napEnd) { printf("FAIL: NAP did not put it to sleep\n"); return 1; }
+    click(lbx, lby);                       // asleep: the button wakes it at once
+    if (pet.sleeping || sleepOpen) { printf("FAIL: asleep, the light button should wake it directly\n"); return 1; }
+    printf("PASS: sleep menu -> nap; asleep the light button wakes it\n");
+  }
+
+  // places: the map button, the Pokemon Center, the garden, the store's shop
+  {
+    pump(10);
+    uint32_t seedBefore = g_seed;
+    click(394, 154);                       // the map button
+    if (!mapOpen) { printf("FAIL: the map button did not open GO OUT\n"); return 1; }
+    click(233, 122 + 2 * 52 + 23);         // row 2: the Pokemon Center
+    if (placeScene != 3) { printf("FAIL: the center row did not open the center\n"); return 1; }
+    pet.sickness = SICK_COLD; pet.centerDay = 0;
+    click(110 + 58, 380 + 22);             // HEAL
+    if (pet.isSick()) { printf("FAIL: HEAL did not cure it\n"); return 1; }
+    click(240 + 58, 380 + 22);             // BACK
+    if (placeScene) { printf("FAIL: BACK did not leave the center\n"); return 1; }
+    printf("PASS: map -> Pokemon Center -> heal -> back\n");
+
+    pet.seedCount = 1; pet.plantEpoch = 0;
+    click(394, 154);
+    click(233, 122 + 3 * 52 + 23);         // row 3: the garden
+    click(110 + 58, 380 + 22);             // PLANT
+    if (!pet.plantEpoch || pet.seedCount) { printf("FAIL: PLANT did not plant the seed\n"); return 1; }
+    click(240 + 58, 380 + 22);
+    printf("PASS: map -> garden -> a seed is planted\n");
+
+    click(394, 154);
+    click(233, 122 + 52 + 23);             // row 1: the store
+    click(110 + 58, 380 + 22);             // GO IN: the shop opens over the store
+    if (!shopOpen || placeScene != 2) { printf("FAIL: the store did not open the shop\n"); return 1; }
+    click(20, 233);                        // out of the shop: back in the store
+    if (shopOpen || placeScene != 2) { printf("FAIL: leaving the shop should return to the store\n"); return 1; }
+    click(240 + 58, 380 + 22);
+    printf("PASS: map -> store -> the shop opens over it\n");
+    g_seed = seedBefore;
+  }
 
   click(233, 60);                        // name/status band opens the menu
   if (!menuOpen) { printf("FAIL: name band did not open the menu\n"); return 1; }
