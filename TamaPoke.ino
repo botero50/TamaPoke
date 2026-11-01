@@ -41,7 +41,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.9"
+#define FW_VERSION "3.14-funpack.11"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -179,14 +179,16 @@ char partyBannerName[14] = "";
 bool clockOpen = false;       // pantalla de ajuste de hora (deslizar abajo)
 int clockH = 12, clockM = 0;  // hora en edicion
 // settings pages, swiped left/right
-enum { SET_TIME, SET_VOLUME, SET_BRIGHT, SET_LANG, SET_PARENT, SET_ABOUT, SET_PAGES };
+enum { SET_TIME, SET_VOLUME, SET_BRIGHT, SET_LANG, SET_ALARM, SET_PARENT, SET_ABOUT, SET_PAGES };
 uint8_t gBright = 7;           // screen brightness 1..10, saved under "bri"
 uint8_t settingsPage = 0;
 
 // bath scene: foam over the creature, cleaned up when it bursts
 uint32_t bathUntil = 0;
 bool bathPending = false;
-struct { int16_t x, y; uint8_t r, ph; } bubbles[14];
+struct { int16_t x, y; uint8_t r, ph; uint32_t born, popAt; } bubbles[14];   // popAt: when a finger popped it
+bool bathPlay = false;        // a bubble was popped: the wash became a bubble game
+uint8_t bathPops = 0;
 uint32_t feedMenuUntil = 0;   // food picker open until this millis
 
 // "taps" minigame: keep the pokeball in the air
@@ -231,6 +233,9 @@ bool walletOpen = false;
 bool hubOpen = false;
 bool trophyOpen = false;     // the trophies list (from the purse)
 uint8_t trophyPage = 0;
+bool choresOpen = false, piggyOpen = false, diaryOpen = false;   // more of the purse
+uint8_t diaryPage = 0;
+bool alarmRinging = false;   // the alarm clock is going off
 bool shopOpen = false;
 bool bagOpen = false;
 bool hatAdjust = false;      // the hat-moving pad is up on the main screen
@@ -934,6 +939,7 @@ void loop() {
     checkTrophyToast();
   }
   studyTick();
+  alarmTick();
 
   // Fun Pack: nobody has touched it for a while in the evening and the screen
   // is still on -- it nods off with the light on (Pet::dozeOff checks the hour)
@@ -1417,8 +1423,9 @@ void onSwipeV(int dir) {
   if (uiCurrentScreen() == SCR_DEXPICK || uiCurrentScreen() == SCR_GYMPICK)
     return;                 // on the chooser, vertical does nothing: pick a row
   if (menuOpen) { menuOpen = false; return; }   // any swipe closes the menu
-  if (missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || hatAdjust || foodOpen || bathOpen || sleepOpen || mapOpen || placeScene || trophyOpen) {
+  if (missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || hatAdjust || foodOpen || bathOpen || sleepOpen || mapOpen || placeScene || trophyOpen || choresOpen || piggyOpen || diaryOpen) {
     missionsOpen = walletOpen = hubOpen = shopOpen = bagOpen = hatAdjust = foodOpen = bathOpen = sleepOpen = mapOpen = trophyOpen = false;
+    choresOpen = piggyOpen = diaryOpen = false;
     placeScene = 0;
     shopConfirm = -1;
     return;
@@ -1763,8 +1770,9 @@ void onSwipe(int dir) {
   if (pet.awaitingStarter()) return;  // blocked during the starter choice
   if (menuOpen) { menuOpen = false; return; }   // any swipe closes the menu
   if (shopSwipe(dir)) return;
-  if (missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || hatAdjust || foodOpen || bathOpen || sleepOpen || mapOpen || placeScene || trophyOpen) {
+  if (missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || hatAdjust || foodOpen || bathOpen || sleepOpen || mapOpen || placeScene || trophyOpen || choresOpen || piggyOpen || diaryOpen) {
     missionsOpen = walletOpen = hubOpen = shopOpen = bagOpen = hatAdjust = foodOpen = bathOpen = sleepOpen = mapOpen = trophyOpen = false;
+    choresOpen = piggyOpen = diaryOpen = false;
     placeScene = 0;
     shopConfirm = -1;
     return;
@@ -1862,6 +1870,9 @@ void onSwipe(int dir) {
 }
 
 void onTap(int16_t x, int16_t y) {
+  if (alarmRinging) { alarmRinging = false; audioMusic(MUS_NONE); sfxPlay(SFX_TAP); return; }
+  // mid-shower, a finger pops the bubbles
+  if (bathUntil && !pet.awaitingStarter() && uiCurrentScreen() == SCR_MAIN && bathTap(x, y)) return;
   if (pet.awaitingStarter()) {  // first game: region, then starter
     if (!starterRegionDone) {
       int r = regionPickTap(x, y, RPICK_FOR_START);
@@ -2126,6 +2137,9 @@ void onTap(int16_t x, int16_t y) {
   if (shopOpen) { shopTap(x, y); return; }
   if (bagOpen) { bagTap(x, y); return; }
   if (trophyOpen) { trophyTap(x, y); return; }
+  if (choresOpen) { choresTap(x, y); return; }
+  if (piggyOpen) { piggyTap(x, y); return; }
+  if (diaryOpen) { diaryTap(x, y); return; }
   if (mapOpen) { mapMenuTap(x, y); return; }
   if (placeScene) { placeTap(x, y); return; }
   if (missionsOpen || walletOpen) { missionsOpen = walletOpen = false; return; }
@@ -3855,7 +3869,7 @@ uint8_t uiCurrentScreen() {
   if (shopOpen) return SCR_MENU;               // the shop can open over the store
   if (placeScene) return SCR_GAME;
   if (trainOpen || fpMenuCat) return SCR_TRAIN;
-  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen) return SCR_MENU;
+  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen) return SCR_MENU;
   return SCR_MAIN;
 }
 
@@ -3900,6 +3914,7 @@ void bootReport() {
 
 void render() {
   crumbDrop();   // so a crash can name the screen it happened on
+  if (alarmRinging) { renderAlarm(); return; }
   if (pet.awaitingStarter()) {  // first game: region, then starter
     if (!starterRegionDone) renderRegionPick(RPICK_FOR_START);
     else renderStarterSelect();
@@ -3978,6 +3993,9 @@ void render() {
     renderTrophies();
     return;
   }
+  if (choresOpen) { renderChores(); return; }
+  if (piggyOpen) { renderPiggy(); return; }
+  if (diaryOpen) { renderDiary(); return; }
   if (mapOpen) {
     renderMapMenu();
     return;
@@ -4685,6 +4703,8 @@ void renderClock() {
       gfx->drawRoundRect(x, y, LANG_CELL_W, LANG_CELL_H, 12, UI_INK);
       uiText(langFont, x + LANG_CELL_W / 2, y + LANG_CELL_H / 2 + 7, LANG_NAMES[lg], on ? UI_BG_DAY : UI_INK, 1);
     }
+  } else if (settingsPage == SET_ALARM) {
+    renderAlarmPage();
   } else if (settingsPage == SET_PARENT) {
     renderParentPage();
   } else {
@@ -4795,6 +4815,8 @@ void clockTap(int16_t x, int16_t y) {
         return;
       }
     }
+  } else if (settingsPage == SET_ALARM) {
+    alarmPageTap(x, y);
   } else if (settingsPage == SET_PARENT) {
     parentPageTap(x, y);
   }
@@ -7802,16 +7824,73 @@ void drawPet() {
 
 // ---------- bath scene ----------
 
+#define BATH_PLAY_MS 10000UL   // the bubble game, from the first pop
+#define BATH_RESPAWN_MS 400     // a popped bubble comes back this much later
+#define BATH_RISE_DIV 90        // ms per pixel a bubble rises
+
+static void bathSpawn(int i, uint32_t now, bool low) {
+  int cx = (int)beh.x;
+  bubbles[i].x = cx - 70 + random(140);
+  bubbles[i].y = PET_GROUND - (low ? random(40) : random(150));
+  bubbles[i].r = 8 + random(16);
+  bubbles[i].ph = random(64);
+  bubbles[i].born = now;
+  bubbles[i].popAt = 0;
+}
+
+static int bathBubbleX(int i, float t) { return bubbles[i].x + (int)(sinf(t + bubbles[i].ph) * 6); }
+static int bathBubbleY(int i, uint32_t now) { return bubbles[i].y - (int)((now - bubbles[i].born) / BATH_RISE_DIV); }
+
+// where bubble i is right now (for the tests)
+void bathBubblePos(int i, int *x, int *y) { uint32_t now = millis(); *x = bathBubbleX(i, now / 220.0f); *y = bathBubbleY(i, now); }
+
 void startBath() {
   if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil) return;
-  bathUntil = millis() + 3000;
+  uint32_t now = millis();
+  bathUntil = now + 3000;
   bathPending = true;
-  int cx = (int)beh.x;
-  for (auto &b : bubbles) {
-    b.x = cx - 70 + random(140);
-    b.y = PET_GROUND - random(150);
-    b.r = 8 + random(16);
-    b.ph = random(64);
+  bathPlay = false;
+  bathPops = 0;
+  for (int i = 0; i < 14; i++) bathSpawn(i, now, false);
+}
+
+// a finger on a bubble pops it; the first pop stretches the wash into a game
+bool bathTap(int16_t x, int16_t y) {
+  uint32_t now = millis();
+  if (!bathUntil || now + 300 > bathUntil) return false;
+  float t = now / 220.0f;
+  for (int i = 0; i < 14; i++) {
+    if (bubbles[i].popAt) continue;
+    int dx = x - bathBubbleX(i, t), dy = y - bathBubbleY(i, now), r = bubbles[i].r + 12;   // a little forgiving
+    if (dx * dx + dy * dy > r * r) continue;
+    bubbles[i].popAt = now;
+    if (bathPops < 255) bathPops++;
+    if (!bathPlay) { bathPlay = true; bathUntil = now + BATH_PLAY_MS; }
+    sfxPlay(SFX_PLAY);
+    return true;
+  }
+  return y < 312;   // a miss over the landscape is not a pat on the head mid-shower
+}
+
+static void bathRing(int bx, int by, int r, uint16_t rim, uint16_t rimIn) {
+  // A bubble is a clear sphere: only the rim is drawn (the creature shows
+  // through), with a bright glint at the upper left and a faint one opposite.
+  // The old white disc with a dark dot read as an eyeball.
+  gfx->drawCircle(bx, by, r, rim);
+  gfx->drawCircle(bx, by, r - 1, rimIn);
+  for (float a = 3.45f; a < 4.35f; a += 0.13f)         // glint arc, upper left
+    gfx->fillRect(bx + (int)(cosf(a) * r * 0.62f), by + (int)(sinf(a) * r * 0.62f), 2, 2, UI_WHITE);
+  gfx->fillCircle(bx - r * 45 / 100, by - r * 45 / 100, r / 7 + 1, UI_WHITE);
+  gfx->fillRect(bx + r * 35 / 100, by + r * 35 / 100, 2, 2, rimIn);   // faint opposite glint
+}
+
+// pop: the ring swells and thins out while droplets fly off it (p: 0..1)
+static void bathBurst(int bx, int by, int r, float p, uint8_t ph, uint16_t rim, uint16_t rimIn) {
+  if (p < 0.5f) gfx->drawCircle(bx, by, r + (int)(r * p * 0.8f), rim);
+  for (int k = 0; k < 6; k++) {
+    float a = k * 1.0472f + ph * 0.1f;
+    float d = r * (0.9f + p * 1.6f);
+    gfx->fillRect(bx + (int)(cosf(a) * d), by + (int)(sinf(a) * d), 2, 2, (k & 1) ? rimIn : UI_WHITE);
   }
 }
 
@@ -7824,6 +7903,9 @@ void drawBath() {
       if (bathKind == 1) pet.bubbleBath();
       else pet.clean();
       bathKind = 0;
+      // playing with the bubbles cheers it up a little: a point of joy per two pops, at most 10
+      if (bathPops) pet.joy = (uint8_t)min(100, pet.joy + min(10, bathPops / 2));
+      bathPlay = false;
       // joy pose once clean
       if (pmd.has(PMD_POSE)) {
         beh.mode = 2;
@@ -7835,36 +7917,28 @@ void drawBath() {
     return;
   }
   uint32_t left = bathUntil - now;
-  // A bubble is a clear sphere: only the rim is drawn (the creature shows
-  // through), with a bright glint at the upper left and a faint one opposite.
-  // The old white disc with a dark dot read as an eyeball.
   const uint16_t rim = C565(0x8f, 0xd0, 0xf0), rimIn = C565(0xdf, 0xf4, 0xff);
   float t = now / 220.0f;
-  if (left > 800) {
-    // foam: bubbles swaying and slowly rising
-    for (auto &b : bubbles) {
-      int bx = b.x + (int)(sinf(t + b.ph) * 6);
-      int by = b.y - (int)((3000 - left) / 90);
-      gfx->drawCircle(bx, by, b.r, rim);
-      gfx->drawCircle(bx, by, b.r - 1, rimIn);
-      for (float a = 3.45f; a < 4.35f; a += 0.13f)         // glint arc, upper left
-        gfx->fillRect(bx + (int)(cosf(a) * b.r * 0.62f), by + (int)(sinf(a) * b.r * 0.62f), 2, 2, UI_WHITE);
-      gfx->fillCircle(bx - b.r * 45 / 100, by - b.r * 45 / 100, b.r / 7 + 1, UI_WHITE);
-      gfx->fillRect(bx + b.r * 35 / 100, by + b.r * 35 / 100, 2, 2, rimIn);   // faint opposite glint
+  bool ending = left <= 800;
+  float p = ending ? (800 - (int)left) / 800.0f : 0;
+  for (int i = 0; i < 14; i++) {
+    auto &b = bubbles[i];
+    if (b.popAt) {                                         // popped by a finger
+      uint32_t age = now - b.popAt;
+      if (age < 300) bathBurst(bathBubbleX(i, t), bathBubbleY(i, b.popAt), b.r, age / 300.0f, b.ph, rim, rimIn);
+      else if (bathPlay && !ending && age > BATH_RESPAWN_MS) bathSpawn(i, now, true);   // a new one rises
+      continue;
     }
-  } else {
-    // pop: each ring swells and thins out while droplets fly off it
-    float p = (800 - (int)left) / 800.0f;
-    for (auto &b : bubbles) {
-      int bx = b.x + (int)(sinf(t + b.ph) * 6);
-      int by = b.y - 24;                                   // where the rise ended
-      if (p < 0.5f) gfx->drawCircle(bx, by, b.r + (int)(b.r * p * 0.8f), rim);
-      for (int k = 0; k < 6; k++) {
-        float a = k * 1.0472f + b.ph * 0.1f;
-        float d = b.r * (0.9f + p * 1.6f);
-        gfx->fillRect(bx + (int)(cosf(a) * d), by + (int)(sinf(a) * d), 2, 2, (k & 1) ? rimIn : UI_WHITE);
-      }
-    }
+    int bx = bathBubbleX(i, t), by = bathBubbleY(i, now);
+    if (bathPlay && !ending && by < 110) { bathSpawn(i, now, true); continue; }   // floated away: another
+    if (ending) bathBurst(bx, by, b.r, p, b.ph, rim, rimIn);   // the end of the wash pops the rest
+    else bathRing(bx, by, b.r, rim, rimIn);
+  }
+  if (bathPlay) {                                          // the pop count, top centre
+    char c[8];
+    snprintf(c, sizeof(c), "%u", (unsigned)bathPops);
+    bathRing(CX - 26, 124, 12, rim, rimIn);
+    uiText(UIF_MID, CX - 8, 134, c, inkColor(), 0);
   }
 }
 
@@ -9513,37 +9587,21 @@ static void drawItemRow(int i, const char *const *icon, const char *label, bool 
 
 // ---------- the hub ----------
 
-static const StrId HUB_ROWS[4] = { S_SHOP, S_BAG, S_EARN_TITLE, S_TROPHIES };
-#define HUB_ROW_Y(i) (PANEL_Y + 78 + (i) * 58)
-#define HUB_ROW_H 50
-
-void renderHub() {
-  drawPanelBase();
-  drawMap(SPR_ICON_COIN, 16, CX - 84, PANEL_Y + 16, 3, false);
-  char c[12];
-  snprintf(c, sizeof(c), "%lu", (unsigned long)pet.coins);
-  uiText(UIF_BIG, CX - 30, PANEL_Y + 54, c, UI_INK, 0);
-  for (int i = 0; i < 4; i++) {
-    int y = HUB_ROW_Y(i);
-    gfx->fillRoundRect(PANEL_X + 18, y, PANEL_W - 36, HUB_ROW_H, 12, i == 0 ? UI_BAR_WARN : UI_BG_DAY);
-    gfx->drawRoundRect(PANEL_X + 18, y, PANEL_W - 36, HUB_ROW_H, 12, UI_INK);
-    uiTextFit(UIF_MID, CX, uiMidY(UIF_MID, y, HUB_ROW_H), T(HUB_ROWS[i]), UI_INK, 1, PANEL_W - 70);
-  }
-  gfx->flush();
-}
+void renderHub() { renderHubGrid(); }   // a grid of tiles now: see the phase 11 code
 
 void hubTap(int16_t x, int16_t y) {
   hubOpen = false;
-  if (!inPanel(x, y)) return;
-  for (int i = 0; i < 4; i++) {
-    int ry = HUB_ROW_Y(i);
-    if (y < ry || y > ry + HUB_ROW_H) continue;
-    sfxPlay(SFX_TAP);
-    if (i == 0) { shopOpen = true; shopCat = -1; shopPage = 0; shopConfirm = -1; }
-    else if (i == 1) { bagOpen = true; bagCat = -1; bagPage = 0; }
-    else if (i == 2) walletOpen = true;
-    else { trophyOpen = true; trophyPage = 0; }
-    return;
+  int i = hubGridHit(x, y);
+  if (i < 0) return;
+  sfxPlay(SFX_TAP);
+  switch (i) {
+    case 0: shopOpen = true; shopCat = -1; shopPage = 0; shopConfirm = -1; break;
+    case 1: bagOpen = true; bagCat = -1; bagPage = 0; break;
+    case 2: choresOpen = true; break;
+    case 3: piggyOpen = true; break;
+    case 4: trophyOpen = true; trophyPage = 0; break;
+    case 5: diaryOpen = true; diaryPage = 0; break;
+    default: walletOpen = true; break;
   }
 }
 
@@ -9564,7 +9622,7 @@ bool feedFromBag(uint8_t f);   // defined with the food menu
 
 static uint8_t catCount(uint8_t c) {
   return c == CAT_HATS ? HAT_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_COUNT - DEC_TOY_COUNT
-       : c == CAT_FOOD ? FOOD_COUNT : c == CAT_SCENE ? SCENERY_COUNT : 3;   // CARE: the soap, the brush, garden seeds
+       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : 3;   // CARE: the soap, the brush, garden seeds
 }
 static uint8_t catPages(uint8_t c) { return (catCount(c) + SHOP_PER_PAGE - 1) / SHOP_PER_PAGE; }
 // the catalogue id (HatId or DecorId) of item i in category c
@@ -9669,7 +9727,7 @@ void renderShop() {
     drawItemRow(i, catIcon(c, id), catLabel(c, id, lb, sizeof(lb)), catInUse(c, id));
     int y = SHOP_ROW_Y(i);
     if (catOwned(c, id) && !catConsumable(c, id)) {
-      StrId tag = catInUse(c, id) ? (c == CAT_HATS ? S_WEARING : c == CAT_SCENE ? S_OWNED : S_ON_FLOOR) : S_OWNED;
+      StrId tag = !catInUse(c, id) || c == CAT_SCENE ? S_OWNED : c == CAT_HATS ? S_WEARING : S_ON_FLOOR;
       uiText(UIF_TINY, PANEL_X + PANEL_W - 26, uiMidY(UIF_TINY, y, SHOP_ROW_H), T(tag), UI_BAR_OK, 2);
     } else {
       char pr[8];
@@ -9749,7 +9807,8 @@ static uint8_t bagEntries(int8_t *out, uint8_t max) {
     if (pet.hatOn >= 0 && n < max) out[n++] = -2;
     if (pet.hatOn >= 0 && n < max) out[n++] = -1;
   }
-  for (uint8_t k = 0; k < catCount(c) && n < max; k++) {
+  uint8_t all = c == CAT_FOOD ? FOOD_COUNT : catCount(c);   // the bag also holds what was cooked
+  for (uint8_t k = 0; k < all && n < max; k++) {
     uint8_t id = catItem(c, k);
     if (catOwned(c, id)) out[n++] = (int8_t)id;
   }
@@ -9911,20 +9970,27 @@ bool hatPadTap(int16_t x, int16_t y) {
 #define FOOD_QUICK_X(j) (PANEL_X + 18 + (j) * 76)
 
 static const StrId FOOD_CAT_NAME[3] = { S_MEALS, S_SWEETS, S_DRINKS };
-static uint8_t foodCatFirst(uint8_t c) { return c == 0 ? 0 : (c == 1 ? FOOD_MEALS : FOOD_MEALS + FOOD_SWEETS); }
-static uint8_t foodCatSize(uint8_t c) { return c == 0 ? FOOD_MEALS : (c == 1 ? FOOD_SWEETS : FOOD_DRINKS); }
+// each list: the shop's foods, then what the kitchen makes in that group
+static const uint8_t FOOD_CAT_ITEMS[3][5] = {
+  { FOOD_SANDWICH, FOOD_CURRY, FOOD_SOUP, FOOD_ONIGIRI, FOOD_STEW },
+  { FOOD_CAKE, FOOD_COOKIE, FOOD_ICECREAM, FOOD_PIE, FOOD_PARFAIT },
+  { FOOD_MILK, FOOD_JUICE, 0, 0, 0 },
+};
+static uint8_t foodCatSize(uint8_t c) { return c == 2 ? FOOD_DRINKS : 5; }
+static uint8_t foodCatItem(uint8_t c, uint8_t i) { return FOOD_CAT_ITEMS[c % 3][i % 5]; }
 
 static StrId foodName(uint8_t f) {
   static const StrId T_[FOOD_COUNT] = {
     S_FOOD_SANDWICH, S_FOOD_CURRY, S_FOOD_SOUP, S_FOOD_ONIGIRI,
-    S_FOOD_CAKE, S_FOOD_COOKIE, S_FOOD_ICECREAM, S_FOOD_MILK, S_FOOD_JUICE
+    S_FOOD_CAKE, S_FOOD_COOKIE, S_FOOD_ICECREAM, S_FOOD_MILK, S_FOOD_JUICE,
+    S_FOOD_PIE, S_FOOD_STEW, S_FOOD_PARFAIT
   };
   return T_[f % FOOD_COUNT];
 }
 
 static uint16_t foodCatTotal(uint8_t c) {
   uint16_t n = 0;
-  for (uint8_t i = 0; i < foodCatSize(c); i++) n += pet.foodCount[foodCatFirst(c) + i];
+  for (uint8_t i = 0; i < foodCatSize(c); i++) n += pet.foodCount[foodCatItem(c, i)];
   return n;
 }
 
@@ -9960,10 +10026,10 @@ void renderFood() {
     uint8_t c = (uint8_t)foodCat;
     uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(FOOD_CAT_NAME[c]), UI_INK, 1, PANEL_W - 80);
     for (uint8_t i = 0; i < foodCatSize(c); i++) {
-      uint8_t f = foodCatFirst(c) + i;
+      uint8_t f = foodCatItem(c, i);
       bool have = pet.foodCount[f] > 0;
       drawFoodRow(i, SPR_FOODS[f], T(foodName(f)), pet.foodCount[f], have ? UI_BG_DAY : UI_TRACK_TEXT);
-      if (!have) {                         // none: what it costs in the shop
+      if (!have && f < FOOD_SHOP_COUNT) {  // none: what it costs in the shop (cooked dishes are not sold)
         char pr[8];
         snprintf(pr, sizeof(pr), "%u", Pet::foodInfo(f).price);
         int y = FOOD_ROW_Y(i);
@@ -10024,7 +10090,7 @@ void foodTap(int16_t x, int16_t y) {
   uint8_t c = (uint8_t)foodCat;
   int i = foodRowHit(x, y);
   if (i < 0 || i >= foodCatSize(c)) return;
-  if (feedFromBag(foodCatFirst(c) + i)) foodOpen = false;
+  if (feedFromBag(foodCatItem(c, i))) foodOpen = false;
 }
 
 // ===========================================================================
@@ -10248,7 +10314,8 @@ void drawBathDuck() {
 #define PLACE_BTN_W 116
 #define DEX_MEOWTH 52             // the shopkeeper
 #define DEX_CHANSEY 113           // the nurse
-enum : uint8_t { PLACE_NONE = 0, PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_TEETH };
+enum : uint8_t { PLACE_NONE = 0, PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_TEETH,
+                 PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN };
 
 uint32_t placeAnimUntil = 0;      // the park walk animation
 uint32_t placeMsgUntil = 0;
@@ -10271,24 +10338,17 @@ bool mapButtonHit(int16_t x, int16_t y) {
   return dx * dx + dy * dy <= r * r;
 }
 
-void renderMapMenu() {
-  drawMenuTitle(S_MAP_TITLE);
-  drawFoodRow(0, SPR_PLACE_TREE, T(S_PLACE_PARK), 0, UI_BG_DAY);
-  drawFoodRow(1, SPR_ICON_COIN, T(S_SHOP), 0, UI_BG_DAY);
-  drawFoodRow(2, SPR_PLACE_CROSS, T(S_PLACE_CENTER), 0, UI_BG_DAY);
-  drawFoodRow(3, SPR_PLACE_SPROUT, T(S_PLACE_GARDEN), 0, pet.gardenReady() ? lerp565(UI_BAR_OK, UI_WHITE, 4, 8) : UI_BG_DAY);
-  drawFoodRow(4, SPR_ICON_MISSION, T(S_PLACE_SCHOOL), 0, UI_BG_DAY);
-  gfx->flush();
-}
+void renderMapMenu() { renderMapGrid(); }   // a grid of tiles now: see the phase 10 code
 
 void mapMenuTap(int16_t x, int16_t y) {
-  if (!inPanel(x, y)) { mapOpen = false; return; }
-  int i = foodRowHit(x, y);
-  if (i < 0 || i > 4) return;
+  int pl = mapGridHit(x, y);
+  if (pl == -1) { mapOpen = false; return; }
+  if (pl < 0) return;
   sfxPlay(SFX_TAP);
   mapOpen = false;
   schoolReset();
-  placeScene = (uint8_t)(PLACE_PARK + i);
+  enterPlaceFamily();
+  placeScene = (uint8_t)pl;
   placeMsgUntil = 0;
   placeAnimUntil = 0;
   placeFriend = 0;
@@ -10784,7 +10844,7 @@ static void renderSchool() {
         else if (quizPicked == i) fill = UI_BAR_BAD;
         drawSchoolTile(i, b, fill);
       }
-      fpDrawPet(CX, FP_GROUND, quizPicked >= 0 && quizPicked == quizRight ? PMD_IDLE : PMD_IDLE, 2);
+      fpDrawPet(CX, FP_GROUND, PMD_IDLE, 2);
       drawSchoolButton(2, S_LEAVE, UI_WHITE, UI_INK);
       if (quizPicked >= 0 && now > quizFlashUntil) {       // on to the next one
         quizQ++;
@@ -10925,6 +10985,7 @@ static void teethTap(int16_t x, int16_t y) {
 
 // the scenes added after the garden: one entry point for each of render / tap
 bool renderPlaceExtra() {
+  if (renderPlaceFamily()) return true;   // the lake, adventures, the kitchen
   if (placeScene == PLACE_SCHOOL) renderSchool();
   else if (placeScene == PLACE_TEETH) renderTeeth();
   else return false;
@@ -10935,6 +10996,7 @@ bool renderPlaceExtra() {
 }
 
 bool placeTapExtra(int16_t x, int16_t y) {
+  if (placeTapFamily(x, y)) return true;
   if (placeScene == PLACE_SCHOOL) { schoolTap(x, y); return true; }
   if (placeScene == PLACE_TEETH) { teethTap(x, y); return true; }
   return false;
@@ -11000,7 +11062,8 @@ void parentPageTap(int16_t x, int16_t y) {
 static StrId trophyName(uint8_t t) {
   static const StrId T_[TRO_COUNT] = {
     S_TRO_MEALS, S_TRO_GAMES, S_TRO_BATHS, S_TRO_WALKS, S_TRO_HARVEST, S_TRO_COINS, S_TRO_HATS,
-    S_TRO_DECOR, S_TRO_STREAK, S_TRO_LEVEL, S_TRO_STUDY, S_TRO_TEETH, S_TRO_PERFECT, S_TRO_CAPSULE
+    S_TRO_DECOR, S_TRO_STREAK, S_TRO_LEVEL, S_TRO_STUDY, S_TRO_TEETH, S_TRO_PERFECT, S_TRO_CAPSULE,
+    S_TRO_FISH, S_TRO_ROUTE
   };
   return T_[t % TRO_COUNT];
 }
@@ -11075,7 +11138,7 @@ static StrId pickTalk() {
 }
 
 void drawTalk() {
-  if (pet.isEgg() || pet.sleeping || pet.ceremony || uiCurrentScreen() != SCR_MAIN) { talkUntil = 0; return; }
+  if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil || uiCurrentScreen() != SCR_MAIN) { talkUntil = 0; return; }
   uint32_t now = millis();
   if (!talkUntil && now >= talkNextAt) {
     talkMsg = pickTalk();
@@ -11094,4 +11157,566 @@ void drawTalk() {
   gfx->drawLine(CX + 20, y + 40, CX + 22, y + 52, UI_INK);
   gfx->drawLine(CX + 36, y + 40, CX + 22, y + 52, UI_INK);
   uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, y, 40), m, UI_INK, 1, w - 20);
+}
+
+// ===========================================================================
+// Phases 10 and 11: the lake (fishing), step adventures, the kitchen; chores,
+// the piggy bank, the diary and the alarm clock. The map and the purse became
+// grids of tiles to make room. The rules live in Pet (fishCatch, advClaim,
+// cook, doChore, piggy*, diary*, alarmDue); family_test drives them.
+// ===========================================================================
+
+// ---------- tile grids: the map and the purse ----------
+
+#define TILE_W 148
+#define TILE_H 52
+#define TILE_X(c) ((c) ? CX + 4 : CX - 152)
+#define MAP_TILE_Y(r) (PANEL_Y + 52 + (r) * 60)
+#define HUB_TILE_Y(r) (PANEL_Y + 74 + (r) * 58)
+#define MAP_TILES 8
+#define HUB_TILES 7
+
+static void drawTile(int x, int y, const char *const *icon, StrId label, uint16_t fill) {
+  gfx->fillRoundRect(x, y, TILE_W, TILE_H, 12, fill);
+  gfx->drawRoundRect(x, y, TILE_W, TILE_H, 12, UI_INK);
+  if (icon) drawMap(icon, 16, x + 8, y + (TILE_H - 32) / 2, 2, false);
+  uiTextFit(UIF_SMALL, x + (icon ? 44 : 10), uiMidY(UIF_SMALL, y, TILE_H), T(label), UI_INK, 0, TILE_W - (icon ? 50 : 20));
+}
+
+static int tileHit(int16_t x, int16_t y, int n, bool hub) {
+  for (int i = 0; i < n; i++) {
+    int tx = TILE_X(i % 2), ty = hub ? HUB_TILE_Y(i / 2) : MAP_TILE_Y(i / 2);
+    if (x >= tx && x <= tx + TILE_W && y >= ty && y <= ty + TILE_H) return i;
+  }
+  return -1;
+}
+
+static const uint8_t MAP_PLACE[MAP_TILES] = { PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN };
+
+void renderMapGrid() {
+  drawMenuTitle(S_MAP_TITLE);
+  static const char *const *const ICON[MAP_TILES] = { SPR_PLACE_TREE, SPR_ICON_COIN, SPR_PLACE_CROSS, SPR_PLACE_SPROUT, SPR_ICON_MISSION, SPR_PLACE_FISH, SPR_PLACE_FLAG, SPR_PLACE_POT };
+  static const StrId NAME[MAP_TILES] = { S_PLACE_PARK, S_SHOP, S_CENTER_SHORT, S_PLACE_GARDEN, S_PLACE_SCHOOL, S_PLACE_LAKE, S_PLACE_ADVENTURE, S_PLACE_KITCHEN };
+  uint16_t lit = lerp565(UI_BAR_OK, UI_WHITE, 4, 8);
+  for (int i = 0; i < MAP_TILES; i++) {
+    bool hot = (i == 3 && pet.gardenReady()) || (i == 6 && pet.advReady());
+    drawTile(TILE_X(i % 2), MAP_TILE_Y(i / 2), ICON[i], NAME[i], hot ? lit : UI_BG_DAY);
+  }
+  gfx->flush();
+}
+
+// -1 outside the panel (close), -2 inside on nothing, else the PLACE_*
+int mapGridHit(int16_t x, int16_t y) {
+  if (!inPanel(x, y)) return -1;
+  int i = tileHit(x, y, MAP_TILES, false);
+  return i < 0 ? -2 : MAP_PLACE[i];
+}
+
+// the purse: SHOP, BAG, CHORES, PIGGY BANK, TROPHIES, DIARY, HOW TO EARN
+// choresOpen / piggyOpen / diaryOpen / diaryPage are declared with the other menus
+
+void renderHubGrid() {
+  drawPanelBase();
+  drawMap(SPR_ICON_COIN, 16, CX - 84, PANEL_Y + 16, 3, false);
+  char c[12];
+  snprintf(c, sizeof(c), "%lu", (unsigned long)pet.coins);
+  uiText(UIF_BIG, CX - 30, PANEL_Y + 54, c, UI_INK, 0);
+  static const char *const *const ICON[HUB_TILES] = { SPR_ICON_COIN, SPR_DEC_GIFT, SPR_ICON_CHORES, SPR_ICON_PIGGY, nullptr, SPR_ICON_DIARY, nullptr };
+  static const StrId NAME[HUB_TILES] = { S_SHOP, S_BAG, S_CHORES, S_PIGGY, S_TROPHIES, S_DIARY, S_EARN_TITLE };
+  for (int i = 0; i < HUB_TILES; i++)
+    drawTile(TILE_X(i % 2), HUB_TILE_Y(i / 2), ICON[i], NAME[i], i == 0 ? UI_BAR_WARN : UI_BG_DAY);
+  gfx->flush();
+}
+
+int hubGridHit(int16_t x, int16_t y) {
+  if (!inPanel(x, y)) return -1;
+  return tileHit(x, y, HUB_TILES, true);
+}
+
+// ---------- chores (for the parents to tick) ----------
+
+static StrId choreName(uint8_t c) {
+  static const StrId T_[CHORE_COUNT] = { S_CHORE_BED, S_CHORE_HOMEWORK, S_CHORE_TIDY, S_CHORE_HELP, S_CHORE_READ, S_CHORE_TEETH };
+  return T_[c % CHORE_COUNT];
+}
+
+#define CHORE_ROW_Y(i) (PANEL_Y + 52 + (i) * 44)
+#define CHORE_ROW_H 40
+
+void renderChores() {
+  drawPanelBase();
+  uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(S_CHORES), UI_INK, 1, PANEL_W - 80);
+  for (int i = 0; i < CHORE_COUNT; i++) {
+    int y = CHORE_ROW_Y(i);
+    bool done = pet.choreDoneToday(i);
+    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, CHORE_ROW_H, 12, done ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : UI_BG_DAY);
+    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, CHORE_ROW_H, 12, UI_INK);
+    int bx = PANEL_X + 26, by = y + 9;                     // the tick box
+    gfx->fillRoundRect(bx, by, 22, 22, 5, UI_WHITE);
+    gfx->drawRoundRect(bx, by, 22, 22, 5, UI_INK);
+    if (done) { gfx->drawLine(bx + 4, by + 11, bx + 9, by + 17, UI_BAR_OK); gfx->drawLine(bx + 9, by + 17, bx + 18, by + 5, UI_BAR_OK);
+                gfx->drawLine(bx + 4, by + 12, bx + 9, by + 18, UI_BAR_OK); gfx->drawLine(bx + 9, by + 18, bx + 18, by + 6, UI_BAR_OK); }
+    uiTextFit(UIF_SMALL, PANEL_X + 60, uiMidY(UIF_SMALL, y, CHORE_ROW_H), T(choreName(i)), UI_INK, 0, 200);
+    if (!done) {
+      char p[6];
+      snprintf(p, sizeof(p), "+%u", (unsigned)CHORE_COINS);
+      uiText(UIF_TINY, PANEL_X + PANEL_W - 26, uiMidY(UIF_TINY, y, CHORE_ROW_H), p, UI_INK, 2);
+    }
+  }
+  drawFpToast();
+  gfx->flush();
+}
+
+void choresTap(int16_t x, int16_t y) {
+  if (!inPanel(x, y)) { choresOpen = false; return; }
+  if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14) return;
+  for (int i = 0; i < CHORE_COUNT; i++) {
+    int ry = CHORE_ROW_Y(i);
+    if (y < ry || y > ry + CHORE_ROW_H) continue;
+    if (pet.doChore(i)) { sfxPlay(SFX_MEDAL); fpShowToast(S_CHORE_THANKS, UI_BAR_OK); }
+    else sfxPlay(SFX_DENY);
+    return;
+  }
+}
+
+// ---------- the piggy bank ----------
+
+#define PIG_BTN_Y (PANEL_Y + 232)
+#define PIG_BTN_H 46
+#define PIG_BTN_W 94
+#define PIG_BTN_X(i) (CX - 147 + (i) * 100)
+
+void renderPiggy() {
+  drawPanelBase();
+  uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(S_PIGGY), UI_INK, 1, PANEL_W - 80);
+  drawMap(SPR_ICON_PIGGY, 16, CX - 120, PANEL_Y + 56, 4, false);
+  char b[32];
+  uiTextFit(UIF_SMALL, CX + 30, PANEL_Y + 82, T(S_PIGGY_SAVED), UI_TRACK_TEXT, 1, 150);
+  snprintf(b, sizeof(b), "%lu", (unsigned long)pet.piggy);
+  uiText(UIF_BIG, CX + 30, PANEL_Y + 120, b, UI_INK, 1);
+  if (pet.piggy) {
+    snprintf(b, sizeof(b), T(S_PIGGY_NEXT_FMT), (unsigned)pet.piggyNextInterest(), (unsigned)pet.piggyDaysLeft());
+    uiTextFit(UIF_SMALL, CX, PANEL_Y + 162, b, UI_BAR_OK, 1, PANEL_W - 60);
+  }
+  uiTextFit(UIF_TINY, CX, PANEL_Y + 196, T(S_PIGGY_HINT), UI_TRACK_TEXT, 1, PANEL_W - 60);
+  for (int i = 0; i < 3; i++) {
+    int x = PIG_BTN_X(i);
+    bool on = i == 2 ? pet.piggy > 0 : pet.coins >= (i == 0 ? 10u : 50u);
+    gfx->fillRoundRect(x, PIG_BTN_Y, PIG_BTN_W, PIG_BTN_H, 12, on ? (i == 2 ? UI_BAR_WARN : UI_BAR_OK) : UI_TRACK_TEXT);
+    gfx->drawRoundRect(x, PIG_BTN_Y, PIG_BTN_W, PIG_BTN_H, 12, UI_INK);
+    if (i < 2) snprintf(b, sizeof(b), "+%u", i == 0 ? 10u : 50u);
+    else snprintf(b, sizeof(b), "%s", T(S_TAKE_OUT));
+    uiTextFit(UIF_SMALL, x + PIG_BTN_W / 2, uiMidY(UIF_SMALL, PIG_BTN_Y, PIG_BTN_H), b, i == 2 ? UI_INK : UI_WHITE, 1, PIG_BTN_W - 8);
+  }
+  drawCoinsLine(PANEL_Y + 296);
+  gfx->flush();
+}
+
+void piggyTap(int16_t x, int16_t y) {
+  if (!inPanel(x, y)) { piggyOpen = false; return; }
+  if (y < PIG_BTN_Y || y > PIG_BTN_Y + PIG_BTN_H) return;
+  for (int i = 0; i < 3; i++) {
+    int bx = PIG_BTN_X(i);
+    if (x < bx || x > bx + PIG_BTN_W) continue;
+    bool ok = i == 2 ? pet.piggyWithdraw() > 0 : pet.piggyDeposit(i == 0 ? 10 : 50);
+    sfxPlay(ok ? SFX_MEDAL : SFX_DENY);
+    return;
+  }
+}
+
+// ---------- the diary ----------
+
+static uint8_t diaryPages() {
+  uint8_t n = 0;
+  for (int i = 0; i < DIARY_DAYS; i++) if (pet.diary[i].day) n = (uint8_t)(i + 1);
+  return n ? n : 1;
+}
+
+void renderDiary() {
+  pet.diaryRoll();
+  drawPanelBase();
+  uint8_t pages = diaryPages();
+  if (diaryPage >= pages) diaryPage = 0;
+  const DiaryDay &d = pet.diary[diaryPage];
+  char b[48];
+  if (diaryPage == 0) snprintf(b, sizeof(b), "%s %s", T(S_DIARY), T(S_DIARY_TODAY));
+  else if (diaryPage == 1) snprintf(b, sizeof(b), "%s", T(S_DIARY_YESTERDAY));
+  else { int yy, mm, dd; Pet::civilDate(d.day, yy, mm, dd); snprintf(b, sizeof(b), "%02d/%02d", dd, mm); }
+  uiTextFit(UIF_MID, CX, PANEL_Y + 34, b, UI_INK, 1, PANEL_W - 80);
+  drawMap(SPR_ICON_DIARY, 16, PANEL_X + 20, PANEL_Y + 10, 2, false);
+  int y = PANEL_Y + 78, lines = 0;
+  auto line = [&](const char *t) { if (lines < 8) { uiTextFit(UIF_SMALL, PANEL_X + 30, y, t, UI_INK, 0, PANEL_W - 60); y += 28; lines++; } };
+  struct { uint8_t v; StrId fmt; } rows[] = {
+    { d.meals, S_D_MEALS_FMT }, { d.games, S_D_GAMES_FMT }, { d.baths, S_D_BATHS_FMT }, { d.walks, S_D_WALKS_FMT },
+    { d.fish, S_D_FISH_FMT }, { d.study, S_D_STUDY_FMT }, { d.chores, S_D_CHORES_FMT },
+  };
+  for (auto &r : rows) if (r.v) { snprintf(b, sizeof(b), T(r.fmt), (unsigned)r.v); line(b); }
+  if (d.flags & DF_COOKED) line(T(S_D_COOKED));
+  if (d.flags & DF_ADVENTURE) line(T(S_D_ADVENTURE));
+  if (d.flags & DF_TROPHY) line(T(S_D_TROPHY));
+  if (d.flags & DF_RARE) line(T(S_D_RARE));
+  uint16_t coins = pet.diaryCoins(diaryPage);
+  if (coins) { snprintf(b, sizeof(b), T(S_D_COINS_FMT), (unsigned)coins); line(b); }
+  if (!lines) line(T(S_D_EMPTY));
+  drawPageNav(diaryPage, pages);
+  gfx->flush();
+}
+
+void diaryTap(int16_t x, int16_t y) {
+  if (!inPanel(x, y)) { diaryOpen = false; return; }
+  uint8_t pages = diaryPages();
+  int a = pageNavHit(x, y, pages);
+  if (a) { diaryPage = (uint8_t)((diaryPage + pages + a) % pages); sfxPlay(SFX_TAP); }
+}
+
+// ---------- the lake: fishing ----------
+
+enum : uint8_t { FISH_IDLE = 0, FISH_WAITING, FISH_BITING };
+uint8_t fishPhase = FISH_IDLE;
+uint32_t fishBiteAt = 0;
+int16_t fishShow = 0;              // the Pokemon caught, shown with the message
+#define FISH_BITE_WINDOW 800       // ms to react to a bite
+#define DEX_MAGIKARP 129
+#define DEX_GOLDEEN 118
+
+static void fishSay(StrId s) { placeSay(T(s)); }
+
+static void lakeScene(uint32_t now) {
+  // sky, a far shore, the water and a little pier
+  for (int y = 0; y < 200; y += 8) gfx->fillRect(0, y, 466, 8, lerp565(C565(0x9f, 0xd4, 0xf4), UI_WHITE, y, 400));
+  gfx->fillRect(0, 200, 466, 20, C565(0x58, 0xb8, 0x68));
+  for (int y = 220; y < 466; y += 6) gfx->fillRect(0, y, 466, 6, lerp565(C565(0x4f, 0x93, 0xc4), C565(0x2a, 0x52, 0x78), y - 220, 246));
+  for (int k = 0; k < 8; k++)                                                    // ripples
+    gfx->drawFastHLine(40 + (k * 61 + (int)(now / 40)) % 420, 250 + (k * 37) % 110, 24, C565(0x9f, 0xd4, 0xf4));
+  gfx->fillRect(0, 300, 170, 18, C565(0xb0, 0x7a, 0x45));                        // the pier
+  for (int x = 20; x < 170; x += 50) gfx->fillRect(x, 318, 8, 60, C565(0x7e, 0x55, 0x30));
+  fpDrawPet(96, 300, PMD_IDLE, 3);
+  // the rod and the line, and the float that dips on a bite
+  int fx = 300, fy = 290;
+  bool biting = fishPhase == FISH_BITING;
+  if (fishPhase != FISH_IDLE) {
+    int dip = biting ? 6 + (int)(sinf(now * 0.05f) * 4) : (int)(sinf(now * 0.004f) * 2);
+    gfx->drawLine(130, 230, 200, 170, C565(0x7e, 0x55, 0x30));
+    gfx->drawLine(200, 170, fx, fy + dip, UI_INK);
+    gfx->fillCircle(fx, fy + dip, 6, UI_BAR_BAD);
+    gfx->fillRect(fx - 6, fy + dip, 13, 6, UI_WHITE);
+    if (biting) uiText(UIF_BIG, fx, fy - 30, "!", UI_BAR_BAD, 1);
+  }
+  if (fishShow && placeMsgUntil) fpThumb(fishShow, 330, 330, 2, false);
+}
+
+static void lakeTick(uint32_t now) {
+  if (fishPhase == FISH_WAITING && now >= fishBiteAt) { fishPhase = FISH_BITING; sfxPlay(SFX_TAP); }
+  else if (fishPhase == FISH_BITING && now > fishBiteAt + FISH_BITE_WINDOW) { fishPhase = FISH_IDLE; fishShow = 0; fishSay(S_FISH_AWAY); }
+}
+
+static void lakeAction() {
+  uint32_t now = millis();
+  if (fishPhase == FISH_IDLE) {                            // cast
+    fishPhase = FISH_WAITING;
+    fishBiteAt = now + 1500 + random(2500);
+    placeMsgUntil = 0; fishShow = 0;
+    sfxPlay(SFX_TAP);
+    return;
+  }
+  if (fishPhase == FISH_WAITING) { fishPhase = FISH_IDLE; fishSay(S_FISH_SOON); sfxPlay(SFX_DENY); return; }
+  // a bite, and in time
+  fishPhase = FISH_IDLE;
+  FishResult r = pet.fishCatch();
+  char what[32], b[48];
+  fishShow = 0;
+  switch (r) {
+    case FISH_KARP:    snprintf(what, sizeof(what), "%s", DEX_TBL[DEX_MAGIKARP].name); fishShow = DEX_MAGIKARP; break;
+    case FISH_GOLDEEN: snprintf(what, sizeof(what), "%s", DEX_TBL[DEX_GOLDEEN].name); fishShow = DEX_GOLDEEN; break;
+    case FISH_BOOT:    snprintf(what, sizeof(what), "%s", T(S_ITEM_BOOT)); break;
+    case FISH_SNACK:   snprintf(what, sizeof(what), "%s", T(foodName(FOOD_ONIGIRI))); break;
+    case FISH_SHELL:   snprintf(what, sizeof(what), "%s", T(S_ITEM_SHELL)); break;
+    default:           snprintf(what, sizeof(what), "%s", T(S_ITEM_PEARL)); break;
+  }
+  int n = snprintf(b, sizeof(b), T(S_FISH_GOT_FMT), what);
+  if (pet.lastFishCoins && n > 0 && n < (int)sizeof(b) - 6) snprintf(b + n, sizeof(b) - n, " +%u", (unsigned)pet.lastFishCoins);
+  sfxPlay(r == FISH_BOOT ? SFX_DENY : SFX_MEDAL);
+  placeSay(b);
+}
+
+// ---------- step adventures ----------
+
+static StrId routeName(uint8_t r) {
+  static const StrId T_[ROUTE_COUNT] = { S_ROUTE_1, S_ROUTE_2, S_ROUTE_3, S_ROUTE_4 };
+  return T_[r % ROUTE_COUNT];
+}
+static uint8_t routeBiome(uint8_t r) {   // forest, beach, mountain, volcano
+  static const uint8_t B_[ROUTE_COUNT] = { 2, 1, 4, 3 };
+  return B_[r % ROUTE_COUNT];
+}
+
+// where along the path a step count is: the stops sit on a gentle S-curve
+static void advPoint(float t, int &x, int &y) {
+  x = 80 + (int)(t * 306);
+  y = 300 - (int)(sinf(t * 3.14159f) * 70) + (int)(sinf(t * 9.0f) * 8);
+}
+
+static void adventureScene(uint32_t now) {
+  drawScene(routeBiome(pet.advRoute), now, false);
+  gfx->fillRect(0, 312, 466, 154, UI_BG_DAY);
+  // the path, then the stops: claimed ones ticked, the next one glowing when reached
+  int px = 0, py = 0;
+  for (int k = 0; k <= 40; k++) { int x, y; advPoint(k / 40.0f, x, y); if (k) gfx->drawLine(px, py, x, y, C565(0xc8, 0x9a, 0x60)), gfx->drawLine(px, py + 1, x, y + 1, C565(0xc8, 0x9a, 0x60)); px = x; py = y; }
+  uint32_t total = Pet::advNeed(ROUTE_STOPS - 1);
+  for (int s = 0; s < ROUTE_STOPS; s++) {
+    int x, y;
+    advPoint((float)Pet::advNeed(s) / total, x, y);
+    bool claimed = s < pet.advStop, ready = s == pet.advStop && pet.advReady();
+    uint16_t col = claimed ? UI_BAR_OK : ready ? UI_BAR_WARN : UI_WHITE;
+    if (ready) gfx->fillCircle(x, y, 13 + (int)(sinf(now * 0.008f) * 3), lerp565(UI_BAR_WARN, UI_WHITE, 4, 8));
+    gfx->fillCircle(x, y, 10, col);
+    gfx->drawCircle(x, y, 10, UI_INK);
+    if (s == ROUTE_STOPS - 1) drawMap(SPR_PLACE_FLAG, 16, x - 8, y - 30, 1, false);
+  }
+  // the creature, where the steps have taken it
+  uint32_t at = pet.advSteps > total ? total : pet.advSteps;
+  int x, y;
+  advPoint((float)at / total, x, y);
+  fpDrawPet(x, y - 6, PMD_WALKR, 2);
+  char b[40];
+  if (pet.advReady()) snprintf(b, sizeof(b), "%s", T(S_CLAIM));
+  else snprintf(b, sizeof(b), T(S_STEPS_TO_FMT), (unsigned)(Pet::advNeed(pet.advStop) - pet.advSteps));
+  uiTextFit(UIF_SMALL, CX, 342, b, UI_INK, 1, 300);
+  uiTextFit(UIF_TINY, CX, 366, T(S_ADV_HINT), UI_TRACK_TEXT, 1, 300);
+}
+
+static void adventureClaim() {
+  AdvResult r = pet.advClaim();
+  char b[48];
+  switch (r) {
+    case ADV_NONE: sfxPlay(SFX_DENY); placeSay(T(S_ADV_HINT)); return;
+    case ADV_COINS: snprintf(b, sizeof(b), T(S_ADV_COINS_FMT), (unsigned)pet.advWhat); break;
+    case ADV_FOOD: snprintf(b, sizeof(b), T(S_ADV_FOOD_FMT), T(foodName((uint8_t)pet.advWhat))); break;
+    case ADV_SEEDS: snprintf(b, sizeof(b), "%s", T(S_CAP_SEED)); break;
+    case ADV_FRIEND: {
+      int16_t d = 0;
+      for (int t = 0; t < 40 && !d; t++) { int16_t c = (int16_t)(1 + random(DEX_COUNT)); if (regionAvailable(regionOfDex(c)) && thumbs.get(c)) d = c; }
+      placeFriend = d ? d : 16;
+      snprintf(b, sizeof(b), T(S_PARK_FRIEND_FMT), DEX_TBL[placeFriend].name);
+      break;
+    }
+    default: snprintf(b, sizeof(b), "%s", T(S_ADV_DONE)); break;
+  }
+  sfxPlay(r == ADV_DONE ? SFX_VICTORY : SFX_MEDAL);
+  placeSay(b);
+}
+
+// ---------- the kitchen ----------
+
+uint8_t cookRecipe = 0, cookStirs = 0;
+bool cooking = false;
+#define COOK_STIRS 8
+#define KIT_ROW_Y(i) (110 + (i) * 64)
+#define KIT_ROW_H 56
+
+static void kitchenScene(uint32_t now) {
+  drawIndoor(C565(0xf8, 0xe0, 0xc0), C565(0xc8, 0xb0, 0x90));
+  if (cooking) {
+    // the pot on the stove, steaming more with every stir
+    gfx->fillRect(CX - 90, 300, 180, 76, C565(0x78, 0x7e, 0x8c));
+    gfx->fillRoundRect(CX - 70, 220, 140, 84, 16, C565(0xaa, 0xb0, 0xbc));
+    gfx->drawRoundRect(CX - 70, 220, 140, 84, 16, UI_INK);
+    gfx->fillRoundRect(CX - 60, 214, 120, 16, 6, C565(0xe0, 0x90, 0x50));
+    for (int k = 0; k < 2 + cookStirs; k++)
+      gfx->fillCircle(CX - 50 + (k * 23) % 100, 200 - (int)((now / 12 + k * 40) % 80), 4 + k % 3, UI_WHITE);
+    int sx = CX + (int)(sinf(now * 0.01f * (1 + cookStirs)) * 30);     // the spoon
+    gfx->drawLine(sx, 222, sx + 30, 150, C565(0x7e, 0x55, 0x30));
+    gfx->drawLine(sx + 1, 222, sx + 31, 150, C565(0x7e, 0x55, 0x30));
+    gfx->fillRoundRect(110, 112, 246, 12, 5, UI_TRACK_TEXT);
+    if (cookStirs) gfx->fillRoundRect(112, 114, 242 * cookStirs / COOK_STIRS, 8, 4, UI_BAR_OK);
+    uiTextFit(UIF_SMALL, CX, 150, T(S_COOK_STIR), UI_INK, 1, 300);
+    return;
+  }
+  for (int i = 0; i < RECIPE_COUNT; i++) {                // a + b = dish
+    const Recipe &r = Pet::recipe(i);
+    int y = KIT_ROW_Y(i);
+    bool can = pet.canCook(i);
+    gfx->fillRoundRect(73, y, 320, KIT_ROW_H, 14, can ? UI_BG_DAY : UI_TRACK_TEXT);
+    gfx->drawRoundRect(73, y, 320, KIT_ROW_H, 14, UI_INK);
+    drawMap(SPR_FOODS[r.a], 16, 88, y + 12, 2, false);
+    uiText(UIF_MID, 134, y + 38, "+", UI_INK, 1);
+    drawMap(SPR_FOODS[r.b], 16, 148, y + 12, 2, false);
+    uiText(UIF_MID, 196, y + 38, "=", UI_INK, 1);
+    drawMap(SPR_FOODS[r.out], 16, 210, y + 12, 2, false);
+    uiTextFit(UIF_TINY, 250, uiMidY(UIF_TINY, y, KIT_ROW_H), T(foodName(r.out)), UI_INK, 0, 136);
+  }
+  fpDrawPet(CX, FP_GROUND, PMD_IDLE, 2);
+}
+
+static void kitchenTap(int16_t x, int16_t y) {
+  if (cooking) {
+    if (++cookStirs >= COOK_STIRS) {
+      cooking = false;
+      if (pet.cook(cookRecipe)) {
+        char b[48];
+        snprintf(b, sizeof(b), T(S_COOK_DONE_FMT), T(foodName(Pet::recipe(cookRecipe).out)));
+        sfxPlay(SFX_LEVEL);
+        placeSay(b);
+      }
+    } else sfxPlay(SFX_PLAY);
+    return;
+  }
+  for (int i = 0; i < RECIPE_COUNT; i++) {
+    int ry = KIT_ROW_Y(i);
+    if (x < 73 || x > 393 || y < ry || y > ry + KIT_ROW_H) continue;
+    if (!pet.canCook(i)) { sfxPlay(SFX_DENY); placeSay(T(S_COOK_MISSING)); return; }
+    sfxPlay(SFX_TAP);
+    cooking = true; cookRecipe = (uint8_t)i; cookStirs = 0; placeMsgUntil = 0;
+    return;
+  }
+}
+
+// ---------- the three new places, through the shared place buttons ----------
+
+void enterPlaceFamily() { fishPhase = FISH_IDLE; fishShow = 0; cooking = false; }
+
+bool renderPlaceFamily() {
+  uint32_t now = millis();
+  StrId act = S_FISH, title = S_PLACE_LAKE;
+  bool on = true;
+  if (placeScene == PLACE_LAKE) { lakeTick(now); lakeScene(now); }
+  else if (placeScene == PLACE_ADVENTURE) { adventureScene(now); act = S_CLAIM; on = pet.advReady(); title = routeName(pet.advRoute); }
+  else if (placeScene == PLACE_KITCHEN) { kitchenScene(now); title = S_PLACE_KITCHEN; }
+  else return false;
+  uiTextFit(UIF_MID, CX, 52, T(title), UI_INK, 1, 300);
+  if (placeScene == PLACE_LAKE) {
+    char b[32];
+    uint8_t left = pet.fishPaidLeft();
+    if (left) snprintf(b, sizeof(b), T(S_FISH_LEFT_FMT), (unsigned)left);
+    else snprintf(b, sizeof(b), "%s", T(S_FISH_FUN));
+    uiTextFit(UIF_TINY, CX, 80, b, UI_INK, 1, 260);
+    if (fishPhase == FISH_WAITING) uiTextFit(UIF_SMALL, CX, 360, T(S_FISH_WAIT), UI_WHITE, 1, 260);
+    if (fishPhase == FISH_BITING) uiTextFit(UIF_SMALL, CX, 360, T(S_FISH_BITE), UI_BAR_WARN, 1, 260);
+  }
+  if (placeScene == PLACE_KITCHEN) {
+    // only BACK in the kitchen: the recipes are the buttons
+    int x = PLACE_BACK_X - 64;
+    gfx->fillRoundRect(x, PLACE_BTN_Y, PLACE_BTN_W, PLACE_BTN_H, 12, UI_WHITE);
+    gfx->drawRoundRect(x, PLACE_BTN_Y, PLACE_BTN_W, PLACE_BTN_H, 12, UI_INK);
+    uiTextFit(UIF_SMALL, x + PLACE_BTN_W / 2, uiMidY(UIF_SMALL, PLACE_BTN_Y, PLACE_BTN_H), T(S_LEAVE), UI_INK, 1, PLACE_BTN_W - 10);
+  } else drawPlaceButtons(act, on);
+  if (placeScene == PLACE_ADVENTURE && placeFriend && placeMsgUntil) fpThumb(placeFriend, 340, 230, 2, false);
+  drawPlaceMsg();
+  drawFpToast();
+  gfx->flush();
+  return true;
+}
+
+bool placeTapFamily(int16_t x, int16_t y) {
+  if (placeScene != PLACE_LAKE && placeScene != PLACE_ADVENTURE && placeScene != PLACE_KITCHEN) return false;
+  bool inBtnRow = y >= PLACE_BTN_Y && y <= PLACE_BTN_Y + PLACE_BTN_H;
+  if (placeScene == PLACE_KITCHEN) {
+    int bx = PLACE_BACK_X - 64;
+    if (y < 72 || (inBtnRow && x >= bx && x <= bx + PLACE_BTN_W)) { sfxPlay(SFX_TAP); cooking = false; placeScene = PLACE_NONE; return true; }
+    kitchenTap(x, y);
+    return true;
+  }
+  if (y < 72 || (inBtnRow && x >= PLACE_BACK_X && x <= PLACE_BACK_X + PLACE_BTN_W)) {
+    sfxPlay(SFX_TAP); fishPhase = FISH_IDLE; placeScene = PLACE_NONE; return true;
+  }
+  if (placeScene == PLACE_LAKE) {
+    // the FISH button casts; once a line is out, a tap anywhere strikes
+    if (fishPhase != FISH_IDLE || (inBtnRow && x >= PLACE_ACT_X && x <= PLACE_ACT_X + PLACE_BTN_W)) lakeAction();
+    return true;
+  }
+  if (inBtnRow && x >= PLACE_ACT_X && x <= PLACE_ACT_X + PLACE_BTN_W) adventureClaim();
+  return true;
+}
+
+// ---------- the alarm clock ----------
+
+// alarmRinging is declared with the other menus
+uint32_t alarmStartAt = 0, alarmNextTune = 0;
+#define ALARM_RING_MS 60000UL
+
+static void wakeScreenForAlarm(uint32_t now) {
+  if (screenOff) pet.setScreenOff(false);
+  screenOff = false;
+  lastInteract = now;
+}
+
+// once a second from the loop: the alarm, and the parents' bedtime reminder
+void alarmTick() {
+  static uint32_t last = 0;
+  uint32_t now = millis();
+  if (alarmRinging) {
+    if (now - alarmStartAt > ALARM_RING_MS) alarmRinging = false;
+    else if (now >= alarmNextTune) { audioMusic(MUS_VICTORY); alarmNextTune = now + 7000; }
+    lastInteract = now;                                    // keep the screen up while it rings
+    return;
+  }
+  if (now - last < 1000) return;
+  last = now;
+  if (pet.alarmDue()) {
+    pet.alarmRang();
+    alarmRinging = true;
+    alarmStartAt = now;
+    alarmNextTune = now;
+    wakeScreenForAlarm(now);
+  } else if (pet.bedReminderDue()) {
+    pet.bedReminded();
+    wakeScreenForAlarm(now);
+    sfxPlay(SFX_HEART);
+    talkMsg = S_BED_REMINDER;
+    talkUntil = now + 8000;
+  }
+}
+
+void renderAlarm() {
+  uint32_t now = millis();
+  drawGameScene();
+  // a big sun, the time, and the creature waking up
+  int r = 46 + (int)(sinf(now * 0.004f) * 4);
+  gfx->fillCircle(CX, 150, r + 12, lerp565(UI_BAR_WARN, UI_WHITE, 5, 8));
+  gfx->fillCircle(CX, 150, r, UI_BAR_WARN);
+  char t[8];
+  snprintf(t, sizeof(t), "%02u:%02u", (unsigned)pet.alarmH, (unsigned)pet.alarmM);
+  uiText(UIF_BIG, CX, 162, t, UI_INK, 1);
+  uiTextFit(UIF_BIG, CX, 250, T(S_GOOD_MORNING), fpInk(), 1, 340);
+  fpDrawPet(CX, FP_GROUND, PMD_IDLE, 3);
+  uiTextFit(UIF_SMALL, CX, 420, T(S_ALARM_STOP), fpInk(), 1, 260);
+  gfx->flush();
+}
+
+// the settings page: the alarm time and ON / OFF
+#define ALM_SW_X 163
+#define ALM_SW_Y 286
+#define ALM_SW_W 140
+#define ALM_SW_H 48
+
+void renderAlarmPage() {
+  settingsTitle(T(S_SET_ALARM));
+  char t[8];
+  snprintf(t, sizeof(t), "%02u:%02u", (unsigned)pet.alarmH, (unsigned)pet.alarmM);
+  uiText(UIF_HUGE, CX, 160, t, pet.alarmOn ? UI_INK : UI_TRACK_TEXT, 1);
+  drawClockBtn(104, 190, "-");
+  drawClockBtn(170, 190, "+");
+  drawClockBtn(252, 190, "-");
+  drawClockBtn(318, 190, "+");
+  uiTextFit(UIF_SMALL, 166, 270, T(S_HOUR), UI_TRACK_TEXT, 1, 120);
+  uiTextFit(UIF_SMALL, 314, 270, T(S_MIN), UI_TRACK_TEXT, 1, 120);
+  gfx->fillRoundRect(ALM_SW_X, ALM_SW_Y, ALM_SW_W, ALM_SW_H, 24, pet.alarmOn ? UI_BAR_OK : UI_TRACK_TEXT);
+  gfx->drawRoundRect(ALM_SW_X, ALM_SW_Y, ALM_SW_W, ALM_SW_H, 24, UI_INK);
+  uiTextFit(UIF_MID, CX, uiMidY(UIF_MID, ALM_SW_Y, ALM_SW_H), T(pet.alarmOn ? S_ON_LBL : S_OFF_LBL), UI_WHITE, 1, ALM_SW_W - 20);
+}
+
+void alarmPageTap(int16_t x, int16_t y) {
+  if (y >= 190 && y <= 248) {
+    if (x >= 104 && x < 162) pet.alarmH = (uint8_t)((pet.alarmH + 23) % 24);
+    else if (x >= 170 && x < 228) pet.alarmH = (uint8_t)((pet.alarmH + 1) % 24);
+    else if (x >= 252 && x < 310) pet.alarmM = (uint8_t)((pet.alarmM + 55) % 60);   // five minutes at a time
+    else if (x >= 318 && x < 376) pet.alarmM = (uint8_t)((pet.alarmM + 5) % 60);
+    else return;
+    pet.alarmOn = true;                                    // setting a time means you want it
+  } else if (y >= ALM_SW_Y && y <= ALM_SW_Y + ALM_SW_H && x >= ALM_SW_X && x <= ALM_SW_X + ALM_SW_W) {
+    pet.alarmOn = !pet.alarmOn;
+  } else return;
+  pet.alarmDay = 0;                                        // a changed alarm may ring today
+  pet.saveAlarm();
+  sfxPlay(SFX_TAP);
 }
