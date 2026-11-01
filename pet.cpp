@@ -181,8 +181,23 @@ void Pet::tick() {
     return;
   }
 
+  if (jobKind && !atWork() && lastSeenEpoch) {    // home from work, with its pay
+    jobKind = JOB_NONE;
+    earnCoins(JOB_COINS, false);
+    joy = clamp100(joy + 5);
+    jobDoneFlash = true;
+    pendingSave = true;
+  }
+  if (atWork()) return;                            // away: nothing drains while it works
   applyAutoSleep();   // put down at 21:00 still goes to bed at 22:00
   wishTick();
+  if (lastSeenEpoch && mailDay != today()) {       // the post comes once a day
+    mailDay = today();
+    mailKind = (uint8_t)(1 + random(LETTER_KINDS));
+    mailRead = false;
+    pendingSave = true;
+  }
+  if (wearingSet() >= 0 && ageMinutes % 20 == 0) joy = clamp100(joy + 1);   // dressed up: cheerful
   if (isLonely() && ageMinutes % 2 == 0) joy = dropTo(joy, 1, 20);   // lonely: it misses you
 
 
@@ -1069,7 +1084,7 @@ void Pet::feed() {
 }
 
 void Pet::feedBerry(uint8_t color) {
-  if (ceremony != CER_NONE) return;
+  if (ceremony != CER_NONE || atWork()) return;
   if (isEgg() || sleeping) return;
   bool wasFull = fullness >= 90;
   if (lovesBerry(color)) {
@@ -1092,7 +1107,7 @@ void Pet::feedBerry(uint8_t color) {
 }
 
 void Pet::feedCandy() {
-  if (ceremony != CER_NONE) return;
+  if (ceremony != CER_NONE || atWork()) return;
   if (isEgg() || sleeping) return;
   if (fullness >= 90) noteOverfeed(2);  // candy on a full stomach: worse
   fullness = clamp100(fullness + 10);
@@ -1241,6 +1256,14 @@ const MiniReward MINI_REWARDS[MINI_COUNT] = {
   { 4, 2, 18,   1,    MINI_STAT_DEF,  1, 10,   3, 4,  0, 0,  0,  6 },  // SIMON
   { 3, 1, 15,   1,    MINI_STAT_SPE,  2, 10,   5, 3,  0, 0,  1,  8 },  // FLAPPY
   { 3, 2, 15,   1,    MINI_STAT_ATK,  1, 10,   4, 3,  0, 0,  1,  4 },  // MAZE
+  { 3, 1, 15,   1,    MINI_STAT_ATK,  3, 12,   6, 3,  0, 0,  1,  8 },  // BALLOON
+  { 3, 1, 15,   1,    MINI_STAT_SPE,  1, 10,   8, 2,  0, 0,  2,  3 },  // SHAKE
+  { 3, 1, 15,   1,    MINI_STAT_DEF,  3, 10,   5, 3,  0, 0,  1,  8 },  // CATCH
+  { 3, 1, 15,   1,    MINI_STAT_DEF,  4, 10,   4, 4,  0, 0,  0, 10 },  // BALANCE
+  { 4, 2, 20,   2,    MINI_NO_STAT,   1,  0,   2, 5,  0, 0,  0,  6 },  // QUIZ
+  { 4, 2, 20,   2,    MINI_NO_STAT,   1,  0,   2, 5,  0, 0,  0, 10 },  // SLIDE
+  { 4, 1, 20,   1,    MINI_NO_STAT,   1,  0,   2, 6,  0, 0,  0, 30 },  // BUBBLES
+  { 6, 1, 20,   3,    MINI_NO_STAT,   1,  0,   1, 9,  0, 0,  0, 10 },  // DRAW
 };
 }
 
@@ -1486,6 +1509,7 @@ void Pet::notePlayedGame(uint8_t cat, uint16_t score) {
   noteMission(MIS_PLAY, 1);
   bumpTally(TALLY_GAMES);
   grantWish(WISH_PLAY);
+  questNote(QK_GAME);
   if (personality() == PERS_PLAYFUL) joy = clamp100(joy + 2);
   if (isExcited()) joy = clamp100(joy + 2);   // a great day: everything is more fun
   if (gamesToday < 255) gamesToday++;
@@ -1590,7 +1614,7 @@ bool Pet::eatFood(uint8_t f) {
   const FoodInfo &fi = foodInfo(f);
   if (fullness >= 90 && fi.food > 0) noteOverfeed(fi.sweet ? 2 : 1);   // already full: a binge
   bumpTally(TALLY_MEALS);
-  if (f >= FOOD_SHOP_COUNT) addBond(2);   // home-cooked
+  if (f >= FOOD_SHOP_COUNT) { addBond(2); questNote(QK_MEAL); }   // home-cooked
   grantWish(WISH_FOOD, f);
   if (personality() == PERS_HUNGRY && fi.food > 0) fullness = clamp100(fullness + 5);   // a big eater
   fullness = clamp100(fullness + fi.food);
@@ -1680,6 +1704,7 @@ ParkResult Pet::parkWalk() {
   energy = dropTo(energy, PARK_WALK_ENERGY, 5);
   bumpTally(TALLY_WALKS);
   grantWish(WISH_PARK);
+  questNote(QK_PARK);
   joy = clamp100(joy + 3);
   registerCare();
   if (parkDay != today()) { parkDay = today(); parkFinds = 0; }
@@ -1868,6 +1893,146 @@ void Pet::placeFurn(uint8_t f) {
   save();
 }
 
+// ---------- the wardrobe ----------
+
+uint16_t Pet::accPrice(uint8_t a) {
+  static const uint16_t PRICE[ACC_COUNT] = { 70, 90, 90, 110,  60, 60, 100, 70,  150, 90, 180, 180 };
+  return PRICE[a % ACC_COUNT];
+}
+
+bool Pet::buyAcc(uint8_t a) {
+  if (a >= ACC_COUNT || ownsAcc(a)) return false;
+  if (!spendCoins(accPrice(a))) return false;
+  accOwned |= 1 << a;
+  accOn[accSlot(a)] = (int8_t)a;           // bought to be worn
+  save();
+  return true;
+}
+
+void Pet::wearAcc(uint8_t a) {
+  if (!ownsAcc(a)) return;
+  int8_t &s = accOn[accSlot(a)];
+  s = (s == (int8_t)a) ? -1 : (int8_t)a;
+  save();
+}
+
+const OutfitSet &Pet::outfitSet(uint8_t i) {
+  static const OutfitSet S_[OUTFIT_SETS] = {
+    { HAT_PIRATE, ACC_BANDANA, ACC_MONOCLE },      // pirate
+    { 255, ACC_CAPE, ACC_STARGLASSES },            // superhero
+    { HAT_WREATH, ACC_WINGS, ACC_HEARTGLASSES },   // angel
+    { HAT_WITCH, ACC_BATWINGS, ACC_SUNGLASSES },   // spooky
+    { HAT_CHEF, ACC_BOWTIE, 255 },                 // chef
+  };
+  return S_[i % OUTFIT_SETS];
+}
+
+int8_t Pet::wearingSet() const {
+  for (uint8_t i = 0; i < OUTFIT_SETS; i++) {
+    const OutfitSet &o = outfitSet(i);
+    if (o.hat != 255 && hatOn != (int8_t)o.hat) continue;
+    if (o.a != 255 && !wearingAcc(o.a)) continue;
+    if (o.b != 255 && !wearingAcc(o.b)) continue;
+    return (int8_t)i;
+  }
+  return -1;
+}
+
+// ---------- town life ----------
+
+bool Pet::findShell() {
+  if (shellDay != today()) { shellDay = today(); shellsToday = 0; }
+  if (shellsToday >= SHELLS_PER_DAY) return false;
+  shellsToday++;
+  questNote(QK_BEACH);
+  earnCoins(1, false);
+  pendingSave = true;
+  return true;
+}
+
+bool Pet::buildCastle() {
+  if (isEgg() || castleDay == today()) return false;
+  castleDay = today();
+  questNote(QK_BEACH);
+  joy = clamp100(joy + 8);
+  addBond(1);
+  registerCare();
+  save();
+  return true;
+}
+
+bool Pet::readBook() {
+  if (isEgg()) return false;
+  if (bookDay != today()) { bookDay = today(); booksToday = 0; }
+  if (booksToday >= BOOKS_PER_DAY) return false;
+  booksToday++;
+  questNote(QK_READ);
+  joy = clamp100(joy + 2);
+  addBond(1);
+  registerCare();
+  save();
+  return true;
+}
+
+bool Pet::playSong() {
+  if (isEgg() || sleeping) return false;
+  if (songDay != today()) { songDay = today(); songsToday = 0; }
+  if (songsToday >= SONGS_PER_DAY) return false;
+  songsToday++;
+  questNote(QK_SONG);
+  joy = clamp100(joy + 3);
+  registerCare();
+  save();
+  return true;
+}
+
+// the judges like a dressed-up, well-loved, happy creature -- and a little luck
+uint8_t Pet::contestScore() const {
+  int s = 0;
+  if (hatOn >= 0) s += 20;
+  for (int k = 0; k < 3; k++) if (accOn[k] >= 0) s += 15;
+  if (wearingSet() >= 0) s += 30;
+  s += bond / 4 + joy / 10;
+  return (uint8_t)(s > 255 ? 255 : s);
+}
+
+Ribbon Pet::enterContest(uint8_t score) {
+  if (isEgg() || contestDoneThisWeek()) return RIB_NONE;
+  contestWeek = today() / 7;
+  Ribbon r = score >= 100 ? RIB_GOLD : score >= 70 ? RIB_SILVER : score >= 40 ? RIB_BRONZE : RIB_NONE;
+  static const uint8_t PRIZE[4] = { 2, 5, 10, 20 };
+  earnCoins(PRIZE[r], false);
+  if (r && ribbons[r - 1] < 255) ribbons[r - 1]++;
+  joy = clamp100(joy + 5);
+  registerCare();
+  save();
+  return r;
+}
+
+bool Pet::startJob(uint8_t k) {
+  if (k == JOB_NONE || k >= JOB_KINDS || isEgg() || sleeping || isSick() || atWork() || jobDoneToday() || !lastSeenEpoch) return false;
+  jobKind = k;
+  jobUntil = lastSeenEpoch + JOB_SECS;
+  jobDay = today();
+  save();
+  return true;
+}
+
+uint8_t Pet::openMail() {
+  if (!hasMail()) return 0;
+  mailRead = true;
+  switch (mailKind) {                          // each letter brings a little something
+    case 1: earnCoins(5, false); break;
+    case 2: if (foodCount[FOOD_COOKIE] < FOOD_STACK_MAX) foodCount[FOOD_COOKIE]++; break;
+    case 3: seedCount = seedCount + 1 > FOOD_STACK_MAX ? FOOD_STACK_MAX : seedCount + 1; break;
+    case 4: if (soapCount < FOOD_STACK_MAX) soapCount++; break;
+    case 5: earnCoins(8, false); break;
+    default: joy = clamp100(joy + 5); break;
+  }
+  save();
+  return mailKind;
+}
+
 // ---------- wishes, moods, birthdays, events ----------
 
 void Pet::wishTick() {
@@ -1922,7 +2087,7 @@ bool Pet::claimBirthday() {
   if (!birthdayMonths() || bdayDay == today()) return false;
   bdayDay = today();
   if (foodCount[FOOD_CAKE] < FOOD_STACK_MAX) foodCount[FOOD_CAKE]++;
-  earnCoins(20, false);
+  earnCoins(birthdayMonths() % 12 == 0 ? 50 : 20, false);   // a whole year: a bigger party
   joy = clamp100(joy + 20);
   addBond(5);
   save();
@@ -1944,6 +2109,8 @@ EventId Pet::eventToday() const {
   int y, m, d;
   civilDate(t, y, m, d);
   if (m == 7) return EVENT_SUMMER;
+  if (m == 10 && d >= 24) return EVENT_HALLOWEEN;
+  if ((m == 12 && d >= 20) || (m == 1 && d <= 6)) return EVENT_WINTER;
   int em, ed;
   easterDate(y, em, ed);
   // a week of egg hunting, from three days before Easter Sunday
@@ -1963,11 +2130,51 @@ bool Pet::findEasterEgg() {
   return true;
 }
 
-bool Pet::claimFestivalTreat() {
-  if (eventToday() != EVENT_SUMMER || festDay == today()) return false;
+uint8_t Pet::claimFestivalTreat() {
+  EventId e = eventToday();
+  if ((e != EVENT_SUMMER && e != EVENT_HALLOWEEN && e != EVENT_WINTER) || festDay == today()) return 0;
   festDay = today();
-  if (foodCount[FOOD_ICECREAM] < FOOD_STACK_MAX) foodCount[FOOD_ICECREAM]++;
+  uint8_t f = e == EVENT_SUMMER ? FOOD_ICECREAM : e == EVENT_HALLOWEEN ? FOOD_COOKIE : FOOD_MILK;   // ice cream, a treat, hot cocoa
+  if (foodCount[f] < FOOD_STACK_MAX) foodCount[f]++;
   joy = clamp100(joy + 5);
+  save();
+  return (uint8_t)e;
+}
+
+// ---------- story quests ----------
+
+QuestKind Pet::questStepKind(uint8_t q, uint8_t step) {
+  static const QuestKind Q[QUEST_COUNT][QUEST_STEPS] = {
+    { QK_PARK, QK_BEACH, QK_READ },      // Pikachu lost its hat
+    { QK_FISH, QK_COOK, QK_MEAL },       // Meowth's lunch
+    { QK_ADV, QK_CENTER, QK_BATH },      // Chansey's lost egg
+    { QK_SONG, QK_GAME, QK_STUDY },      // a song for Jigglypuff
+  };
+  return Q[q % QUEST_COUNT][step % QUEST_STEPS];
+}
+
+void Pet::questRoll() {
+  uint32_t w = today() / 7;
+  if (!w || questWeek == w) return;
+  questWeek = w; questStep = 0; questStepDay = 0;
+  pendingSave = true;
+}
+
+bool Pet::questNote(uint8_t kind) {
+  questRoll();
+  if (!questStepReady() || questStepKind(questToday(), questStep) != kind) return false;
+  questStep++;
+  questStepDay = today();
+  joy = clamp100(joy + 3);
+  if (questStep >= QUEST_STEPS) {               // the end of the story: a hat not owned yet, or coins
+    uint8_t free[HAT_COUNT], n = 0;
+    for (uint8_t h = 0; h < HAT_COUNT; h++) if (!ownsHat(h)) free[n++] = h;
+    if (n) hatsOwned |= 1UL << free[random(n)];
+    else earnCoins(QUEST_COINS, false);
+    earnCoins(10, false);
+    addBond(3);
+    questDoneFlash = true;
+  }
   save();
   return true;
 }
@@ -2058,6 +2265,7 @@ uint8_t Pet::studyDone(uint8_t minutes) {
   joy = clamp100(joy + 2);
   addBond(2);
   bumpTally(TALLY_STUDY);
+  questNote(QK_STUDY);
   uint8_t c = 0;
   if (studyToday < STUDY_PER_DAY) {      // a reward for the work, not a coin farm
     studyToday++;
@@ -2100,6 +2308,7 @@ uint16_t Pet::advNeed(uint8_t stop) {
 AdvResult Pet::advClaim() {
   if (!advReady()) return ADV_NONE;
   diaryFlag(DF_ADVENTURE);
+  questNote(QK_ADV);
   if (advStop == ROUTE_STOPS - 1) {                      // the end of the route
     earnCoins(10, false);
     advWhat = 10;
@@ -2137,6 +2346,7 @@ FishResult Pet::fishCatch() {
   if (fishToday < 255) fishToday++;
   bumpTally(TALLY_FISH);
   grantWish(WISH_FISH);
+  questNote(QK_FISH);
   joy = clamp100(joy + 2);
   registerCare();
   int k = random(100);
@@ -2176,6 +2386,7 @@ bool Pet::cook(uint8_t r) {
   foodCount[x.b]--;
   foodCount[x.out]++;
   bumpTally(TALLY_COOK);
+  questNote(QK_COOK);
   registerCare();
   save();
   return true;
@@ -2404,6 +2615,7 @@ void Pet::clean() {
   if (sickness == SICK_COLD && sickDoses >= 2) { sickness = SICK_NONE; sickTicks = 0; sickDoses = 0; }
   noteMission(MIS_BATH, 1);
   bumpTally(TALLY_BATHS);
+  questNote(QK_BATH);
   grantWish(WISH_BATH);
   earnCoins(1, true);
   addBond(1);
@@ -2412,7 +2624,7 @@ void Pet::clean() {
 }
 
 void Pet::caress() {
-  if (ceremony != CER_NONE) return;
+  if (ceremony != CER_NONE || atWork()) return;
   if (isEgg() || sleeping) return;
   joy = clamp100(joy + 5);
   heartUntil = millis() + HEART_MS;
@@ -2591,6 +2803,28 @@ void Pet::save() {
   prefs.putUInt("egd", eggDay);
   prefs.putUChar("egn", eggsFound);
   prefs.putUInt("fest", festDay);
+  prefs.putUShort("accO", accOwned);
+  prefs.putUInt("shd", shellDay);
+  prefs.putUInt("qwk", questWeek);
+  prefs.putUChar("qst", questStep);
+  prefs.putUInt("qsd", questStepDay);
+  prefs.putUChar("shn", shellsToday);
+  prefs.putUInt("csd", castleDay);
+  prefs.putUInt("lbd", bookDay);
+  prefs.putUChar("lbn", booksToday);
+  prefs.putUInt("msd", songDay);
+  prefs.putUChar("msn", songsToday);
+  prefs.putUInt("ctw", contestWeek);
+  prefs.putBytes("rib", ribbons, sizeof(ribbons));
+  prefs.putUChar("jbk", jobKind);
+  prefs.putUInt("jbu", jobUntil);
+  prefs.putUInt("jbd", jobDay);
+  prefs.putUInt("mld", mailDay);
+  prefs.putUChar("mlk", mailKind);
+  prefs.putBool("mlr", mailRead);
+  prefs.putChar("acF", accOn[0]);
+  prefs.putChar("acN", accOn[1]);
+  prefs.putChar("acB", accOn[2]);
 }
 
 void Pet::load() {
@@ -2803,6 +3037,31 @@ void Pet::load() {
   eggDay = prefs.getUInt("egd", 0);
   eggsFound = prefs.getUChar("egn", 0);
   festDay = prefs.getUInt("fest", 0);
+  accOwned = prefs.getUShort("accO", 0) & ((1 << ACC_COUNT) - 1);
+  shellDay = prefs.getUInt("shd", 0);
+  questWeek = prefs.getUInt("qwk", 0);
+  questStep = prefs.getUChar("qst", 0);
+  if (questStep > QUEST_STEPS) questStep = 0;
+  questStepDay = prefs.getUInt("qsd", 0);
+  shellsToday = prefs.getUChar("shn", 0);
+  castleDay = prefs.getUInt("csd", 0);
+  bookDay = prefs.getUInt("lbd", 0);
+  booksToday = prefs.getUChar("lbn", 0);
+  songDay = prefs.getUInt("msd", 0);
+  songsToday = prefs.getUChar("msn", 0);
+  contestWeek = prefs.getUInt("ctw", 0);
+  if (prefs.getBytesLength("rib") == sizeof(ribbons)) prefs.getBytes("rib", ribbons, sizeof(ribbons));
+  jobKind = prefs.getUChar("jbk", 0) % JOB_KINDS;
+  jobUntil = prefs.getUInt("jbu", 0);
+  jobDay = prefs.getUInt("jbd", 0);
+  mailDay = prefs.getUInt("mld", 0);
+  mailKind = prefs.getUChar("mlk", 0);
+  if (mailKind > LETTER_KINDS) mailKind = 0;
+  mailRead = prefs.getBool("mlr", true);
+  {
+    const char *k[3] = { "acF", "acN", "acB" };
+    for (int s = 0; s < 3; s++) { int8_t v = prefs.getChar(k[s], -1); accOn[s] = (v >= 0 && v < ACC_COUNT && accSlot(v) == s && ownsAcc(v)) ? v : -1; }
+  }
   // seeding: the current pet counts as raised (old saves)
   if (speciesId >= 1) registerSpecies(speciesId);
 }

@@ -68,6 +68,15 @@ const SaveField SAVE_FIELDS[] = {
   { "wsK", SK_U8 },     { "wsA", SK_U8 },     { "wsU", SK_U32 },    { "wsN", SK_U32 },
   { "wsD", SK_U32 },    { "wsC", SK_U8 },     { "lcare", SK_U32 },  { "born", SK_U32 },
   { "bday", SK_U32 },   { "egd", SK_U32 },    { "egn", SK_U8 },     { "fest", SK_U32 },
+  // the wardrobe
+  { "accO", SK_U16 },   { "acF", SK_I8 },     { "acN", SK_I8 },     { "acB", SK_I8 },
+  // town life
+  { "shd", SK_U32 },    { "shn", SK_U8 },     { "csd", SK_U32 },    { "lbd", SK_U32 },
+  { "lbn", SK_U8 },     { "msd", SK_U32 },    { "msn", SK_U8 },     { "ctw", SK_U32 },
+  { "rib", SK_BYTES },  { "jbk", SK_U8 },     { "jbu", SK_U32 },    { "jbd", SK_U32 },
+  { "mld", SK_U32 },    { "mlk", SK_U8 },     { "mlr", SK_BOOL },
+  // story quests
+  { "qwk", SK_U32 },    { "qst", SK_U8 },     { "qsd", SK_U32 },
   // the banked creatures
   { "party", SK_BYTES }, { "box", SK_BYTES },
   // settings, so a restored device plays the way it did

@@ -52,6 +52,14 @@ enum MiniGameId : uint8_t {
   MINI_SIMON,    // repeat the sequence
   MINI_FLAPPY,   // fly through the gaps
   MINI_MAZE,     // tilt maze
+  MINI_BALLOON,  // balloon pop (phase 15)
+  MINI_SHAKE,    // shake race
+  MINI_CATCH,    // catch the falling Pokemon
+  MINI_BALANCE,  // keep the berry on the seesaw
+  MINI_QUIZ,     // the type quiz
+  MINI_SLIDE,    // slide puzzle
+  MINI_BUBBLES,  // pop groups of one colour
+  MINI_DRAW,     // finger painting
   MINI_COUNT
 };
 #define MINI_NO_STAT (-1)
@@ -176,6 +184,29 @@ enum FurnId : uint8_t {
 #define FURN_FLOOR_LAST FURN_FIREPLACE
 static_assert(FURN_COUNT <= 16, "furnOwned needs a bit per piece");
 
+// Accessories (phase 16), worn with a hat: one on the face, one at the neck, one
+// on the back. Append within a slot's run only by moving the runs: the slot is
+// the id's group of four. A bit each in NVS.
+enum AccId : uint8_t {
+  ACC_SUNGLASSES = 0, ACC_STARGLASSES, ACC_HEARTGLASSES, ACC_MONOCLE,   // face
+  ACC_SCARF, ACC_BOWTIE, ACC_MEDAL, ACC_BANDANA,                         // neck
+  ACC_CAPE, ACC_BACKPACK, ACC_WINGS, ACC_BATWINGS,                       // back
+  ACC_COUNT
+};
+enum AccSlot : uint8_t { ACC_FACE = 0, ACC_NECK, ACC_BACK };
+#define OUTFIT_SETS 5
+struct OutfitSet { uint8_t hat, a, b; };   // 255 = that part is not needed
+
+// Town life (phase 17).
+#define SHELLS_PER_DAY 5
+#define BOOKS_PER_DAY 3
+#define SONGS_PER_DAY 3
+#define JOB_SECS (3UL * 3600)            // a shift
+#define JOB_COINS 15
+#define LETTER_KINDS 6
+enum JobId : uint8_t { JOB_NONE = 0, JOB_CAFE, JOB_FLOWERS, JOB_POST, JOB_KINDS };
+enum Ribbon : uint8_t { RIB_NONE = 0, RIB_BRONZE, RIB_SILVER, RIB_GOLD };
+
 // Wishes: now and then it asks for something; doing it grants the wish.
 enum WishId : uint8_t { WISH_NONE = 0, WISH_FOOD, WISH_PLAY, WISH_PARK, WISH_BATH, WISH_FISH, WISH_PET, WISH_KINDS };
 #define WISHES_PER_DAY 3
@@ -187,7 +218,12 @@ enum Personality : uint8_t { PERS_PLAYFUL = 0, PERS_LAZY, PERS_HUNGRY, PERS_SHY,
 #define LONELY_SECS (3UL * 3600)          // awake and nobody cared for it this long
 #define BIRTHDAY_DAYS 30                  // a party every month of its life
 // Seasonal events by the date (besides the one-day holiday gifts).
-enum EventId : uint8_t { EVENT_NONE = 0, EVENT_EASTER, EVENT_SUMMER };
+enum EventId : uint8_t { EVENT_NONE = 0, EVENT_EASTER, EVENT_SUMMER, EVENT_HALLOWEEN, EVENT_WINTER };
+// Story quests (phase 19): one a week, three steps, each on a later day than the last.
+enum QuestKind : uint8_t { QK_PARK = 0, QK_BEACH, QK_READ, QK_FISH, QK_COOK, QK_MEAL, QK_ADV, QK_CENTER, QK_BATH, QK_SONG, QK_GAME, QK_STUDY };
+#define QUEST_COUNT 4
+#define QUEST_STEPS 3
+#define QUEST_COINS 30
 #define EASTER_EGGS_PER_DAY 5
 // Trophies: lifetime goals, each pays TROPHY_COINS once. Append at the END:
 // a bit each in NVS. The tallies they count are a byte blob, also append-only.
@@ -531,6 +567,42 @@ public:
   bool furnPlaced(uint8_t f) const;
   void placeFurn(uint8_t f);    // into its spot (or out again); also switches to the room
 
+  // The wardrobe (phase 16). Player-wide.
+  uint16_t accOwned = 0;
+  int8_t accOn[3] = { -1, -1, -1 };            // what is worn on the face, the neck, the back
+  static uint16_t accPrice(uint8_t a);
+  static uint8_t accSlot(uint8_t a) { return a / 4; }
+  bool ownsAcc(uint8_t a) const { return a < ACC_COUNT && (accOwned & (1 << a)); }
+  bool buyAcc(uint8_t a);
+  void wearAcc(uint8_t a);                     // on, or off again if it is already on
+  bool wearingAcc(uint8_t a) const { return a < ACC_COUNT && accOn[accSlot(a)] == (int8_t)a; }
+  static const OutfitSet &outfitSet(uint8_t i);
+  int8_t wearingSet() const;                   // the full set being worn, or -1
+
+  // Town life (phase 17). Player-wide.
+  uint32_t shellDay = 0, castleDay = 0, bookDay = 0, songDay = 0;
+  uint8_t shellsToday = 0, booksToday = 0, songsToday = 0;
+  bool findShell();                            // 1 coin, five a day
+  bool buildCastle();                          // once a day: joy and bond
+  bool readBook();                             // three a day: bond and joy
+  bool playSong();                             // three a day: it dances
+  uint32_t contestWeek = 0;
+  uint8_t ribbons[3] = { 0, 0, 0 };            // bronze, silver, gold won
+  uint8_t contestScore() const;
+  bool contestDoneThisWeek() const { return contestWeek && contestWeek == today() / 7; }
+  Ribbon enterContest(uint8_t score);
+  uint8_t jobKind = JOB_NONE;
+  uint32_t jobUntil = 0, jobDay = 0;
+  bool jobDoneFlash = false;                   // the screen says it came back with its pay
+  bool atWork() const { return jobKind != JOB_NONE && lastSeenEpoch < jobUntil; }
+  bool startJob(uint8_t k);
+  bool jobDoneToday() const { return jobDay == today(); }
+  uint32_t mailDay = 0;
+  uint8_t mailKind = 0;                        // the letter waiting, 1..LETTER_KINDS
+  bool mailRead = true;
+  bool hasMail() const { return mailKind && !mailRead; }
+  uint8_t openMail();                          // reads it and takes the gift; the letter id
+
   // A livelier pet (phase 14).
   uint8_t wishKind = WISH_NONE, wishArg = 0;   // the wish, and its food for WISH_FOOD
   uint32_t wishUntil = 0, wishNextAt = 0;      // epochs
@@ -552,7 +624,15 @@ public:
   uint32_t eggDay = 0, festDay = 0;
   uint8_t eggsFound = 0;
   bool findEasterEgg();                        // a walk in the park during Easter may find one
-  bool claimFestivalTreat();                   // the summer festival: a free ice cream a day
+  uint8_t claimFestivalTreat();                // the day's event treat (summer, Halloween, winter): the EventId, or 0
+  uint32_t questWeek = 0, questStepDay = 0;
+  uint8_t questStep = 0;                       // steps done this week, 0..QUEST_STEPS
+  bool questDoneFlash = false;
+  uint8_t questToday() const { return (uint8_t)((today() / 7) % QUEST_COUNT); }
+  static QuestKind questStepKind(uint8_t quest, uint8_t step);
+  void questRoll();                            // a new week: a new quest
+  bool questNote(uint8_t kind);                // something done that may be the next step
+  bool questStepReady() const { return questStep < QUEST_STEPS && questStepDay != today(); }
   bool buyScenery(uint8_t b);
   void pickScenery(int8_t b);   // an unowned one is ignored; picking the one in use puts it back
   uint16_t tally[TALLY_COUNT] = { 0 };
