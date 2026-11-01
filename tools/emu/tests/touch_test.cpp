@@ -46,6 +46,11 @@ extern int16_t memDex[12]; extern uint8_t memState[12];
 extern uint8_t simSeq[32], simLen; extern bool simShowing;
 extern float flyY, flyV;
 extern float mzBX, mzBY;
+struct Balloon { float x, y, v; uint8_t col; bool bomb, alive; };
+extern Balloon bal[8];
+extern uint8_t slTile[9]; extern int8_t bbCell[6][7];
+extern uint8_t tqRight; extern int8_t tqPicked;
+extern uint16_t drN; extern float raceMe;
 extern bool alarmRinging, choresOpen, piggyOpen, diaryOpen;
 extern uint32_t bathUntil; extern uint8_t bathPops; extern bool bathPlay;
 void startBath(); void bathBubblePos(int i, int *x, int *y);
@@ -172,26 +177,27 @@ int main(int argc, char **argv) {
   printf("PASS: 5th icon opens the training submenu\n");
 
   // Each row opens its category's list; the first game there is the original
-  // trainer. List rows sit at FPM_ROW_Y(i) = 132 + 64 i, so +28 is mid-row.
-  click(233, 178);                       // row 0 == STRENGTH == TRAIN_ROW_Y(0)+28
+  // trainer. The menu is a 2x3 grid of tiles (rows 132 + 80 r); list rows sit at
+  // 132 + 50 i, so +22 is mid-row.
+  click(155, 167);                       // tile 0 == STRENGTH
   if (fpMenuCat != 1) { printf("FAIL: STRENGTH row did not open its games\n"); return 1; }
-  click(233, 160);
+  click(233, 154);
   if (!sackOpen) { printf("FAIL: STRENGTH list did not start the sack\n"); return 1; }
   printf("PASS: STRENGTH -> list -> the punching bag\n");
   sackOpen = false;
 
   click(tbx, tby);
-  click(233, 242);                       // row 1 == SPEED == TRAIN_ROW_Y(1)+28
+  click(311, 167);                       // tile 1 == SPEED
   if (fpMenuCat != 2) { printf("FAIL: SPEED row did not open its games\n"); return 1; }
-  click(233, 160);
+  click(233, 154);
   if (!spdOpen) { printf("FAIL: SPEED list did not start the reaction test\n"); return 1; }
   printf("PASS: SPEED -> list -> the reaction test\n");
   spdOpen = false;
 
   click(tbx, tby);
-  click(233, 306);                       // row 2 == DEFENCE
+  click(155, 247);                       // tile 2 == DEFENCE
   if (fpMenuCat != 3) { printf("FAIL: DEFENCE row did not open its games\n"); return 1; }
-  click(233, 160);
+  click(233, 154);
   if (!gameOpen) { printf("FAIL: DEFENCE list did not start the ball game\n"); return 1; }
   printf("PASS: DEFENCE -> list -> the ball game\n");
   gameOpen = false;
@@ -200,16 +206,16 @@ int main(int argc, char **argv) {
   // a sweep on the seed it has always had -- so put the stream back afterwards.
   uint32_t seedBefore = g_seed;
   click(tbx, tby);
-  click(233, 370);                       // row 3 == FUN == TRAIN_ROW_Y(3)+28
-  if (fpMenuCat != 4) { printf("FAIL: FUN row did not open its games\n"); return 1; }
-  click(233, 160 + 64);                  // second entry: hide and seek
+  click(155, 327);                       // tile 4 == FUN
+  if (fpMenuCat != 5) { printf("FAIL: FUN row did not open its games\n"); return 1; }
+  click(233, 154 + 50);                  // second entry: hide and seek
   if (!fpOpen || fpGame != MINI_HIDE) { printf("FAIL: FUN list did not start hide and seek\n"); return 1; }
   printf("PASS: FUN -> list -> hide and seek\n");
   fpOpen = false;
   g_seed = seedBefore;
 
   click(tbx, tby);
-  click(233, 178);
+  click(155, 167);
   click(20, 233);                        // outside the list: back to the categories
   if (fpMenuCat || !trainOpen) { printf("FAIL: tapping outside a list did not go back\n"); return 1; }
   printf("PASS: outside a list goes back to the categories\n");
@@ -575,6 +581,95 @@ int main(int argc, char **argv) {
     click(233, 40);
     pump(140);                             // the result screen goes
     printf("PASS: tilt maze -> the flag scores and a new maze starts\n");
+
+    // phase 15 games
+    {
+      startFunPackGame(MINI_BALLOON);
+      pump(3);
+      bal[0] = { 233.0f, 300.0f, 0.0f, 0, false, true };
+      for (int i = 1; i < 8; i++) bal[i].alive = false;
+      click(233, 300);
+      if (fpScore != 1) { printf("FAIL: tapping a balloon did not pop it\n"); return 1; }
+      click(233, 40);
+      printf("PASS: balloon pop -> a balloon popped\n");
+
+      startFunPackGame(MINI_SLIDE);
+      pump(2);
+      for (int i = 0; i < 9; i++) slTile[i] = (uint8_t)((i + 1) % 9);   // solved but for the last two
+      slTile[7] = 0; slTile[8] = 8;
+      click(233 - 120 + 2 * 80 + 40, 128 + 2 * 80 + 40);   // the 8, into the gap: solved
+      if (fpScore != 5) { printf("FAIL: finishing the slide puzzle did not score (%u)\n", fpScore); return 1; }
+      click(233, 40);
+      printf("PASS: slide puzzle -> solved\n");
+
+      startFunPackGame(MINI_BUBBLES);
+      pump(2);
+      bbCell[5][0] = 1; bbCell[5][1] = 1; bbCell[4][0] = 2; bbCell[4][1] = 3;
+      click(233 - 147 + 21, 132 + 5 * 42 + 21);
+      if (fpScore < 1) { printf("FAIL: a pair of bubbles did not pop\n"); return 1; }
+      click(233, 40);
+      printf("PASS: bubbles -> a group popped\n");
+
+      startFunPackGame(MINI_QUIZ);
+      pump(2);
+      click(233 - 166 + tqRight * 84 + 39, 300 + 28);
+      if (fpScore != 1 || tqPicked != (int8_t)tqRight) { printf("FAIL: the right answer did not score\n"); return 1; }
+      click(233, 40);
+      printf("PASS: type quiz -> a right answer\n");
+
+      startFunPackGame(MINI_SHAKE);
+      for (int k = 0; k < 50; k++) pump(1);                    // past "3, 2..."
+      click(233, 250);
+      if (raceMe <= 0) { printf("FAIL: tapping did not run in the race\n"); return 1; }
+      click(233, 40);
+      printf("PASS: shake race -> a tap runs\n");
+
+      startFunPackGame(MINI_DRAW);
+      pump(2);
+      g_touchX = 233; g_touchY = 236; g_touchDown = true; fire(); pump(6);   // a stroke
+      g_touchX = 260; g_touchY = 250; fire(); pump(6);
+      g_touchDown = false; fire(); pump(3);
+      if (drN < 1) { printf("FAIL: dragging did not paint\n"); return 1; }
+      click(233 + 96 + 30, 384);                                // DONE
+      if (!fpOverUntil) { printf("FAIL: DONE did not finish the drawing\n"); return 1; }
+      pump(140);
+      printf("PASS: drawing -> paint, then done\n");
+    }
+
+    // phase 17: map page two, the mailbox
+    {
+      extern uint8_t mapPage; extern bool mailOpen;
+      uint32_t today = pet.lastSeenEpoch / 86400;
+      pet.castleDay = 0; pet.contestWeek = 0; pet.jobDay = 0; pet.jobKind = 0;
+      click(394, 154);                       // the map
+      click(357, 376);                       // next page
+      if (mapPage != 1) { printf("FAIL: the arrow did not turn the map page\n"); return 1; }
+      click(155, 154);                       // page 2, tile 0: the beach
+      if (placeScene != 10) { printf("FAIL: the beach tile did not open the beach (%u)\n", placeScene); return 1; }
+      click(110 + 58, 380 + 22);             // CASTLE
+      if (pet.castleDay != today) { printf("FAIL: CASTLE did not build one\n"); return 1; }
+      click(240 + 58, 380 + 22);             // BACK
+      click(394, 154);
+      click(311, 212);                       // tile 3: the contest
+      if (placeScene != 13) { printf("FAIL: the contest tile did not open the contest\n"); return 1; }
+      click(110 + 58, 380 + 22);             // ENTER
+      if (!pet.contestDoneThisWeek()) { printf("FAIL: ENTER did not enter the contest\n"); return 1; }
+      click(240 + 58, 380 + 22);
+      click(394, 154);
+      click(311, 270);                       // tile 5: jobs
+      click(233, 118 + 28);                  // the cafe
+      if (!pet.atWork() || placeScene) { printf("FAIL: picking the cafe did not send it to work\n"); return 1; }
+      pet.jobKind = 0; pet.jobUntil = 0;     // back home for the rest of the test
+      mapPage = 0;
+      printf("PASS: map page 2 -> beach castle, contest, a job\n");
+      pet.mailDay = today; pet.mailKind = 2; pet.mailRead = false;
+      click(366, 72);
+      click(311, 150 + 3 * 58 + 26);         // hub tile 7: MAIL
+      if (!mailOpen || pet.hasMail()) { printf("FAIL: MAIL did not open and read the letter\n"); return 1; }
+      click(233, 233);
+      if (mailOpen) { printf("FAIL: a tap did not fold the letter away\n"); return 1; }
+      printf("PASS: purse -> mail -> a letter\n");
+    }
     g_seed = seedBefore;
   }
 

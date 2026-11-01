@@ -40,6 +40,9 @@ static void fresh(Pet &p, uint32_t day){
   p.stepCount = 0; p.stepDay = day; p.stepCoinK = 0;
 }
 
+// one minute of the pet clock, through the public update()
+static void tickOnce(Pet &p){ g_ms += PET_TICK_MS; p.update(g_ms); }
+
 int main(){
   // --- adventures: steps walk the route, stops are claimed in order
   {
@@ -289,8 +292,96 @@ int main(){
     ck(p.eventToday() == EVENT_SUMMER, "July is the summer festival");
     p.festDay = 0;
     ck(p.claimFestivalTreat() && !p.claimFestivalTreat(), "a free ice cream, once a day");
-    fresh(p, 20757);
-    ck(p.eventToday() == EVENT_NONE, "31 October: no event (the gift is separate)");
+    fresh(p, 20758);
+    ck(p.eventToday() == EVENT_NONE, "1 November: no event");
+  }
+
+  // --- phase 16: the wardrobe
+  {
+    Pet p; fresh(p, 20000);
+    p.accOwned = 0; p.accOn[0] = p.accOn[1] = p.accOn[2] = -1; p.hatsOwned = 0; p.hatOn = -1;
+    p.coins = 2000;
+    ck(p.buyAcc(ACC_SUNGLASSES) && p.wearingAcc(ACC_SUNGLASSES), "bought glasses are worn");
+    ck(p.buyAcc(ACC_STARGLASSES) && p.wearingAcc(ACC_STARGLASSES) && !p.wearingAcc(ACC_SUNGLASSES), "one pair at a time: the new one replaces it");
+    ck(p.buyAcc(ACC_CAPE) && p.wearingAcc(ACC_CAPE) && p.wearingAcc(ACC_STARGLASSES), "a cape goes on the back, the glasses stay");
+    ck(p.wearingSet() == 1, "cape + star glasses: the superhero set");
+    p.wearAcc(ACC_CAPE);
+    ck(!p.wearingAcc(ACC_CAPE) && p.wearingSet() < 0, "tapped again: off, and no set");
+    p.buyHat(HAT_PIRATE); p.wearHat(HAT_PIRATE); p.buyAcc(ACC_BANDANA); p.buyAcc(ACC_MONOCLE);
+    ck(p.wearingSet() == 0, "pirate hat + bandana + monocle: the pirate set");
+    p.setClock(p.lastSeenEpoch);
+    Pet q; q.begin();
+    ck(q.ownsAcc(ACC_CAPE) && q.wearingAcc(ACC_MONOCLE) && q.wearingAcc(ACC_BANDANA) && q.wearingSet() == 0, "the wardrobe persists");
+  }
+
+  // --- phase 17: town life
+  {
+    Pet p; fresh(p, 20000);
+    p.shellDay = 0; p.castleDay = 0; p.bookDay = 0; p.songDay = 0; p.contestWeek = 0;
+    p.ribbons[0] = p.ribbons[1] = p.ribbons[2] = 0; p.jobKind = JOB_NONE; p.jobDay = 0; p.mailDay = 0; p.mailKind = 0; p.mailRead = true;
+    int shells = 0;
+    for (int i = 0; i < 10; i++) shells += p.findShell();
+    ck(shells == SHELLS_PER_DAY, "five shells a day");
+    ck(p.buildCastle() && !p.buildCastle(), "one sandcastle a day");
+    int books = 0, songs = 0;
+    for (int i = 0; i < 6; i++) { books += p.readBook(); songs += p.playSong(); }
+    ck(books == BOOKS_PER_DAY && songs == SONGS_PER_DAY, "three books and three songs a day");
+    uint32_t c = p.coins;
+    ck(p.enterContest(120) == RIB_GOLD && p.ribbons[2] == 1 && p.coins == c + 20, "120 points: gold, 20 coins");
+    ck(p.contestDoneThisWeek() && p.enterContest(120) == RIB_NONE, "once a week");
+    p.lastSeenEpoch = atDay(20007, 12);
+    ck(!p.contestDoneThisWeek() && p.enterContest(50) == RIB_BRONZE, "next week: 50 points is bronze");
+    p.hatOn = -1; p.accOn[0] = p.accOn[1] = p.accOn[2] = -1; p.bond = 0; p.joy = 0;
+    ck(p.contestScore() == 0, "plain and unloved: no points");
+    // a job: away for three hours, nothing drains, paid on return
+    p.lastSeenEpoch = atDay(20010, 9); p.fullness = 60; p.joy = 60;
+    ck(p.startJob(JOB_CAFE) && p.atWork(), "off to the cafe");
+    ck(!p.startJob(JOB_POST), "one job a day");
+    uint8_t food = p.fullness;
+    for (int m = 0; m < 60; m++) { p.lastSeenEpoch += 60; tickOnce(p); }
+    ck(p.fullness == food, "nothing drains while it works");
+    p.feedBerry(0);
+    ck(p.fullness == food, "and it cannot be fed while it is out");
+    c = p.coins;
+    p.lastSeenEpoch = atDay(20010, 12) + 60; tickOnce(p);
+    ck(!p.atWork() && p.coins >= c + JOB_COINS && p.jobDoneFlash, "home after three hours with its pay");
+    // the mail: once a day, with a gift
+    p.mailDay = 0; tickOnce(p);
+    ck(p.hasMail(), "a letter arrives");
+    uint8_t k = p.openMail();
+    ck(k >= 1 && k <= LETTER_KINDS && !p.hasMail(), "read once");
+    p.setClock(p.lastSeenEpoch);
+    Pet q; q.begin();
+    ck(q.ribbons[2] == 1 && q.ribbons[0] == 1 && q.jobDay == 20010 && q.mailDay == p.mailDay, "town life persists");
+  }
+
+  // --- phase 19: the weekly quest, Halloween and winter, the anniversary
+  {
+    Pet p; fresh(p, 20003);                // week 2857: quest (20003/7) % 4
+    p.questWeek = 0; p.questStep = 0; p.questStepDay = 0; p.hatsOwned = 0;
+    uint8_t q = p.questToday();
+    QuestKind k0 = Pet::questStepKind(q, 0), k1 = Pet::questStepKind(q, 1), k2 = Pet::questStepKind(q, 2);
+    ck(!p.questNote(k1) && p.questStep == 0, "out of order: nothing");
+    ck(p.questNote(k0) && p.questStep == 1, "the first step");
+    ck(!p.questNote(k1) && p.questStep == 1, "the next step waits for another day");
+    p.lastSeenEpoch = atDay(20004, 12);
+    ck(p.questNote(k1) && p.questStep == 2, "the second step, the next day");
+    p.lastSeenEpoch = atDay(20005, 12);
+    ck(p.questNote(k2) && p.questStep == 3 && p.questDoneFlash && p.hatsOwned != 0, "the third: done, and a hat");
+    p.lastSeenEpoch = atDay(20003 + 7, 12);
+    p.questRoll();
+    ck(p.questStep == 0 && p.questToday() != q, "a new week: a new quest from the start");
+    fresh(p, 20750);                       // 2026-10-24
+    ck(p.eventToday() == EVENT_HALLOWEEN, "24 October starts Halloween week");
+    p.festDay = 0; uint8_t ck0 = p.foodCount[FOOD_COOKIE];
+    ck(p.claimFestivalTreat() == EVENT_HALLOWEEN && p.foodCount[FOOD_COOKIE] == ck0 + 1, "trick or treat: a cookie");
+    fresh(p, 20807);                       // 2026-12-20
+    ck(p.eventToday() == EVENT_WINTER, "20 December: the winter holidays");
+    fresh(p, 20824);                       // 2027-01-06
+    ck(p.eventToday() == EVENT_WINTER, "until 6 January");
+    fresh(p, 20000);
+    p.bornDay = 20000 - 360; p.bdayDay = 0; uint32_t c = p.coins;
+    ck(p.birthdayMonths() == 12 && p.claimBirthday() && p.coins == c + 50, "a year old: a bigger party");
   }
 
   if (bad) printf("FAILURES\n");
