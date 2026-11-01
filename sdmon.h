@@ -50,6 +50,16 @@ struct PmdMon {
   bool has(uint8_t a) const { return loaded && a < PMD_NACTS && acts[a].frames > 0; }
 };
 
+
+// The photo album: up to ALBUM_MAX photos at half size (ALBUM_W x ALBUM_W RGB565)
+// in /album on the SD card, the oldest overwritten first.
+#define ALBUM_MAX 24
+#define ALBUM_W 233
+bool albumSave(const uint16_t *fb466);       // downscales the screen and writes the next photo
+uint8_t albumCount();
+bool albumLoad(uint8_t newest, uint16_t *out);   // 0 = the newest
+uint16_t *albumBuffer();                     // room for one photo (PSRAM)
+
 // gallery thumbnails (the whole thumbs.bin in PSRAM)
 struct SdThumbs {
   bool loaded = false;

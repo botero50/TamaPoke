@@ -1,3 +1,4 @@
+#include <Preferences.h>
 #include "sdmon.h"
 #include "noart.h"
 #include "pin_config.h"
@@ -297,4 +298,62 @@ bool sdSerialCommand(const String &line) {
     return true;
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// The photo album. The counter lives in its own NVS namespace: it belongs to the
+// card's files, not to the pet's save.
+// ---------------------------------------------------------------------------
+
+static uint16_t albumNext() {
+  Preferences p;
+  p.begin("album", true);
+  uint16_t n = p.getUShort("n", 0);
+  p.end();
+  return n;
+}
+
+bool albumSave(const uint16_t *fb) {
+  if (!sdReady || !fb) return false;
+  SD_MMC.mkdir("/album");
+  uint16_t n = albumNext();
+  char path[24];
+  snprintf(path, sizeof(path), "/album/%02u.raw", (unsigned)(n % ALBUM_MAX));
+  File f = SD_MMC.open(path, FILE_WRITE);
+  if (!f) return false;
+  static uint16_t row[ALBUM_W];
+  for (int y = 0; y < ALBUM_W; y++) {
+    for (int x = 0; x < ALBUM_W; x++) row[x] = fb[(y * 2) * 466 + x * 2];
+    f.write((const uint8_t *)row, sizeof(row));
+  }
+  f.close();
+  Preferences p;
+  p.begin("album", false);
+  p.putUShort("n", n + 1);
+  p.end();
+  return true;
+}
+
+uint8_t albumCount() {
+  uint16_t n = albumNext();
+  return n > ALBUM_MAX ? ALBUM_MAX : (uint8_t)n;
+}
+
+bool albumLoad(uint8_t newest, uint16_t *out) {
+  if (!sdReady || !out || newest >= albumCount()) return false;
+  uint16_t n = albumNext();
+  char path[24];
+  snprintf(path, sizeof(path), "/album/%02u.raw", (unsigned)((n - 1 - newest) % ALBUM_MAX));
+  File f = SD_MMC.open(path, FILE_READ);
+  if (!f) return false;
+  size_t want = ALBUM_W * ALBUM_W * 2;
+  size_t got = f.read((uint8_t *)out, want);
+  f.close();
+  return got == want;
+}
+
+uint16_t *albumBuffer() {
+  static uint16_t *b = nullptr;
+  if (!b) b = (uint16_t *)ps_malloc(ALBUM_W * ALBUM_W * 2);
+  return b;
 }

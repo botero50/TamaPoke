@@ -143,6 +143,40 @@ static const LullabyNote LULLABY_HZ[] = {
   { 294, 250 }, { 349, 250 }, { 494, 250 }, { 440, 250 }, { 392, 500 }, { 494, 500 }, { 523, 1500 },
 };
 #define LULLABY_N (sizeof(LULLABY_HZ) / sizeof(LULLABY_HZ[0]))
+// The places' tunes, all traditional or long out of copyright.
+#define Q 380   // a crotchet
+static const LullabyNote TWINKLE_HZ[] = {     // "Twinkle, Twinkle, Little Star"
+  {262,Q},{262,Q},{392,Q},{392,Q},{440,Q},{440,Q},{392,2*Q},{349,Q},{349,Q},{330,Q},{330,Q},{294,Q},{294,Q},{262,2*Q},
+  {392,Q},{392,Q},{349,Q},{349,Q},{330,Q},{330,Q},{294,2*Q},{392,Q},{392,Q},{349,Q},{349,Q},{330,Q},{330,Q},{294,2*Q},
+  {262,Q},{262,Q},{392,Q},{392,Q},{440,Q},{440,Q},{392,2*Q},{349,Q},{349,Q},{330,Q},{330,Q},{294,Q},{294,Q},{262,2*Q},{0,2*Q},
+};
+static const LullabyNote FRERE_HZ[] = {       // "Frere Jacques"
+  {262,Q},{294,Q},{330,Q},{262,Q},{262,Q},{294,Q},{330,Q},{262,Q},{330,Q},{349,Q},{392,2*Q},{330,Q},{349,Q},{392,2*Q},
+  {392,Q/2},{440,Q/2},{392,Q/2},{349,Q/2},{330,Q},{262,Q},{392,Q/2},{440,Q/2},{392,Q/2},{349,Q/2},{330,Q},{262,Q},
+  {262,Q},{196,Q},{262,2*Q},{262,Q},{196,Q},{262,2*Q},{0,2*Q},
+};
+static const LullabyNote ODE_HZ[] = {         // Beethoven, "Ode to Joy"
+  {330,Q},{330,Q},{349,Q},{392,Q},{392,Q},{349,Q},{330,Q},{294,Q},{262,Q},{262,Q},{294,Q},{330,Q},{330,3*Q/2},{294,Q/2},{294,2*Q},
+  {330,Q},{330,Q},{349,Q},{392,Q},{392,Q},{349,Q},{330,Q},{294,Q},{262,Q},{262,Q},{294,Q},{330,Q},{294,3*Q/2},{262,Q/2},{262,2*Q},{0,2*Q},
+};
+static const LullabyNote CUCARACHA_HZ[] = {   // "La Cucaracha"
+  {392,Q/2},{392,Q/2},{392,Q/2},{523,Q},{659,3*Q/2},{392,Q/2},{392,Q/2},{392,Q/2},{523,Q},{659,3*Q/2},
+  {523,Q/2},{523,Q/2},{494,Q/2},{494,Q/2},{440,Q/2},{440,Q/2},{392,2*Q},{0,Q},
+  {392,Q/2},{392,Q/2},{392,Q/2},{494,Q},{587,3*Q/2},{392,Q/2},{392,Q/2},{392,Q/2},{494,Q},{587,3*Q/2},
+  {784,Q/2},{698,Q/2},{659,Q/2},{587,Q/2},{523,Q/2},{494,Q/2},{523,2*Q},{0,2*Q},
+};
+#undef Q
+struct HzTune { const LullabyNote *n; uint16_t len; };
+static const HzTune PLACE_TUNES[4] = {
+  { TWINKLE_HZ, sizeof(TWINKLE_HZ) / sizeof(LullabyNote) },
+  { FRERE_HZ, sizeof(FRERE_HZ) / sizeof(LullabyNote) },
+  { ODE_HZ, sizeof(ODE_HZ) / sizeof(LullabyNote) },
+  { CUCARACHA_HZ, sizeof(CUCARACHA_HZ) / sizeof(LullabyNote) },
+};
+#define PLACE_TUNE_MAX 64
+static MusicNote gPlaceTune[PLACE_TUNE_MAX];
+static uint16_t gPlaceTuneN = 0;
+static uint8_t gPlaceTuneFor = MUS_NONE;
 static uint16_t hzToGb(uint16_t hz);
 static MusicNote gLullaby1[LULLABY_N];
 static const MusicNote gLullaby2[1] = { { 0, 2, 0, 0, 0, 60000 } };   // the second voice rests
@@ -265,7 +299,15 @@ static void audioTask(void *) {
     // had started again.
     buildLullaby();
     static const MusicTrack LULLABY = { gLullaby1, (uint16_t)LULLABY_N, gLullaby2, 1, "lullaby" };
-    const MusicTrack &t = (m == MUS_LULLABY) ? LULLABY : MUSIC_TBL[(m == MUS_VICTORY) ? 3 : 0];
+    if (m >= MUS_TWINKLE && m != gPlaceTuneFor) {        // a place's tune: into notes, softly
+      const HzTune &h = PLACE_TUNES[m - MUS_TWINKLE];
+      gPlaceTuneN = h.len > PLACE_TUNE_MAX ? PLACE_TUNE_MAX : h.len;
+      for (uint16_t i = 0; i < gPlaceTuneN; i++) gPlaceTune[i] = { hzToGb(h.n[i].hz), 2, 6, 0, 0, h.n[i].ms };
+      gPlaceTuneFor = m;
+    }
+    static MusicTrack PLACE = { gPlaceTune, 0, gLullaby2, 1, "place" };
+    PLACE.n1 = gPlaceTuneN;
+    const MusicTrack &t = (m >= MUS_TWINKLE) ? PLACE : (m == MUS_LULLABY) ? LULLABY : MUSIC_TBL[(m == MUS_VICTORY) ? 3 : 0];
     // start whichever channel is due
     if (clock >= at1) {
       if (mi1 >= t.n1) {                       // loop, or stop a one-shot
@@ -293,7 +335,8 @@ static void audioTask(void *) {
   }
 }
 
-void audioMusic(uint8_t id) { gMusic = (id <= MUS_LULLABY) ? id : MUS_NONE; }
+void audioMusic(uint8_t id) { gMusic = (id <= MUS_LAST) ? id : MUS_NONE; }
+uint8_t audioMusicNow() { return gMusic; }
 
 void audioSetVolume(uint8_t v) { gVol = v > 100 ? 100 : v; }
 void audioSaveVolume() {
