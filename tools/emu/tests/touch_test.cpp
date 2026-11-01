@@ -39,6 +39,12 @@ extern bool fpOpen, missionsOpen, walletOpen, hubOpen, shopOpen, bagOpen, hatAdj
 extern int8_t shopConfirm, shopCat, bagCat, foodCat;
 extern bool foodOpen, bathOpen, sleepOpen, scrubOpen, mapOpen;
 extern uint8_t placeScene;
+extern uint8_t schoolMode, quizRight, quizCorrect, quizQ;
+extern uint32_t studyEnd, teethEnd;
+extern bool trophyOpen, clockOpen;
+extern uint8_t settingsPage;
+void openClock();
+bool fpBlockedBySick();
 extern uint8_t movePickSlot, movePickPage;
 extern bool battleOpen, btlOver, btlWon;
 extern Combatant btlYou, btlFoe;
@@ -213,10 +219,10 @@ int main(int argc, char **argv) {
   // hub -> shop -> buy the cap -> it goes straight on
   pet.coins = 1000; pet.hatsOwned = 0; pet.hatOn = -1;
   click(366, 72);
-  click(233, 76 + 84 + 30);              // hub row 0: SHOP
+  click(233, 76 + 78 + 25);              // hub row 0: SHOP
   if (!shopOpen) { printf("FAIL: SHOP row did not open the shop\n"); return 1; }
   // shop and bag rows sit at SHOP_ROW_Y(i) = 146 + 54 i, so +24 is mid-row
-  click(233, 146 + 24);                  // category 0: HATS
+  click(233, 76 + 52 + 20);              // category 0: HATS (rows CATL_ROW_Y = 128 + 44 i)
   if (shopCat != 0) { printf("FAIL: HATS did not open the hats\n"); return 1; }
   click(233, 146 + 24);                  // hats row 0: the cap
   if (shopConfirm != HAT_CAP) { printf("FAIL: tapping a hat did not ask to buy it\n"); return 1; }
@@ -228,7 +234,7 @@ int main(int argc, char **argv) {
   click(20, 233);                        // outside: back to the categories
   if (!shopOpen || shopCat != -1) { printf("FAIL: tapping outside did not go back to the categories\n"); return 1; }
   pet.decorOwned = 0; pet.slotL = pet.slotR = -1;
-  click(233, 146 + 54 + 24);             // category 1: TOYS
+  click(233, 76 + 52 + 44 + 20);         // category 1: TOYS
   click(233, 146 + 24);                  // toys row 0: the ball
   click(163, 307);                       // BUY
   if (!pet.ownsDecor(DEC_BALL) || pet.slotL != DEC_BALL) { printf("FAIL: buying the ball did not put it out\n"); return 1; }
@@ -239,9 +245,9 @@ int main(int argc, char **argv) {
 
   // hub -> bag -> move the hat with the pad
   click(366, 72);
-  click(233, 76 + 84 + 72 + 30);         // hub row 1: BAG
+  click(233, 76 + 78 + 58 + 25);         // hub row 1: BAG (rows HUB_ROW_Y = 154 + 58 i)
   if (!bagOpen) { printf("FAIL: BAG row did not open the bag\n"); return 1; }
-  click(233, 146 + 24);                  // category 0: HATS
+  click(233, 76 + 52 + 20);              // category 0: HATS (rows CATL_ROW_Y = 128 + 44 i)
   click(233, 146 + 24);                  // bag row 0: move the hat
   if (!hatAdjust) { printf("FAIL: MOVE HAT did not open the pad\n"); return 1; }
   click(233, 372 - 48);                  // up arrow
@@ -328,6 +334,86 @@ int main(int argc, char **argv) {
     if (shopOpen || placeScene != 2) { printf("FAIL: leaving the shop should return to the store\n"); return 1; }
     click(240 + 58, 380 + 22);
     printf("PASS: map -> store -> the shop opens over it\n");
+
+    // the capsule machine, left in the store
+    pet.coins = 100; pet.capDay = 0; pet.capSpins = 0;
+    uint16_t capsBefore = pet.tally[TALLY_CAPSULE];
+    click(394, 154);
+    click(233, 122 + 52 + 23);             // the store
+    click(80, 250);                        // the machine
+    if (pet.tally[TALLY_CAPSULE] != capsBefore + 1 || pet.capSpins != 1) { printf("FAIL: tapping the machine did not turn a capsule\n"); return 1; }
+    click(240 + 58, 380 + 22);
+    printf("PASS: store -> the capsule machine turns\n");
+
+    // the school: a full math quiz, all right; then 10 minutes of homework
+    pet.sleeping = false; pet.parentBed = 0; pet.parentGames = 0;
+    click(394, 154);
+    click(233, 122 + 4 * 52 + 23);         // row 4: the school
+    if (placeScene != 5) { printf("FAIL: the school row did not open the school\n"); return 1; }
+    click(233, 380 + 22);                  // MATH (middle button)
+    if (schoolMode != 3) { printf("FAIL: MATH did not start the quiz\n"); return 1; }
+    for (int q = 0; q < 10; q++) {
+      click(233 - 110 + quizRight * 110, 280);   // the right answer's tile
+      pump(25);                                  // past the green flash
+    }
+    if (schoolMode != 4 || quizCorrect != 10 || pet.quizHi != 10) { printf("FAIL: ten right answers did not finish a perfect quiz (%u)\n", quizCorrect); return 1; }
+    printf("PASS: school -> math quiz -> 10/10\n");
+    click(343, 380 + 22);                  // BACK: to the room
+    click(123, 380 + 22);                  // STUDY
+    click(123, 280);                       // 10 min
+    if (schoolMode != 2 || !studyEnd) { printf("FAIL: STUDY 10 min did not start the timer\n"); return 1; }
+    uint16_t studyBefore = pet.tally[TALLY_STUDY];
+    studyEnd = 1;                          // the ten minutes are up
+    pump(3);
+    if (pet.tally[TALLY_STUDY] != studyBefore + 1 || studyEnd || schoolMode != 0) { printf("FAIL: the homework timer did not finish\n"); return 1; }
+    click(343, 380 + 22);                  // BACK: out of the school
+    if (placeScene) { printf("FAIL: BACK did not leave the school\n"); return 1; }
+    printf("PASS: school -> homework -> rewarded when the time is up\n");
+
+    // brushing teeth, from the bath menu
+    pet.teethDay = 0; pet.teethToday = 0;
+    { int bbx, bby; uiButtonAt(2, &bbx, &bby, nullptr); click(bbx, bby); }
+    if (!bathOpen) { printf("FAIL: the bath button did not open the bath menu\n"); return 1; }
+    click(233, 122 + 4 * 52 + 23);         // row 4: BRUSH TEETH
+    if (placeScene != 6 || !teethEnd) { printf("FAIL: BRUSH TEETH did not start brushing\n"); return 1; }
+    uint16_t teethBefore = pet.tally[TALLY_TEETH];
+    teethEnd = 1;                          // two minutes later
+    pump(3);
+    if (pet.tally[TALLY_TEETH] != teethBefore + 1) { printf("FAIL: finishing the brushing did not count\n"); return 1; }
+    click(240 - 64 + 58, 380 + 22);        // BACK
+    if (placeScene) { printf("FAIL: BACK did not leave the bathroom\n"); return 1; }
+    printf("PASS: bath -> brush teeth -> counted\n");
+
+    // trophies from the purse; a backdrop from the shop
+    click(366, 72);
+    click(233, 76 + 78 + 3 * 58 + 25);     // hub row 3: TROPHIES
+    if (!trophyOpen) { printf("FAIL: TROPHIES did not open the list\n"); return 1; }
+    click(20, 233);
+    if (trophyOpen) { printf("FAIL: tapping outside did not close the trophies\n"); return 1; }
+    pet.coins = 1000; pet.sceneryOwned = 0; pet.sceneryPick = -1;
+    click(366, 72);
+    click(233, 76 + 78 + 25);              // SHOP
+    click(233, 76 + 52 + 5 * 44 + 20);     // category 5: SCENERY
+    if (shopCat != 5) { printf("FAIL: SCENERY did not open (cat %d)\n", shopCat); return 1; }
+    click(233, 146 + 54 + 24);             // row 1: the beach
+    click(163, 307);                       // BUY
+    if (!pet.ownsScenery(1)) { printf("FAIL: the beach was not bought\n"); return 1; }
+    click(20, 233); click(20, 233);
+    printf("PASS: purse -> trophies; shop -> scenery -> the beach\n");
+
+    // the parents' page: a bedtime that stops the games
+    openClock();
+    settingsPage = 4;                      // SET_PARENT
+    click(233, 130 + 32);                  // bedtime row: OFF -> 19:00
+    if (pet.parentBed != 19) { printf("FAIL: the bedtime row did not set 19:00 (%u)\n", pet.parentBed); return 1; }
+    clockOpen = false;
+    uint32_t seen = pet.lastSeenEpoch;
+    pet.lastSeenEpoch = (seen / 86400) * 86400 + 20 * 3600;
+    bool blocked = fpBlockedBySick();
+    pet.lastSeenEpoch = seen; pet.parentBed = 0;
+    if (!blocked) { printf("FAIL: past the bedtime the games should be refused\n"); return 1; }
+    printf("PASS: settings -> parents -> bedtime refuses games\n");
+    pump(90);                              // let the toast go
     g_seed = seedBefore;
   }
 
