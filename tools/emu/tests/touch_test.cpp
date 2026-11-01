@@ -7,6 +7,7 @@
 #include "Arduino_GFX_Library.h"
 #include "Preferences.h"
 #include "pet.h"
+#include "audio.h"
 #include "party.h"
 #include "moves.h"
 #include "battle.h"
@@ -669,6 +670,31 @@ int main(int argc, char **argv) {
       click(233, 233);
       if (mailOpen) { printf("FAIL: a tap did not fold the letter away\n"); return 1; }
       printf("PASS: purse -> mail -> a letter\n");
+
+      // the album: from the diary, PHOTO snaps the main screen into it
+      extern bool albumOpen, diaryOpen, photoPending;
+      uint8_t albumCount(); uint8_t audioMusicNow();
+      uint8_t photos = albumCount();
+      click(366, 72);
+      click(311, 292);                       // DIARY
+      click(343, 107);                       // ALBUM
+      if (!albumOpen) { printf("FAIL: ALBUM did not open the album\n"); return 1; }
+      click(233, 400);                       // PHOTO
+      if (albumOpen || diaryOpen) { printf("FAIL: PHOTO did not go back to the pet\n"); return 1; }
+      pump(6);
+      if (albumCount() != photos + 1 || photoPending) { printf("FAIL: the photo was not saved (%u)\n", albumCount()); return 1; }
+      printf("PASS: diary -> album -> photo saved\n");
+      pump(90);
+
+      // each place has its tune; leaving it goes quiet
+      click(394, 154);
+      click(155, 154);                       // the park
+      pump(2);
+      if (audioMusicNow() != MUS_TWINKLE) { printf("FAIL: the park did not play its tune (%u)\n", audioMusicNow()); return 1; }
+      click(240 + 58, 380 + 22);             // BACK
+      pump(2);
+      if (audioMusicNow() != MUS_NONE) { printf("FAIL: leaving the park did not stop its tune\n"); return 1; }
+      printf("PASS: the park plays its tune, and stops on the way out\n");
     }
     g_seed = seedBefore;
   }

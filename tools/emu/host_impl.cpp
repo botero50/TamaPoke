@@ -154,6 +154,7 @@ const LinkNowStats &linkNowStats() { return gNoStats; }
 // audio is silent here, but the sketch calls these, so they have to exist
 static uint8_t g_emuVol = 50, g_emuMusic = 0;
 void audioMusic(uint8_t id) { g_emuMusic = id; }
+uint8_t audioMusicNow() { return g_emuMusic; }
 void audioSetVolume(uint8_t v) { g_emuVol = v > 100 ? 100 : v; }
 void audioSaveVolume() {}
 uint8_t audioVolume() { return g_emuVol; }
@@ -165,3 +166,23 @@ bool audioEnabled() { return true; }
 static int g_resetReason = ESP_RST_POWERON;
 esp_reset_reason_t emuResetReason() { return g_resetReason; }
 void emuSetResetReason(int r) { g_resetReason = r; }
+
+// the photo album, kept in memory: the same newest-first order as on the card
+#include <vector>
+static std::vector<std::vector<uint16_t>> g_album;
+bool albumSave(const uint16_t *fb) {
+  if (!fb) return false;
+  std::vector<uint16_t> ph(ALBUM_W * ALBUM_W);
+  for (int y = 0; y < ALBUM_W; y++) for (int x = 0; x < ALBUM_W; x++) ph[y * ALBUM_W + x] = fb[(y * 2) * 466 + x * 2];
+  g_album.push_back(ph);
+  if (g_album.size() > ALBUM_MAX) g_album.erase(g_album.begin());
+  return true;
+}
+uint8_t albumCount() { return (uint8_t)g_album.size(); }
+bool albumLoad(uint8_t newest, uint16_t *out) {
+  if (newest >= g_album.size() || !out) return false;
+  const std::vector<uint16_t> &ph = g_album[g_album.size() - 1 - newest];
+  for (size_t i = 0; i < ph.size(); i++) out[i] = ph[i];
+  return true;
+}
+uint16_t *albumBuffer() { static std::vector<uint16_t> b(ALBUM_W * ALBUM_W); return b.data(); }
