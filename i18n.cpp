@@ -61,7 +61,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // bath and sleep menus
     "BANO", "DUCHA RAPIDA", "BANO DE BURBUJAS", "FROTAR", "CEPILLAR", "Frota las manchas!", "Reluciente!", "Necesitas jabon", "Compra un cepillo", "DORMIR", "A DORMIR", "SIESTA 30 MIN", "NANA", "CUIDADO", "JABON", "CEPILLO",
     // places, garden, seasonal gifts
-    "SALIR", "PARQUE", "CENTRO POKEMON", "HUERTO", "PASEAR", "ENTRAR", "VOLVER", "CURAR", "Gratis hoy", "Esta como nuevo!", "Encontro %u monedas!", "Encontro una baya!", "Un %s te saluda!", "Que paseo tan bonito", "Esta muy cansado", "PLANTAR", "COSECHAR", "Compra semillas", "Creciendo... %u%%", "SEMILLA", "Cosechaste: %s", "Regalo de Halloween!", "Regalo de Navidad!", "Feliz Ano Nuevo!", "Regalo de San Valentin!", },
+    "SALIR", "PARQUE", "CENTRO POKEMON", "HUERTO", "PASEAR", "ENTRAR", "VOLVER", "CURAR", "Gratis hoy", "Esta como nuevo!", "Encontro %u monedas!", "Encontro una baya!", "Un %s te saluda!", "Que paseo tan bonito", "Esta muy cansado", "PLANTAR", "COSECHAR", "Compra semillas", "Creciendo... %u%%", "SEMILLA", "Cosechaste: %s", "Regalo de Halloween!", "Regalo de Navidad!", "Feliz Ano Nuevo!", "Regalo de San Valentin!",
+    // capsules, scenery, trophies, teeth, school, quiz, parents, talk
+    "FONDOS", "PRADERA", "PLAYA", "BOSQUE", "VOLCAN", "MONTANA", "NIEVE", "CEMENTERIO", "TROFEOS", "Nuevo trofeo! +10", "100 comidas", "50 juegos", "30 banos", "25 paseos", "5 cosechas", "1000 monedas", "5 sombreros", "6 adornos", "7 dias seguidos", "Nivel 20", "10 tareas", "14 cepilladas", "Examen perfecto", "10 capsulas", "CAPSULA", "Quedan %u hoy", "Salio: %s!", "Salieron 2 jabones!", "Salieron 2 semillas!", "Salieron %u monedas!", "Vuelve manana", "LAVAR DIENTES", "Dientes limpios!", "Ya se lavo 2 veces hoy", "Toca para cepillar", "ESCUELA", "ESTUDIAR", "MATES", "Cuanto tiempo?", "%u min", "Estudiando...", "Buen trabajo! +%u", "Buen trabajo!", "PARAR", "%u de 10!", "PADRES", "Hora de dormir", "Juegos al dia", "NO", "Toca para cambiar", "Es hora de dormir", "Basta de juegos por hoy", "Tengo hambre!", "Quiero un bano", "Tengo sueno...", "Me siento mal...", "Juguemos!", "Esta lloviendo!", "Esta nevando!", "El huerto esta listo!", "Te quiero!", "Que buen dia!", "Estudiamos?", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -117,7 +119,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // bath and sleep menus
     "BATH", "QUICK WASH", "BUBBLE BATH", "SCRUB", "BRUSH", "Rub the dirt off!", "Squeaky clean!", "You need soap", "Buy a brush first", "SLEEP", "BEDTIME", "30 MIN NAP", "LULLABY", "CARE", "SOAP", "BRUSH",
     // places, garden, seasonal gifts
-    "GO OUT", "PARK", "POKEMON CENTER", "GARDEN", "WALK", "GO IN", "BACK", "HEAL", "Free today", "Good as new!", "It found %u coins!", "It found a berry!", "A wild %s says hi!", "What a nice walk", "Too tired", "PLANT", "HARVEST", "Buy some seeds", "Growing... %u%%", "SEED", "You picked: %s", "A Halloween gift!", "A Christmas gift!", "Happy New Year!", "A Valentine gift!", },
+    "GO OUT", "PARK", "POKEMON CENTER", "GARDEN", "WALK", "GO IN", "BACK", "HEAL", "Free today", "Good as new!", "It found %u coins!", "It found a berry!", "A wild %s says hi!", "What a nice walk", "Too tired", "PLANT", "HARVEST", "Buy some seeds", "Growing... %u%%", "SEED", "You picked: %s", "A Halloween gift!", "A Christmas gift!", "Happy New Year!", "A Valentine gift!",
+    // capsules, scenery, trophies, teeth, school, quiz, parents, talk
+    "SCENERY", "MEADOW", "BEACH", "FOREST", "VOLCANO", "MOUNTAIN", "SNOW", "GRAVEYARD", "TROPHIES", "New trophy! +10", "100 meals", "50 games", "30 baths", "25 walks", "5 harvests", "1000 coins", "5 hats", "6 decorations", "7-day streak", "Level 20", "10 study times", "14 brushings", "Perfect quiz", "10 capsules", "CAPSULE", "%u left today", "You got: %s!", "2 soaps!", "2 seeds!", "%u coins!", "Come back tomorrow", "BRUSH TEETH", "Sparkly teeth!", "Already brushed twice today", "Tap to brush", "SCHOOL", "STUDY", "MATH", "How long?", "%u min", "Studying...", "Great work! +%u", "Great work!", "STOP", "%u out of 10!", "PARENTS", "Bedtime", "Games a day", "OFF", "Tap to change", "It's bedtime", "Enough games for today", "I'm hungry!", "I need a bath", "I'm sleepy...", "I don't feel well...", "Let's play!", "It's raining!", "It's snowing!", "The garden is ready!", "I love you!", "What a great day!", "Shall we study?", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -172,7 +176,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // bath and sleep menus
     "BAIN", "DOUCHE", "BAIN MOUSSANT", "FROTTER", "BROSSER", "Frotte les taches !", "Tout propre !", "Il faut du savon", "Achete une brosse", "DODO", "AU LIT", "SIESTE 30 MIN", "BERCEUSE", "SOINS", "SAVON", "BROSSE",
     // places, garden, seasonal gifts
-    "SORTIR", "PARC", "CENTRE POKEMON", "POTAGER", "PROMENER", "ENTRER", "RETOUR", "SOIGNER", "Gratuit aujourd hui", "Comme neuf !", "Il a trouve %u pieces !", "Il a trouve une baie !", "Un %s dit bonjour !", "Belle promenade", "Trop fatigue", "PLANTER", "RECOLTER", "Achete des graines", "Ca pousse... %u%%", "GRAINE", "Recolte: %s", "Cadeau d Halloween !", "Cadeau de Noel !", "Bonne annee !", "Cadeau de la St-Valentin !", },
+    "SORTIR", "PARC", "CENTRE POKEMON", "POTAGER", "PROMENER", "ENTRER", "RETOUR", "SOIGNER", "Gratuit aujourd hui", "Comme neuf !", "Il a trouve %u pieces !", "Il a trouve une baie !", "Un %s dit bonjour !", "Belle promenade", "Trop fatigue", "PLANTER", "RECOLTER", "Achete des graines", "Ca pousse... %u%%", "GRAINE", "Recolte: %s", "Cadeau d Halloween !", "Cadeau de Noel !", "Bonne annee !", "Cadeau de la St-Valentin !",
+    // capsules, scenery, trophies, teeth, school, quiz, parents, talk
+    "DECORS", "PRAIRIE", "PLAGE", "FORET", "VOLCAN", "MONTAGNE", "NEIGE", "CIMETIERE", "TROPHEES", "Nouveau trophee ! +10", "100 repas", "50 jeux", "30 bains", "25 promenades", "5 recoltes", "1000 pieces", "5 chapeaux", "6 decorations", "7 jours de suite", "Niveau 20", "10 devoirs", "14 brossages", "Quiz parfait", "10 capsules", "CAPSULE", "Encore %u aujourd hui", "Tu as eu : %s !", "2 savons !", "2 graines !", "%u pieces !", "Reviens demain", "BROSSER LES DENTS", "Dents toutes propres !", "Deja brosse 2 fois", "Touche pour brosser", "ECOLE", "ETUDIER", "MATHS", "Combien de temps ?", "%u min", "Au travail...", "Bravo ! +%u", "Bravo !", "ARRETER", "%u sur 10 !", "PARENTS", "Coucher", "Jeux par jour", "NON", "Touche pour changer", "C'est l'heure de dormir", "Assez joue aujourd hui", "J'ai faim !", "Je veux un bain", "J'ai sommeil...", "Je me sens mal...", "On joue ?", "Il pleut !", "Il neige !", "Le potager est pret !", "Je t'aime !", "Quelle belle journee !", "On etudie ?", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -227,7 +233,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // bath and sleep menus
     "BAD", "DUSCHE", "SCHAUMBAD", "SCHRUBBEN", "BUERSTEN", "Reib den Dreck weg!", "Blitzsauber!", "Du brauchst Seife", "Kauf eine Buerste", "SCHLAFEN", "INS BETT", "NICKERCHEN 30 MIN", "SCHLAFLIED", "PFLEGE", "SEIFE", "BUERSTE",
     // places, garden, seasonal gifts
-    "AUSGEHEN", "PARK", "POKEMON-CENTER", "GARTEN", "SPAZIEREN", "REINGEHEN", "ZURUECK", "HEILEN", "Heute gratis", "Wie neu!", "%u Muenzen gefunden!", "Eine Beere gefunden!", "Ein %s sagt hallo!", "Schoener Spaziergang", "Zu muede", "PFLANZEN", "ERNTEN", "Kauf Samen", "Waechst... %u%%", "SAMEN", "Geerntet: %s", "Halloween-Geschenk!", "Weihnachtsgeschenk!", "Frohes neues Jahr!", "Valentinsgeschenk!", },
+    "AUSGEHEN", "PARK", "POKEMON-CENTER", "GARTEN", "SPAZIEREN", "REINGEHEN", "ZURUECK", "HEILEN", "Heute gratis", "Wie neu!", "%u Muenzen gefunden!", "Eine Beere gefunden!", "Ein %s sagt hallo!", "Schoener Spaziergang", "Zu muede", "PFLANZEN", "ERNTEN", "Kauf Samen", "Waechst... %u%%", "SAMEN", "Geerntet: %s", "Halloween-Geschenk!", "Weihnachtsgeschenk!", "Frohes neues Jahr!", "Valentinsgeschenk!",
+    // capsules, scenery, trophies, teeth, school, quiz, parents, talk
+    "KULISSEN", "WIESE", "STRAND", "WALD", "VULKAN", "BERG", "SCHNEE", "FRIEDHOF", "TROPHAEEN", "Neue Trophaee! +10", "100 Mahlzeiten", "50 Spiele", "30 Baeder", "25 Spaziergaenge", "5 Ernten", "1000 Muenzen", "5 Huete", "6 Dekos", "7 Tage am Stueck", "Level 20", "10x Lernen", "14x Zaehneputzen", "Perfektes Quiz", "10 Kapseln", "KAPSEL", "Heute noch %u", "Bekommen: %s!", "2 Seifen!", "2 Samen!", "%u Muenzen!", "Komm morgen wieder", "ZAEHNE PUTZEN", "Saubere Zaehne!", "Heute schon 2x geputzt", "Tippen zum Putzen", "SCHULE", "LERNEN", "MATHE", "Wie lange?", "%u Min", "Lernzeit...", "Super gemacht! +%u", "Super gemacht!", "STOPP", "%u von 10!", "ELTERN", "Schlafenszeit", "Spiele am Tag", "AUS", "Tippen zum Aendern", "Schlafenszeit!", "Genug gespielt heute", "Ich hab Hunger!", "Ich will baden", "Ich bin muede...", "Mir gehts nicht gut...", "Lass uns spielen!", "Es regnet!", "Es schneit!", "Der Garten ist reif!", "Hab dich lieb!", "So ein schoener Tag!", "Wollen wir lernen?", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -282,7 +290,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // bath and sleep menus
     "BAGNO", "DOCCIA", "BAGNOSCHIUMA", "STROFINARE", "SPAZZOLARE", "Strofina le macchie!", "Pulitissimo!", "Serve sapone", "Compra una spazzola", "DORMIRE", "A NANNA", "PISOLINO 30 MIN", "NINNA NANNA", "CURA", "SAPONE", "SPAZZOLA",
     // places, garden, seasonal gifts
-    "USCIRE", "PARCO", "CENTRO POKEMON", "ORTO", "PASSEGGIA", "ENTRA", "TORNA", "CURA", "Gratis oggi", "Come nuovo!", "Ha trovato %u monete!", "Ha trovato una bacca!", "Un %s ti saluta!", "Che bella passeggiata", "Troppo stanco", "PIANTA", "RACCOGLI", "Compra semi", "Cresce... %u%%", "SEME", "Raccolto: %s", "Regalo di Halloween!", "Regalo di Natale!", "Buon anno!", "Regalo di San Valentino!", },
+    "USCIRE", "PARCO", "CENTRO POKEMON", "ORTO", "PASSEGGIA", "ENTRA", "TORNA", "CURA", "Gratis oggi", "Come nuovo!", "Ha trovato %u monete!", "Ha trovato una bacca!", "Un %s ti saluta!", "Che bella passeggiata", "Troppo stanco", "PIANTA", "RACCOGLI", "Compra semi", "Cresce... %u%%", "SEME", "Raccolto: %s", "Regalo di Halloween!", "Regalo di Natale!", "Buon anno!", "Regalo di San Valentino!",
+    // capsules, scenery, trophies, teeth, school, quiz, parents, talk
+    "SFONDI", "PRATO", "SPIAGGIA", "FORESTA", "VULCANO", "MONTAGNA", "NEVE", "CIMITERO", "TROFEI", "Nuovo trofeo! +10", "100 pasti", "50 giochi", "30 bagni", "25 passeggiate", "5 raccolti", "1000 monete", "5 cappelli", "6 decorazioni", "7 giorni di fila", "Livello 20", "10 compiti", "14 spazzolate", "Quiz perfetto", "10 capsule", "CAPSULA", "Ancora %u oggi", "Uscito: %s!", "2 saponi!", "2 semi!", "%u monete!", "Torna domani", "LAVARE I DENTI", "Denti pulitissimi!", "Gia lavati 2 volte oggi", "Tocca per spazzolare", "SCUOLA", "STUDIA", "MATE", "Quanto tempo?", "%u min", "Si studia...", "Ottimo lavoro! +%u", "Ottimo lavoro!", "FERMA", "%u su 10!", "GENITORI", "Ora di dormire", "Giochi al giorno", "NO", "Tocca per cambiare", "E ora di dormire", "Basta giochi per oggi", "Ho fame!", "Voglio un bagno", "Ho sonno...", "Non sto bene...", "Giochiamo!", "Piove!", "Nevica!", "L'orto e pronto!", "Ti voglio bene!", "Che bella giornata!", "Studiamo?", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -337,7 +347,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // bath and sleep menus
     "BANHO", "DUCHA RAPIDA", "BANHO DE ESPUMA", "ESFREGAR", "ESCOVAR", "Esfregue a sujeira!", "Limpinho!", "Precisa de sabao", "Compre uma escova", "DORMIR", "HORA DE DORMIR", "SONECA 30 MIN", "CANCAO DE NINAR", "CUIDADOS", "SABAO", "ESCOVA",
     // places, garden, seasonal gifts
-    "SAIR", "PARQUE", "CENTRO POKEMON", "HORTA", "PASSEAR", "ENTRAR", "VOLTAR", "CURAR", "Gratis hoje", "Novinho em folha!", "Achou %u moedas!", "Achou uma baga!", "Um %s diz oi!", "Que passeio bom", "Cansado demais", "PLANTAR", "COLHER", "Compre sementes", "Crescendo... %u%%", "SEMENTE", "Colheu: %s", "Presente de Halloween!", "Presente de Natal!", "Feliz Ano Novo!", "Presente de Namorados!", },
+    "SAIR", "PARQUE", "CENTRO POKEMON", "HORTA", "PASSEAR", "ENTRAR", "VOLTAR", "CURAR", "Gratis hoje", "Novinho em folha!", "Achou %u moedas!", "Achou uma baga!", "Um %s diz oi!", "Que passeio bom", "Cansado demais", "PLANTAR", "COLHER", "Compre sementes", "Crescendo... %u%%", "SEMENTE", "Colheu: %s", "Presente de Halloween!", "Presente de Natal!", "Feliz Ano Novo!", "Presente de Namorados!",
+    // capsules, scenery, trophies, teeth, school, quiz, parents, talk
+    "CENARIOS", "CAMPINA", "PRAIA", "FLORESTA", "VULCAO", "MONTANHA", "NEVE", "CEMITERIO", "TROFEUS", "Novo trofeu! +10", "100 refeicoes", "50 jogos", "30 banhos", "25 passeios", "5 colheitas", "1000 moedas", "5 chapeus", "6 enfeites", "7 dias seguidos", "Nivel 20", "10 licoes", "14 escovadas", "Quiz perfeito", "10 capsulas", "CAPSULA", "Restam %u hoje", "Saiu: %s!", "2 sabonetes!", "2 sementes!", "%u moedas!", "Volte amanha", "ESCOVAR DENTES", "Dentes limpinhos!", "Ja escovou 2 vezes hoje", "Toque para escovar", "ESCOLA", "ESTUDAR", "CONTAS", "Quanto tempo?", "%u min", "Estudando...", "Bom trabalho! +%u", "Bom trabalho!", "PARAR", "%u de 10!", "PAIS", "Hora de dormir", "Jogos por dia", "NAO", "Toque para mudar", "Hora de dormir", "Chega de jogos hoje", "Estou com fome!", "Quero um banho", "Estou com sono...", "Nao me sinto bem...", "Vamos brincar!", "Esta chovendo!", "Esta nevando!", "A horta esta pronta!", "Te amo!", "Que dia bom!", "Vamos estudar?", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -394,7 +406,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // bath and sleep menus
     "洗澡", "冲澡", "泡泡浴", "搓洗", "梳毛", "把脏东西搓掉!", "干干净净!", "需要肥皂", "先买梳子", "睡觉", "去睡觉", "午睡30分钟", "摇篮曲", "护理", "肥皂", "梳子",
     // places, garden, seasonal gifts
-    "出门", "公园", "宝可梦中心", "菜园", "散步", "进去", "回家", "治疗", "今天免费", "完全恢复了!", "找到了%u枚金币!", "找到了树果!", "%s 打招呼!", "散步真开心", "太累了", "种下", "收获", "去买种子", "生长中... %u%%", "种子", "收获了: %s", "万圣节礼物!", "圣诞礼物!", "新年快乐!", "情人节礼物!", },
+    "出门", "公园", "宝可梦中心", "菜园", "散步", "进去", "回家", "治疗", "今天免费", "完全恢复了!", "找到了%u枚金币!", "找到了树果!", "%s 打招呼!", "散步真开心", "太累了", "种下", "收获", "去买种子", "生长中... %u%%", "种子", "收获了: %s", "万圣节礼物!", "圣诞礼物!", "新年快乐!", "情人节礼物!",
+    // capsules, scenery, trophies, teeth, school, quiz, parents, talk
+    "场景", "草原", "海滩", "森林", "火山", "高山", "雪原", "墓地", "奖杯", "新奖杯! +10", "吃饭100次", "游戏50次", "洗澡30次", "散步25次", "收获5次", "1000枚金币", "5顶帽子", "6件装饰", "连续7天", "等级20", "学习10次", "刷牙14次", "测验满分", "扭蛋10次", "扭蛋", "今天还剩%u个", "抽到了: %s!", "2块肥皂!", "2颗种子!", "%u枚金币!", "明天再来", "刷牙", "牙齿亮晶晶!", "今天刷过两次了", "点击刷牙", "学校", "学习", "算术", "学多久?", "%u分钟", "学习中...", "做得好! +%u", "做得好!", "停止", "答对%u题!", "家长", "睡觉时间", "每天游戏", "关", "点击更改", "该睡觉了", "今天玩够了", "我饿了!", "我想洗澡", "我困了...", "我不舒服...", "一起玩吧!", "下雨了!", "下雪了!", "菜园可以收获了!", "我爱你!", "今天真开心!", "我们学习吧?", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -450,7 +464,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // bath and sleep menus
     "목욕", "샤워", "거품 목욕", "문지르기", "빗질", "얼룩을 문질러!", "반짝반짝!", "비누가 필요해요", "빗을 사세요", "잠자기", "재우기", "낮잠 30분", "자장가", "관리", "비누", "빗",
     // places, garden, seasonal gifts
-    "외출", "공원", "포켓몬센터", "텃밭", "산책", "들어가기", "돌아가기", "치료", "오늘 무료", "완전히 회복했어요!", "코인 %u개를 찾았어요!", "열매를 찾았어요!", "%s 인사해요!", "즐거운 산책", "너무 피곤해요", "심기", "수확", "씨앗을 사세요", "자라는 중... %u%%", "씨앗", "수확: %s", "할로윈 선물!", "크리스마스 선물!", "새해 복 많이!", "발렌타인 선물!", },
+    "외출", "공원", "포켓몬센터", "텃밭", "산책", "들어가기", "돌아가기", "치료", "오늘 무료", "완전히 회복했어요!", "코인 %u개를 찾았어요!", "열매를 찾았어요!", "%s 인사해요!", "즐거운 산책", "너무 피곤해요", "심기", "수확", "씨앗을 사세요", "자라는 중... %u%%", "씨앗", "수확: %s", "할로윈 선물!", "크리스마스 선물!", "새해 복 많이!", "발렌타인 선물!",
+    // capsules, scenery, trophies, teeth, school, quiz, parents, talk
+    "배경", "초원", "해변", "숲", "화산", "산", "설원", "묘지", "트로피", "새 트로피! +10", "식사 100번", "게임 50번", "목욕 30번", "산책 25번", "수확 5번", "코인 1000개", "모자 5개", "장식 6개", "7일 연속", "레벨 20", "공부 10번", "양치 14번", "퀴즈 만점", "캡슐 10개", "캡슐", "오늘 %u개 남음", "나왔다: %s!", "비누 2개!", "씨앗 2개!", "코인 %u개!", "내일 다시 와요", "양치하기", "이가 반짝반짝!", "오늘 이미 2번 했어요", "눌러서 양치", "학교", "공부", "수학", "얼마나 할까요?", "%u분", "공부 중...", "잘했어요! +%u", "잘했어요!", "그만", "10개 중 %u개!", "부모님", "잠잘 시간", "하루 게임", "끔", "눌러서 변경", "잘 시간이에요", "오늘은 충분히 놀았어요", "배고파요!", "목욕하고 싶어요", "졸려요...", "몸이 안 좋아요...", "놀자!", "비가 와요!", "눈이 와요!", "텃밭이 다 자랐어요!", "사랑해요!", "정말 좋은 날!", "공부할까요?", },
 };
 
 // Medal names in their three lengths [language][medal].
