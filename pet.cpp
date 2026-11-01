@@ -182,6 +182,8 @@ void Pet::tick() {
   }
 
   applyAutoSleep();   // put down at 21:00 still goes to bed at 22:00
+  wishTick();
+  if (isLonely() && ageMinutes % 2 == 0) joy = dropTo(joy, 1, 20);   // lonely: it misses you
 
 
   // sleep is rest: energy recovers and needs fall MUCH
@@ -573,6 +575,7 @@ void Pet::setStepsToday(uint32_t n) {
 // first care of the day: advances the streak and strengthens the bond
 void Pet::registerCare() {
   if (isEgg() || ceremony != CER_NONE) return;
+  if (lastSeenEpoch) lastCareEpoch = lastSeenEpoch;   // not lonely any more
   uint32_t d = today();
   if (d == 0 || d == lastCareDay) return;  // no clock, or already counted today
   if (lastCareDay == 0 || d == lastCareDay + 1) {
@@ -990,6 +993,8 @@ void Pet::release() {
 
 void Pet::hatch() {
   speciesId = eggTarget;
+  bornDay = today();             // its birthday: a party every month from now
+  wishKind = WISH_NONE;
   shiny = eggShiny;
   // the individual's IVs (each raising is unique). They are rolled BEFORE resetting the
   // bond on purpose: the careBonus that pushes them is the previous creature's.
@@ -1232,6 +1237,10 @@ const MiniReward MINI_REWARDS[MINI_COUNT] = {
   { 3, 1, 15,   1,    MINI_STAT_SPE,  3, 12,   8, 2,  0, 0,  2,  8 },  // ROPE
   { 6, 2, 30,   3,    MINI_NO_STAT,   1,  0,   6, 3,  0, 0,  1,  8 },  // DANCE
   { 4, 2, 20,   2,    MINI_NO_STAT,   1,  0,   3, 4,  0, 0,  0,  5 },  // HIDE
+  { 4, 1, 16,   1,    MINI_STAT_DEF,  2, 10,   3, 4,  0, 0,  0,  8 },  // MEMORY
+  { 4, 2, 18,   1,    MINI_STAT_DEF,  1, 10,   3, 4,  0, 0,  0,  6 },  // SIMON
+  { 3, 1, 15,   1,    MINI_STAT_SPE,  2, 10,   5, 3,  0, 0,  1,  8 },  // FLAPPY
+  { 3, 2, 15,   1,    MINI_STAT_ATK,  1, 10,   4, 3,  0, 0,  1,  4 },  // MAZE
 };
 }
 
@@ -1476,6 +1485,9 @@ void Pet::notePlayedGame(uint8_t cat, uint16_t score) {
   earnCoins(c > COIN_GAME_MAX ? COIN_GAME_MAX : c, true);
   noteMission(MIS_PLAY, 1);
   bumpTally(TALLY_GAMES);
+  grantWish(WISH_PLAY);
+  if (personality() == PERS_PLAYFUL) joy = clamp100(joy + 2);
+  if (isExcited()) joy = clamp100(joy + 2);   // a great day: everything is more fun
   if (gamesToday < 255) gamesToday++;
   if (cat == (uint8_t)MINI_STAT_ATK) noteMission(MIS_TRAIN_ATK, 1);
   else if (cat == (uint8_t)MINI_STAT_SPE) noteMission(MIS_TRAIN_SPE, 1);
@@ -1487,14 +1499,15 @@ void Pet::notePlayedGame(uint8_t cat, uint16_t score) {
 
 uint16_t Pet::hatPrice(uint8_t h) {
   // About a day of good play for the simple ones, most of a week for the crown.
-  static const uint16_t PRICE[HAT_COUNT] = { 80, 80, 100, 120, 150, 150, 200, 200, 300, 500 };
+  static const uint16_t PRICE[HAT_COUNT] = { 80, 80, 100, 120, 150, 150, 200, 200, 300, 500,
+                                             90, 150, 100, 110, 160, 140, 120, 130, 90, 220 };
   return h < HAT_COUNT ? PRICE[h] : 0;
 }
 
 bool Pet::buyHat(uint8_t h) {
   if (h >= HAT_COUNT || ownsHat(h)) return false;
   if (!spendCoins(hatPrice(h))) return false;
-  hatsOwned |= (uint16_t)(1 << h);
+  hatsOwned |= 1UL << h;
   save();
   return true;
 }
@@ -1578,6 +1591,8 @@ bool Pet::eatFood(uint8_t f) {
   if (fullness >= 90 && fi.food > 0) noteOverfeed(fi.sweet ? 2 : 1);   // already full: a binge
   bumpTally(TALLY_MEALS);
   if (f >= FOOD_SHOP_COUNT) addBond(2);   // home-cooked
+  grantWish(WISH_FOOD, f);
+  if (personality() == PERS_HUNGRY && fi.food > 0) fullness = clamp100(fullness + 5);   // a big eater
   fullness = clamp100(fullness + fi.food);
   joy = clamp100(joy + fi.joy);
   energy = clamp100(energy + fi.energy);
@@ -1664,6 +1679,7 @@ ParkResult Pet::parkWalk() {
   if (isEgg() || sleeping || ceremony != CER_NONE || energy < 15) return PARK_TIRED;
   energy = dropTo(energy, PARK_WALK_ENERGY, 5);
   bumpTally(TALLY_WALKS);
+  grantWish(WISH_PARK);
   joy = clamp100(joy + 3);
   registerCare();
   if (parkDay != today()) { parkDay = today(); parkFinds = 0; }
@@ -1763,7 +1779,7 @@ CapsuleResult Pet::spinCapsule() {
       uint8_t pick = free[random(n)];
       diaryFlag(DF_RARE);
       if (pick >= 100) { decorOwned |= 1 << (pick - 100); capWhat = pick - 100; res = CAP_DECOR; }
-      else { hatsOwned |= 1 << pick; capWhat = pick; res = CAP_HAT; }
+      else { hatsOwned |= 1UL << pick; capWhat = pick; res = CAP_HAT; }
     } else {                                             // owns everything: a big coin prize
       capWhat = 50; earnCoins(50, false); res = CAP_COINS;
     }
@@ -1790,7 +1806,7 @@ CapsuleResult Pet::spinCapsule() {
 
 uint16_t Pet::sceneryPrice(uint8_t b) {
   // meadow, beach, forest, volcano, mountain, snow, graveyard
-  static const uint16_t PRICE[SCENERY_COUNT] = { 100, 120, 120, 180, 150, 150, 200 };
+  static const uint16_t PRICE[SCENERY_COUNT] = { 100, 120, 120, 180, 150, 150, 200, 0 };   // the room is free
   return PRICE[b % SCENERY_COUNT];
 }
 
@@ -1806,6 +1822,154 @@ void Pet::pickScenery(int8_t b) {
   if (b >= 0 && !ownsScenery((uint8_t)b)) return;
   sceneryPick = (b == sceneryPick) ? -1 : b;
   save();
+}
+
+// ---------- the room ----------
+
+uint16_t Pet::furnPrice(uint8_t f) {
+  static const uint16_t PRICE[FURN_COUNT] = {
+    60, 50, 70, 60,              // window, clock, painting, shelf
+    120, 150, 180, 100, 160,     // sofa, TV, aquarium, bookcase, fireplace
+    50,                          // rug
+    40, 40, 40,                  // wallpapers
+  };
+  return PRICE[f % FURN_COUNT];
+}
+
+bool Pet::buyFurn(uint8_t f) {
+  if (f >= FURN_COUNT || ownsFurn(f)) return false;
+  if (!spendCoins(furnPrice(f))) return false;
+  furnOwned |= 1 << f;
+  save();
+  return true;
+}
+
+bool Pet::furnPlaced(uint8_t f) const {
+  if (f == FURN_RUG) return rugOn;
+  if (f >= FURN_PAPER_BLUE) return wallpaper == (int8_t)f;
+  return furnWallL == (int8_t)f || furnWallR == (int8_t)f || furnBackL == (int8_t)f || furnBackR == (int8_t)f;
+}
+
+void Pet::placeFurn(uint8_t f) {
+  if (!ownsFurn(f)) return;
+  int8_t v = (int8_t)f;
+  if (f == FURN_RUG) rugOn = !rugOn;
+  else if (f >= FURN_PAPER_BLUE) wallpaper = (wallpaper == v) ? -1 : v;
+  else {
+    bool wall = f <= FURN_WALL_LAST;
+    int8_t &a = wall ? furnWallL : furnBackL, &b = wall ? furnWallR : furnBackR;
+    if (a == v) a = -1;                    // out again
+    else if (b == v) b = -1;
+    else if (a < 0) a = v;                 // the first free spot
+    else if (b < 0) b = v;
+    else a = v;                            // both taken: it replaces the left one
+  }
+  if (furnPlaced(f)) sceneryPick = SCENERY_ROOM;   // furniture belongs in the room: go and see it
+  save();
+}
+
+// ---------- wishes, moods, birthdays, events ----------
+
+void Pet::wishTick() {
+  if (isEgg() || sleeping || !lastSeenEpoch) return;
+  if (!bornDay) bornDay = today();               // a save from before birthdays: counting starts now
+  if (!lastCareEpoch) lastCareEpoch = lastSeenEpoch;
+  if (wishKind && lastSeenEpoch >= wishUntil) { wishKind = WISH_NONE; pendingSave = true; }   // it forgot about it
+  if (wishKind) return;
+  if (wishDay != today()) { wishDay = today(); wishesToday = 0; }
+  if (wishesToday >= WISHES_PER_DAY || lastSeenEpoch < wishNextAt) return;
+  if (random(100) >= 4) return;                  // about once in 25 minutes when it may
+  // what it asks for leans on who it is
+  static const uint8_t LEAN[PERS_COUNT][4] = {
+    { WISH_PLAY, WISH_PLAY, WISH_PARK, WISH_FISH },   // playful
+    { WISH_BATH, WISH_PET, WISH_FOOD, WISH_PET },      // lazy
+    { WISH_FOOD, WISH_FOOD, WISH_FISH, WISH_PLAY },    // hungry
+    { WISH_PET, WISH_PET, WISH_BATH, WISH_PARK },      // shy
+  };
+  wishKind = random(2) ? LEAN[personality()][random(4)] : (uint8_t)(1 + random(WISH_KINDS - 1));
+  wishArg = (uint8_t)random(FOOD_SHOP_COUNT);
+  wishUntil = lastSeenEpoch + WISH_LASTS_SECS;
+  wishNextAt = lastSeenEpoch + WISH_GAP_SECS;
+  wishesToday++;
+  pendingSave = true;
+}
+
+bool Pet::grantWish(uint8_t kind, uint8_t arg) {
+  if (!hasWish() || kind != wishKind) return false;
+  if (kind == WISH_FOOD && arg != wishArg) return false;   // it wanted something else
+  wishKind = WISH_NONE;
+  joy = clamp100(joy + 10);
+  addBond(3);
+  earnCoins(WISH_COINS, false);
+  wishGrantedFlash = true;
+  pendingSave = true;
+  return true;
+}
+
+bool Pet::isExcited() const {
+  return coinDay == today() && missionDone == (1 << MISSIONS_PER_DAY) - 1;
+}
+
+uint8_t Pet::birthdayMonths() const {
+  if (isEgg() || !bornDay) return 0;
+  uint32_t d = today();
+  if (d <= bornDay || (d - bornDay) % BIRTHDAY_DAYS) return 0;
+  uint32_t m = (d - bornDay) / BIRTHDAY_DAYS;
+  return (uint8_t)(m > 255 ? 255 : m);
+}
+
+bool Pet::claimBirthday() {
+  if (!birthdayMonths() || bdayDay == today()) return false;
+  bdayDay = today();
+  if (foodCount[FOOD_CAKE] < FOOD_STACK_MAX) foodCount[FOOD_CAKE]++;
+  earnCoins(20, false);
+  joy = clamp100(joy + 20);
+  addBond(5);
+  save();
+  return true;
+}
+
+// the Anonymous Gregorian algorithm
+void Pet::easterDate(int y, int &m, int &d) {
+  int a = y % 19, b = y / 100, c = y % 100, dd = b / 4, e = b % 4, f = (b + 8) / 25, g = (b - f + 1) / 3;
+  int h = (19 * a + b - dd - g + 15) % 30, i = c / 4, k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  int mm = (a + 11 * h + 22 * l) / 451;
+  m = (h + l - 7 * mm + 114) / 31;
+  d = ((h + l - 7 * mm + 114) % 31) + 1;
+}
+
+EventId Pet::eventToday() const {
+  uint32_t t = today();
+  if (!t) return EVENT_NONE;
+  int y, m, d;
+  civilDate(t, y, m, d);
+  if (m == 7) return EVENT_SUMMER;
+  int em, ed;
+  easterDate(y, em, ed);
+  // a week of egg hunting, from three days before Easter Sunday
+  int doy = (m - 1) * 31 + d, edoy = (em - 1) * 31 + ed;
+  if (doy >= edoy - 3 && doy <= edoy + 3) return EVENT_EASTER;
+  return EVENT_NONE;
+}
+
+bool Pet::findEasterEgg() {
+  if (eventToday() != EVENT_EASTER) return false;
+  if (eggDay != today()) { eggDay = today(); eggsFound = 0; }
+  if (eggsFound >= EASTER_EGGS_PER_DAY || random(100) >= 40) return false;
+  eggsFound++;
+  earnCoins(5, false);
+  if (foodCount[FOOD_COOKIE] < FOOD_STACK_MAX) foodCount[FOOD_COOKIE]++;   // a chocolate treat inside
+  save();
+  return true;
+}
+
+bool Pet::claimFestivalTreat() {
+  if (eventToday() != EVENT_SUMMER || festDay == today()) return false;
+  festDay = today();
+  if (foodCount[FOOD_ICECREAM] < FOOD_STACK_MAX) foodCount[FOOD_ICECREAM]++;
+  joy = clamp100(joy + 5);
+  save();
+  return true;
 }
 
 // ---------- trophies ----------
@@ -1841,7 +2005,7 @@ void Pet::trophyProgress(uint8_t t, uint32_t &cur, uint32_t &goal) const {
     case TRO_WALKS:   cur = tally[TALLY_WALKS];   goal = 25;  break;
     case TRO_HARVEST: cur = tally[TALLY_HARVEST]; goal = 5;   break;
     case TRO_COINS:   cur = coinsEarned;          goal = 1000; break;
-    case TRO_HATS:    cur = bitCount16(hatsOwned); goal = 5;  break;
+    case TRO_HATS:    cur = bitCount16((uint16_t)hatsOwned) + bitCount16((uint16_t)(hatsOwned >> 16)); goal = 5;  break;
     case TRO_DECOR:   cur = bitCount16(decorOwned); goal = 6; break;
     case TRO_STREAK:  cur = bestStreak > streak ? bestStreak : streak; goal = 7; break;
     case TRO_LEVEL:   cur = isEgg() ? 0 : level(); goal = 20; break;
@@ -1972,6 +2136,7 @@ FishResult Pet::fishCatch() {
   bool pays = fishToday < FISH_PER_DAY;
   if (fishToday < 255) fishToday++;
   bumpTally(TALLY_FISH);
+  grantWish(WISH_FISH);
   joy = clamp100(joy + 2);
   registerCare();
   int k = random(100);
@@ -2121,8 +2286,8 @@ GiftKind Pet::claimHolidayGift() {
   giftDay = today();
   switch (g) {
     case GIFT_HALLOWEEN: if (!ownsDecor(DEC_PUMPKIN)) decorOwned |= 1 << DEC_PUMPKIN; else earnCoins(20, false); break;
-    case GIFT_CHRISTMAS: if (!ownsHat(HAT_SANTA)) hatsOwned |= 1 << HAT_SANTA; else earnCoins(20, false); break;
-    case GIFT_NEWYEAR:   if (!ownsHat(HAT_PARTY)) hatsOwned |= 1 << HAT_PARTY; else earnCoins(20, false); break;
+    case GIFT_CHRISTMAS: if (!ownsHat(HAT_SANTA)) hatsOwned |= 1UL << HAT_SANTA; else earnCoins(20, false); break;
+    case GIFT_NEWYEAR:   if (!ownsHat(HAT_PARTY)) hatsOwned |= 1UL << HAT_PARTY; else earnCoins(20, false); break;
     case GIFT_VALENTINE: if (!ownsDecor(DEC_FLOWERS)) decorOwned |= 1 << DEC_FLOWERS; else earnCoins(20, false); break;
     default: break;
   }
@@ -2239,6 +2404,7 @@ void Pet::clean() {
   if (sickness == SICK_COLD && sickDoses >= 2) { sickness = SICK_NONE; sickTicks = 0; sickDoses = 0; }
   noteMission(MIS_BATH, 1);
   bumpTally(TALLY_BATHS);
+  grantWish(WISH_BATH);
   earnCoins(1, true);
   addBond(1);
   registerCare();
@@ -2254,6 +2420,8 @@ void Pet::caress() {
   registerCare();
   noteMission(MIS_PET, 1);
   earnCoins(1, true);
+  grantWish(WISH_PET);
+  if (personality() == PERS_SHY) addBond(1);   // a shy one treasures a cuddle
 }
 
 void Pet::eggTap() {
@@ -2353,7 +2521,8 @@ void Pet::save() {
   prefs.putUChar("msdon", missionDone);
   prefs.putUInt("bedd", bedtimeDay);
   // hats
-  prefs.putUShort("hats", hatsOwned);
+  prefs.putUShort("hats", (uint16_t)hatsOwned);
+  prefs.putUShort("hatsX", (uint16_t)(hatsOwned >> 16));   // the phase 13 hats
   prefs.putChar("hton", hatOn);
   prefs.putChar("htdx", hatDx);
   prefs.putChar("htdy", hatDy);
@@ -2403,6 +2572,25 @@ void Pet::save() {
   prefs.putUInt("pigD", piggyDay);
   prefs.putBytes("diary", diary, sizeof(diary));
   prefs.putUInt("dcb", diaryCoinBase);
+  prefs.putUShort("furn", furnOwned);
+  prefs.putChar("fwL", furnWallL);
+  prefs.putChar("fwR", furnWallR);
+  prefs.putChar("fbL", furnBackL);
+  prefs.putChar("fbR", furnBackR);
+  prefs.putBool("frug", rugOn);
+  prefs.putChar("fpap", wallpaper);
+  prefs.putUChar("wsK", wishKind);
+  prefs.putUChar("wsA", wishArg);
+  prefs.putUInt("wsU", wishUntil);
+  prefs.putUInt("wsN", wishNextAt);
+  prefs.putUInt("wsD", wishDay);
+  prefs.putUChar("wsC", wishesToday);
+  prefs.putUInt("lcare", lastCareEpoch);
+  prefs.putUInt("born", bornDay);
+  prefs.putUInt("bday", bdayDay);
+  prefs.putUInt("egd", eggDay);
+  prefs.putUChar("egn", eggsFound);
+  prefs.putUInt("fest", festDay);
 }
 
 void Pet::load() {
@@ -2505,7 +2693,10 @@ void Pet::load() {
   checkLearnGates();
   // Fun Pack
   memset(miniHi, 0, sizeof(miniHi));
-  if (prefs.getBytesLength("mnhi") == sizeof(miniHi)) prefs.getBytes("mnhi", miniHi, sizeof(miniHi));
+  {
+    size_t n = prefs.getBytesLength("mnhi");   // shorter from before the phase 12 games: those start at 0
+    if (n && n <= sizeof(miniHi) && n % sizeof(miniHi[0]) == 0) prefs.getBytes("mnhi", miniHi, n);
+  }
   sickness = prefs.getUChar("sick", SICK_NONE);
   if (sickness > SICK_COLD) sickness = SICK_NONE;
   sickDoses = prefs.getUChar("sdose", 0);
@@ -2526,7 +2717,7 @@ void Pet::load() {
   if (prefs.getBytesLength("msprg") == sizeof(missionProg)) prefs.getBytes("msprg", missionProg, sizeof(missionProg));
   missionDone = prefs.getUChar("msdon", 0);
   bedtimeDay = prefs.getUInt("bedd", 0);
-  hatsOwned = prefs.getUShort("hats", 0) & ((1 << HAT_COUNT) - 1);
+  hatsOwned = ((uint32_t)prefs.getUShort("hats", 0) | ((uint32_t)prefs.getUShort("hatsX", 0) << 16)) & ((1UL << HAT_COUNT) - 1);
   hatOn = prefs.getChar("hton", -1);
   if (hatOn >= HAT_COUNT || (hatOn >= 0 && !ownsHat((uint8_t)hatOn))) hatOn = -1;
   hatDx = prefs.getChar("htdx", 0);
@@ -2591,6 +2782,27 @@ void Pet::load() {
   piggyDay = prefs.getUInt("pigD", 0);
   if (prefs.getBytesLength("diary") == sizeof(diary)) prefs.getBytes("diary", diary, sizeof(diary));
   diaryCoinBase = prefs.getUInt("dcb", 0);
+  furnOwned = prefs.getUShort("furn", 0) & ((1 << FURN_COUNT) - 1);
+  auto furnSlot = [&](const char *k, int lo, int hi) { int8_t v = prefs.getChar(k, -1); return (int8_t)((v >= lo && v <= hi && ownsFurn(v)) ? v : -1); };
+  furnWallL = furnSlot("fwL", 0, FURN_WALL_LAST);
+  furnWallR = furnSlot("fwR", 0, FURN_WALL_LAST);
+  furnBackL = furnSlot("fbL", FURN_WALL_LAST + 1, FURN_FLOOR_LAST);
+  furnBackR = furnSlot("fbR", FURN_WALL_LAST + 1, FURN_FLOOR_LAST);
+  rugOn = prefs.getBool("frug", false) && ownsFurn(FURN_RUG);
+  wallpaper = furnSlot("fpap", FURN_PAPER_BLUE, FURN_PAPER_MINT);
+  wishKind = prefs.getUChar("wsK", 0);
+  if (wishKind >= WISH_KINDS) wishKind = WISH_NONE;
+  wishArg = prefs.getUChar("wsA", 0) % FOOD_SHOP_COUNT;
+  wishUntil = prefs.getUInt("wsU", 0);
+  wishNextAt = prefs.getUInt("wsN", 0);
+  wishDay = prefs.getUInt("wsD", 0);
+  wishesToday = prefs.getUChar("wsC", 0);
+  lastCareEpoch = prefs.getUInt("lcare", 0);
+  bornDay = prefs.getUInt("born", 0);
+  bdayDay = prefs.getUInt("bday", 0);
+  eggDay = prefs.getUInt("egd", 0);
+  eggsFound = prefs.getUChar("egn", 0);
+  festDay = prefs.getUInt("fest", 0);
   // seeding: the current pet counts as raised (old saves)
   if (speciesId >= 1) registerSpecies(speciesId);
 }

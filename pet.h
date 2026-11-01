@@ -48,6 +48,10 @@ enum MiniGameId : uint8_t {
   MINI_ROPE,     // jump rope
   MINI_DANCE,    // dance
   MINI_HIDE,     // hide and seek
+  MINI_MEMORY,   // find the pairs (phase 12)
+  MINI_SIMON,    // repeat the sequence
+  MINI_FLAPPY,   // fly through the gaps
+  MINI_MAZE,     // tilt maze
   MINI_COUNT
 };
 #define MINI_NO_STAT (-1)
@@ -98,9 +102,11 @@ enum PillResult : uint8_t {
 enum HatId : uint8_t {
   HAT_CAP = 0, HAT_BOW, HAT_FLOWER, HAT_BEANIE, HAT_PARTY,
   HAT_STRAW, HAT_WITCH, HAT_SANTA, HAT_TOPHAT, HAT_CROWN,
+  HAT_CHEF, HAT_PIRATE, HAT_CATEARS, HAT_BUNNY, HAT_HEADPHONES,   // phase 13
+  HAT_GRAD, HAT_WREATH, HAT_HELMET, HAT_BERET, HAT_VIKING,
   HAT_COUNT
 };
-static_assert(HAT_COUNT <= 16, "hatsOwned needs a bit per hat");
+static_assert(HAT_COUNT <= 32, "hatsOwned needs a bit per hat");
 #define HAT_NUDGE_MAX 60     // how far the player may move a hat, px each way
 
 // Toys and decorations, bought in the shop and set down on the main screen's
@@ -154,7 +160,35 @@ enum GiftKind : uint8_t { GIFT_NONE = 0, GIFT_HALLOWEEN, GIFT_CHRISTMAS, GIFT_NE
 enum CapsuleResult : uint8_t { CAP_NO_COINS = 0, CAP_LIMIT, CAP_HAT, CAP_DECOR, CAP_FOOD, CAP_SOAP, CAP_SEED, CAP_COINS };
 // Scenery: the main screen's backdrop. The creature's own biome is free; the
 // others are bought once and picked from the bag. A bit per biome (0..6).
-#define SCENERY_COUNT 7
+#define SCENERY_COUNT 8
+#define SCENERY_ROOM 7           // not a biome: the creature's own room, always owned
+// The room's furniture: wall pieces hang in two spots, floor pieces stand in two
+// spots at the back, the rug lies under the creature, wallpapers recolour the wall.
+// Append at the END: a bit each in NVS.
+enum FurnId : uint8_t {
+  FURN_WINDOW = 0, FURN_CLOCK, FURN_PAINTING, FURN_SHELF,          // wall
+  FURN_SOFA, FURN_TV, FURN_AQUARIUM, FURN_BOOKCASE, FURN_FIREPLACE, // floor
+  FURN_RUG,
+  FURN_PAPER_BLUE, FURN_PAPER_PINK, FURN_PAPER_MINT,                 // wallpapers
+  FURN_COUNT
+};
+#define FURN_WALL_LAST FURN_SHELF
+#define FURN_FLOOR_LAST FURN_FIREPLACE
+static_assert(FURN_COUNT <= 16, "furnOwned needs a bit per piece");
+
+// Wishes: now and then it asks for something; doing it grants the wish.
+enum WishId : uint8_t { WISH_NONE = 0, WISH_FOOD, WISH_PLAY, WISH_PARK, WISH_BATH, WISH_FISH, WISH_PET, WISH_KINDS };
+#define WISHES_PER_DAY 3
+#define WISH_LASTS_SECS (2UL * 3600)
+#define WISH_GAP_SECS (3UL * 3600)       // at least this long between wishes
+#define WISH_COINS 5
+// A personality, from the species and the IVs: the same creature always has the same one.
+enum Personality : uint8_t { PERS_PLAYFUL = 0, PERS_LAZY, PERS_HUNGRY, PERS_SHY, PERS_COUNT };
+#define LONELY_SECS (3UL * 3600)          // awake and nobody cared for it this long
+#define BIRTHDAY_DAYS 30                  // a party every month of its life
+// Seasonal events by the date (besides the one-day holiday gifts).
+enum EventId : uint8_t { EVENT_NONE = 0, EVENT_EASTER, EVENT_SUMMER };
+#define EASTER_EGGS_PER_DAY 5
 // Trophies: lifetime goals, each pays TROPHY_COINS once. Append at the END:
 // a bit each in NVS. The tallies they count are a byte blob, also append-only.
 enum TallyId : uint8_t {
@@ -408,7 +442,7 @@ public:
   uint16_t coinsCapLeft() const;
 
   // Hats. Player-wide: a new egg keeps what was bought (and what is worn).
-  uint16_t hatsOwned = 0;       // bit per HatId
+  uint32_t hatsOwned = 0;       // bit per HatId
   int8_t hatOn = -1;            // the hat being worn, -1 = none
   // Where the player nudged the hat for THIS species: tops differ (BULBASAUR's
   // highest point is its bulb, not its head), so a nudge belongs to a species
@@ -416,7 +450,7 @@ public:
   int8_t hatDx = 0, hatDy = 0;
   int16_t hatDex = 0;
   static uint16_t hatPrice(uint8_t h);
-  bool ownsHat(uint8_t h) const { return h < HAT_COUNT && (hatsOwned & (1 << h)); }
+  bool ownsHat(uint8_t h) const { return h < HAT_COUNT && (hatsOwned & (1UL << h)); }
   bool buyHat(uint8_t h);       // false: unknown, already owned, or not enough coins
   void wearHat(int8_t h);       // -1 takes it off; an unowned hat is ignored
   void nudgeHat(int dx, int dy);
@@ -485,7 +519,40 @@ public:
   uint8_t sceneryOwned = 0;     // bit per biome
   int8_t sceneryPick = -1;      // the backdrop chosen, -1 = the creature's own
   static uint16_t sceneryPrice(uint8_t b);
-  bool ownsScenery(uint8_t b) const { return b < SCENERY_COUNT && (sceneryOwned & (1 << b)); }
+  bool ownsScenery(uint8_t b) const { return b == SCENERY_ROOM || (b < SCENERY_COUNT && (sceneryOwned & (1 << b))); }
+  // the room (phase 13)
+  uint16_t furnOwned = 0;       // bit per FurnId
+  int8_t furnWallL = -1, furnWallR = -1, furnBackL = -1, furnBackR = -1;
+  bool rugOn = false;
+  int8_t wallpaper = -1;        // a FURN_PAPER_*, -1 = plain
+  static uint16_t furnPrice(uint8_t f);
+  bool ownsFurn(uint8_t f) const { return f < FURN_COUNT && (furnOwned & (1 << f)); }
+  bool buyFurn(uint8_t f);
+  bool furnPlaced(uint8_t f) const;
+  void placeFurn(uint8_t f);    // into its spot (or out again); also switches to the room
+
+  // A livelier pet (phase 14).
+  uint8_t wishKind = WISH_NONE, wishArg = 0;   // the wish, and its food for WISH_FOOD
+  uint32_t wishUntil = 0, wishNextAt = 0;      // epochs
+  uint32_t wishDay = 0;
+  uint8_t wishesToday = 0;
+  bool wishGrantedFlash = false;               // the screen shows "wish granted" once
+  void wishTick();                             // from tick(): maybe a new wish, or an old one fades
+  bool grantWish(uint8_t kind, uint8_t arg = 0);   // a care action that may grant the wish
+  bool hasWish() const { return wishKind != WISH_NONE && lastSeenEpoch < wishUntil; }
+  Personality personality() const { return (Personality)((speciesId * 7 + ivAtk + ivSpe) % PERS_COUNT); }
+  uint32_t lastCareEpoch = 0;                  // the last time anyone looked after it
+  bool isLonely() const { return !isEgg() && !sleeping && lastCareEpoch && lastSeenEpoch > lastCareEpoch + LONELY_SECS; }
+  bool isExcited() const;                      // every mission done today
+  uint32_t bornDay = 0, bdayDay = 0;
+  uint8_t birthdayMonths() const;              // 0 unless today is a birthday
+  bool claimBirthday();                        // the party, once on the day
+  EventId eventToday() const;
+  static void easterDate(int year, int &m, int &d);
+  uint32_t eggDay = 0, festDay = 0;
+  uint8_t eggsFound = 0;
+  bool findEasterEgg();                        // a walk in the park during Easter may find one
+  bool claimFestivalTreat();                   // the summer festival: a free ice cream a day
   bool buyScenery(uint8_t b);
   void pickScenery(int8_t b);   // an unowned one is ignored; picking the one in use puts it back
   uint16_t tally[TALLY_COUNT] = { 0 };

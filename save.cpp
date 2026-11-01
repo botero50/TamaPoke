@@ -61,6 +61,13 @@ const SaveField SAVE_FIELDS[] = {
   { "fshn", SK_U8 },    { "alOn", SK_BOOL },  { "alH", SK_U8 },     { "alM", SK_U8 },
   { "alD", SK_U32 },    { "brD", SK_U32 },    { "chrD", SK_U32 },   { "chrB", SK_U8 },
   { "pig", SK_U32 },    { "pigD", SK_U32 },   { "diary", SK_BYTES },{ "dcb", SK_U32 },
+  // more hats, the room
+  { "hatsX", SK_U16 },  { "furn", SK_U16 },   { "fwL", SK_I8 },     { "fwR", SK_I8 },
+  { "fbL", SK_I8 },     { "fbR", SK_I8 },     { "frug", SK_BOOL },  { "fpap", SK_I8 },
+  // wishes, moods, birthdays, events
+  { "wsK", SK_U8 },     { "wsA", SK_U8 },     { "wsU", SK_U32 },    { "wsN", SK_U32 },
+  { "wsD", SK_U32 },    { "wsC", SK_U8 },     { "lcare", SK_U32 },  { "born", SK_U32 },
+  { "bday", SK_U32 },   { "egd", SK_U32 },    { "egn", SK_U8 },     { "fest", SK_U32 },
   // the banked creatures
   { "party", SK_BYTES }, { "box", SK_BYTES },
   // settings, so a restored device plays the way it did
