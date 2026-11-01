@@ -3,7 +3,7 @@
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://botero50.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
-![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.19-8A2BE2)
+![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.20-8A2BE2)
 ![Code](https://img.shields.io/badge/code-MIT-blue)
 ![Languages](https://img.shields.io/badge/languages-8-FFCB05)
 [![Stars](https://img.shields.io/github/stars/botero50/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/botero50/TamaPoke/stargazers)
@@ -58,6 +58,7 @@ This fork (**[botero50/TamaPoke](https://github.com/botero50/TamaPoke)**, branch
 - **Outfits**: glasses, neck pieces and back pieces worn with the hats; full sets.
 - **Town life**: a second map page (beach, library, music hall, contest, arcade,
   jobs), part-time jobs, daily mail, weekly story quests, Halloween and winter.
+- **A photo album** on the SD card, and **music** in the places.
 
 See the sections further down for the rules and the economy numbers.
 
@@ -519,6 +520,14 @@ steps, each on a later day. Finishing it gives a hat not owned yet. **Halloween
 week** (24-31 October) brings pumpkins, a ghost and a daily treat; the **winter
 holidays** (20 December - 6 January) a snowman and hot cocoa. A whole year
 together is a bigger birthday party.
+
+### The photo album and the places' music
+Big moments -- a trophy, a birthday, a finished quest, an evolution -- are photographed
+and kept on the SD card (half size, the last 24, in `/album`). DIARY -> ALBUM shows
+them full screen; PHOTO there takes one of the main screen right away. Each place
+hums its own public-domain tune while you are there: the park *Twinkle, Twinkle*,
+the school *Frere Jacques*, the garden and the lake *Ode to Joy*, the beach *La
+Cucaracha*.
 
 ### The economy, checked
 `economy_test` plays thirty days through the real rules (missions, caps, steps):
