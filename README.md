@@ -3,7 +3,7 @@
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://botero50.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
-![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.7-8A2BE2)
+![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.9-8A2BE2)
 ![Code](https://img.shields.io/badge/code-MIT-blue)
 ![Languages](https://img.shields.io/badge/languages-8-FFCB05)
 [![Stars](https://img.shields.io/github/stars/botero50/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/botero50/TamaPoke/stargazers)
@@ -12,6 +12,8 @@ A gen-1-Pokémon-inspired tamagotchi for the
 **Waveshare ESP32-S3-Touch-AMOLED-1.75** (round 466×466 AMOLED, CO5300 driver
 over QSPI, CST9217 touch over I2C). Raise any of the 386, evolve it, train it
 and complete them all (shinies included).
+
+<p align="center"><img src="docs/funpack/funpack-tour.gif" width="300" alt="A tour of the Fun Pack screens"></p>
 
 ## Install the current public version
 
@@ -37,6 +39,12 @@ This fork (**[botero50/TamaPoke](https://github.com/botero50/TamaPoke)**, branch
   and a real dark room when the light is off.
 - **Places to go**: park walks, the store, the Pokemon Center and a garden that
   grows food in real time; holiday gifts and weather by the date.
+- **A capsule machine, sceneries and trophies**: surprise capsules in the store,
+  seven backdrops to buy for the main screen, and 14 trophies to collect.
+- **The school**: a homework timer (10/20/30 minutes) and a math quiz that gets
+  harder as it goes. **Brushing teeth** for two minutes, twice a day.
+- **It talks**: little speech bubbles when it is hungry, sleepy, dirty, or happy.
+- **Parent settings**: a bedtime after which games stop, and a games-a-day limit.
 
 See the sections further down for the rules and the economy numbers.
 
@@ -386,6 +394,32 @@ pumpkin, Christmas (24-26 Dec) the Santa hat, New Year (1 Jan) the party hat,
 Valentine's (14 Feb) the flowers -- or 20 coins if it is already owned.
 **Weather**: one a day, from the date -- mostly fair, about 1 day in 5 rain (snow
 in December-February). Only the sky changes.
+
+### Capsules, sceneries, trophies (phase 8)
+- **Capsule machine** (in the store, tap it): `30` coins, three a day. About one in
+  ten gives a hat or decoration not owned yet; the rest is food, soap, seeds or
+  10-40 coins back. On average a capsule is worth about its price (`extras_test`).
+- **Scenery** (SHOP -> SCENERY): the seven biome backdrops, 100-200 coins each.
+  Pick one from the bag; pick it again to go back to the creature's own.
+- **Trophies** (purse -> TROPHIES): 14 lifetime goals -- 100 meals, 50 games,
+  30 baths, 25 walks, 5 harvests, 1 000 coins earned, 5 hats, 6 decorations, a
+  7-day streak, level 20, 10 study times, 14 brushings, a perfect quiz and 10
+  capsules. Each pays 10 coins once.
+
+### The school, teeth, talking, parents (phase 9)
+- **School** (map -> SCHOOL): **STUDY** runs a 10, 20 or 30 minute homework timer
+  (the screen may switch off; it chimes at the end) and pays 2/4/6 coins, three
+  sessions a day, outside the daily game cap. **MATH** is a 10-question quiz:
+  sums to 10, then to 20 with take-aways, then bigger numbers, then times tables.
+  It counts as a game.
+- **Brush teeth** (bath menu): a two-minute brush, twice a day; tapping scrubs faster.
+- **Speech bubbles** now and then on the main screen: it says when it is hungry,
+  dirty, sleepy or sick, when the garden is ready, when it rains -- or just that
+  it loves you.
+- **Parents** (settings, swipe down, the fifth page): a bedtime (19:00-22:00)
+  after which games, training and battles are refused until 6:00, and a limit of
+  10/20/30 games a day. Tap a row to change it. It is not locked: it is a
+  reminder for the family, not a security feature.
 
 ### The economy, checked
 `economy_test` plays thirty days through the real rules (missions, caps, steps):
