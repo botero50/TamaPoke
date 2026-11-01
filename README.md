@@ -1,17 +1,44 @@
-# TamaPoke
+# TamaPoke -- Fun Pack
 
-[![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://crenberries428.github.io/TamaPoke/web/)
+[![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://botero50.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
-![Firmware](https://img.shields.io/badge/firmware-v3.14-8A2BE2)
+![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.7-8A2BE2)
 ![Code](https://img.shields.io/badge/code-MIT-blue)
 ![Languages](https://img.shields.io/badge/languages-8-FFCB05)
-[![Stars](https://img.shields.io/github/stars/crenberries428/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/crenberries428/TamaPoke/stargazers)
+[![Stars](https://img.shields.io/github/stars/botero50/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/botero50/TamaPoke/stargazers)
 
 A gen-1-Pokémon-inspired tamagotchi for the
 **Waveshare ESP32-S3-Touch-AMOLED-1.75** (round 466×466 AMOLED, CO5300 driver
 over QSPI, CST9217 touch over I2C). Raise any of the 386, evolve it, train it
 and complete them all (shinies included).
+
+## Install the current public version
+
+1. Open the web installer in **Chrome or Edge** on a computer:
+   **https://botero50.github.io/TamaPoke/web/**
+2. Plug the ball in with a USB-C data cable and press **Install TamaPoke**.
+   Leave **"Erase device" unticked** to keep the pet you already have.
+3. First time only: load the sprites (Kanto is enough to start), then restart.
+
+No Arduino and no drivers needed. Everything here is free and open source (MIT).
+
+## What the Fun Pack adds
+
+This fork (**[botero50/TamaPoke](https://github.com/botero50/TamaPoke)**, branch
+`funpack`) is built on top of crenberries428's 3.14 and adds, all in 8 languages:
+
+- **Training in categories** (Strength / Speed / Defence / Fun) with 8 new minigames.
+- **Sickness and moods**: stomachache from overeating, colds from a dirty room,
+  grumpy after a night with the light on, bored without play -- and medicine.
+- **Coins and daily missions** with a gentle daily cap, shown in a new top bar.
+- **A shop and a bag**: 10 hats, 6 toys, 6 decorations, 9 foods, soap, brush, seeds.
+- **Food, bath and sleep menus**: bubble bath, scrub game, brushing, naps, a lullaby,
+  and a real dark room when the light is off.
+- **Places to go**: park walks, the store, the Pokemon Center and a garden that
+  grows food in real time; holiday gifts and weather by the date.
+
+See the sections further down for the rules and the economy numbers.
 
 > ### 🙏 Fork lineage
 >
@@ -23,13 +50,14 @@ and complete them all (shinies included).
 > It also takes code from the fork
 > [**DylanPDao/TamaPoke**](https://github.com/DylanPDao/TamaPoke) by **Dylan Dao**.
 >
-> Maintained by **Cheng Ren**. MIT, on the same terms as both of the above.
+> The 3.14 base is maintained by **Cheng Ren** -- [**crenberries428/TamaPoke**](https://github.com/crenberries428/TamaPoke).
+> The Fun Pack is by **Salchi** ([botero50](https://github.com/botero50)). MIT, on the same terms as all of the above.
 
 > **Personal, non-commercial fan project.** Code is MIT; the sprites are from
 > PMD SpriteCollab (CC BY-NC, Pokémon © Nintendo/Game Freak), and the 3D case is
 > CC BY-NC-SA. See **[License](#license)** and **Credits**.
 
-🔴 **3D-printed Pokéball case + print profiles → [on MakerWorld](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)** · flash it in your browser → **[web installer](https://crenberries428.github.io/TamaPoke/web/)**
+🔴 **3D-printed Pokéball case + print profiles → [on MakerWorld](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)** · flash it in your browser → **[web installer](https://botero50.github.io/TamaPoke/web/)**
 
 ## Screens
 
@@ -196,6 +224,182 @@ While **awake**, per minute:
   evening is deliberately outside the window -- a six-hour night is the only part
   of the day you are not expected to be around. The light
   button beats both: a creature you sent to bed stays there.
+
+### Fun Pack: more minigames
+TRAIN shows four categories -- **STRENGTH**, **SPEED**, **DEFENCE** and **FUN** --
+and each opens a list of its games, the original trainer first: STRENGTH = bag,
+Mole Pop; SPEED = reaction test, Berry Drop, Jump Rope; DEFENCE = ball game,
+Who is it?; FUN = Dance, Hide & Seek, Left / Right, Higher / Lower. Each of the
+eight new games keeps its own record.
+Tapping the top strip quits and keeps what was earned (a swipe works too in
+the four guessing games). Every game cures **bored** and **grumpy**.
+
+| Game | How it plays | Reward |
+|---|---|---|
+| Left / Right | guess which way it turns; 3 lives | JOY 4 + 2/pt (max +20), bond 2 |
+| Higher / Lower | cards 1–9: is the next one higher? 3 lives | JOY 4 + 2/pt (max +20), bond 2 |
+| Who is it? | name the silhouette before the timer (5 s → 2.6 s) | DEF score/3 (max +8), JOY |
+| Berry Drop | 5 lanes, 40 s; rocks cost a life | SPE score/4 (max +10), FOOD score/3 (max +15) |
+| Mole Pop | 25 s; Diglett yes, Voltorb no | ATK score/3 (max +12) |
+| Jump Rope | tap as the rope reaches the ground; speeds up | SPE score/3 (max +12), burns 2 weight/pt |
+| Dance | 48 notes; ±90 ms = 2 pts, ±180 ms = 1 pt; 5 lives | JOY 6 + 2/pt (max +30), bond 3 |
+| Hide & Seek | follow the bush: 3 → 11 swaps, faster each round | JOY 4 + 2/pt (max +20), bond 2 |
+
+Stat gains still stop at the IV ceiling (`trMaxFor`), like the trainers.
+
+### Fun Pack: sickness and statuses
+- 🤢 **Stomachache:** feeding at FOOD ≥ 90 adds 1 to an overeating count (candy
+  adds 2); at **3** it is sick. The count drops by 1 every 30 min.
+- 🤧 **Cold:** 3 poops or HYG < 15 for **45 min in a row**.
+- **While sick:** −1 FOOD and −1 JOY extra per minute, sad, a germ beside it,
+  and TRAIN, the minigames and gym fights are refused. Every **6 h** left sick
+  is one care mistake. Never fatal on its own.
+- 💊 **Medicine** (MEDICINE row of the food menu): a stomachache needs **1 dose**;
+  a cold needs **2 doses at least 10 min apart, then a bath**. Healthy, it just
+  tastes bad: −10 JOY.
+- 💡 **Lights left on:** from **21:00 to 06:00**, awake, on the main screen and
+  untouched for **20 min** with the screen on, it dozes off **with the light on**
+  (ENE only +3/min). The light button turns the light off and it sleeps on; the
+  next press wakes it. The power button turning the screen off also counts as
+  switching the light off.
+- 😠 **Grumpy:** woken after **30+ min** asleep with the light on: −15 JOY, ENE
+  capped at 70, and minigame JOY is halved until it plays once.
+- 😐 **Bored:** **8 h** awake without any minigame: −1 JOY extra per minute.
+
+### Coins and daily missions
+Two round buttons at the top of the main screen: **missions** (left, with a red
+count of the ones still open) and the **purse** (right, with your coins), which opens SHOP / BAG / HOW TO EARN. Coins
+are the player's, so a new egg keeps them. They will buy things in the shop.
+
+| Source | Coins |
+|---|---|
+| Any game | 1 + score/10, at most 5 a game |
+| Feed, pet, bath | 1 each |
+| *Games + care together* | **at most 50 a day** |
+| Every 1 000 steps | 2 (up to 10 000 steps a day) |
+| First care of the day | 5, plus 15 on every 7th day of the streak |
+| Each daily mission | 8, plus 10 for finishing all three |
+| A badge won for the first time | 15 |
+| Sent to bed with the light off, 21:00-06:00 | 3, once a night |
+
+A good day is about 60-80 coins (at most ~110): a cap or a bow in a day or two,
+the crown in about a week.
+
+Three missions a day, the same all day (picked from the date): feed it 3 times,
+its favourite berry, play 2 games, walk 2 000 steps, a bath, pet it 3 times, a
+strength / speed / defence game, or score 10 in one game.
+
+### Shop, bag and hats
+The **shop** and the **bag** open on their categories -- HATS, TOYS, DECORATION -- like TRAIN does. The shop sells ten hats; a hat you buy goes straight on. The **bag** lists the
+hats you own (tap one to wear it or take it off), plus **MOVE HAT**: four arrows
+on the main screen nudge it 4 px at a time, up to 60 px each way.
+
+| Hat | Coins |
+|---|---|
+| Cap, Bow | 80 |
+| Flower | 100 |
+| Beanie | 120 |
+| Party hat, Straw hat | 150 |
+| Witch hat, Santa hat | 200 |
+| Top hat | 300 |
+| Crown | 500 |
+
+The hat sits on the first row of the sprite that is nearly as solid as its widest
+row, so ear tips and antennae do not lift it into the air; it follows every
+animation frame. A nudge belongs to the species: after an evolution or a new
+egg the hat starts centred again. Hats are the player's -- a new egg keeps them.
+
+### Toys and decorations
+Bought in the shop, they stand on the main screen's floor, one each side of the
+creature. In the bag, tapping one puts it in the first free spot (left, then
+right; with both full it replaces the left one) or picks it up again.
+
+| Toys | Coins | Decorations | Coins |
+|---|---|---|---|
+| Beach ball | 40 | Plant | 50 |
+| Plush | 90 | Flowers | 60 |
+| Rubber duck | 60 | Lamp | 90 |
+| Blocks | 70 | Bed | 150 |
+| Drum | 110 | Gift | 80 |
+| Kite | 120 | Pumpkin | 70 |
+
+- **A toy out** keeps it company: boredom builds **half as fast**, and now and
+  then it walks over to play (the toy bounces while it is next to it).
+- **The bed** helps it sleep: ENE **+7/min** instead of +6 with the light off.
+- Everything else is decoration. Like the hats, they are the player's.
+
+### Food menu and foods
+The food button opens the **food menu**: the free berries and the candy on the
+first row (one tap feeds, as before), then **MEALS**, **SWEETS** and **DRINKS**,
+which list the servings in the bag, and **MEDICINE**. Servings are bought in the
+shop (FOOD category) or eaten from the bag. A food with none left shows its price.
+
+| Food | Coins | FOOD | JOY | ENE | Weight |
+|---|---|---|---|---|---|
+| Sandwich | 12 | +30 | +5 | | +2 |
+| Curry | 20 | +45 | +10 | | +4 |
+| Soup | 15 | +25 | +5 | +10 | |
+| Rice ball | 8 | +20 | | | +1 |
+| Cake (sweet) | 25 | +15 | +25 | | +15 |
+| Cookie (sweet) | 8 | +5 | +12 | | +5 |
+| Ice cream (sweet) | 12 | +8 | +18 | | +8 |
+| Milk | 12 | +10 | | +20 | |
+| Juice | 8 | +5 | +10 | +5 | +2 |
+
+Eating at FOOD 90+ counts towards a stomachache like the berries: sweets count
+double, like the candy. Each serving counts for the "feed it" mission and pays
+1 coin (inside the daily cap). Up to 99 of each.
+
+### Bath and sleep menus
+**The bath button** opens: **QUICK WASH** (free, as before), **BUBBLE BATH** (uses a
+soap: the wash plus +10 JOY, bond and a heart; a rubber duck you own joins in),
+**SCRUB** (a little game: rub the mud spots off with your finger -- each takes 3
+rubs; all clean = the wash plus up to +12 JOY) and **BRUSH** (needs the brush:
++5 JOY, +3 bond and a shine for a minute).
+
+**The light button**, while it is awake, opens: **BEDTIME** (lights off, as before),
+**30 MIN NAP** (lights off; it wakes up by itself, rested and never grumpy) and
+**LULLABY** (Brahms' lullaby plays, it goes to bed with +5 JOY; counts as bedtime).
+While it sleeps the button works at once: it turns a light that was left on off,
+or wakes it.
+
+With the light off the scene goes dark and blue, and now and then it dreams.
+
+The shop's **CARE** category sells **soap** (10 coins a bar, used up) and the
+**brush** (60 coins, once).
+
+### Places, the garden, gifts and weather
+**The map button** (under the purse) opens **GO OUT**:
+
+- **Park** -- WALK: a stroll costs 5 ENE and gives +3 JOY, and finds something:
+  coins (2-4, at most 3 finds a day), a wild berry (+10 FOOD, +5 JOY), or a wild
+  Pokemon that says hello (+3 JOY, bond). Too tired below 15 ENE.
+- **Store** -- GO IN opens the shop over the store; leaving it returns there.
+- **Pokemon Center** -- HEAL cures any sickness and grumpiness and gives +30 ENE.
+  Free once a day, then 20 coins.
+- **Garden** -- PLANT a seed (5 coins, CARE in the shop); it grows for **8 hours**
+  of real time, then HARVEST gives one serving of food (mostly juice and sweets,
+  sometimes a meal) into the bag.
+
+**Seasonal gifts**, by the RTC date, once on the day: Halloween (31 Oct) the
+pumpkin, Christmas (24-26 Dec) the Santa hat, New Year (1 Jan) the party hat,
+Valentine's (14 Feb) the flowers -- or 20 coins if it is already owned.
+**Weather**: one a day, from the date -- mostly fair, about 1 day in 5 rain (snow
+in December-February). Only the sky changes.
+
+### The economy, checked
+`economy_test` plays thirty days through the real rules (missions, caps, steps):
+
+| Player | Coins a day |
+|---|---|
+| Light (3 feeds, 2 games, 1 000 steps) | ~33 |
+| Normal (6 feeds, 5 games, a bath, 3 000 steps, bedtime) | ~76 |
+| Busy (10 feeds, 15 games, 8 000 steps) | ~110 |
+
+Food in the shop is 8-25 a serving, and the berries, candy and medicine stay free,
+so a pet can always be fed and cured. A normal player who also spends ~20 a day
+on food saves ~56: a cap in under 2 days, the crown in about 9, everything in the
+shop once (2 930 coins) in about 52 days.
 
 ### Eggs & who you get (spawn odds)
 - **First ever pet:** you pick a starter — **Bulbasaur / Charmander / Squirtle**.
