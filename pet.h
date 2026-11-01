@@ -122,11 +122,11 @@ enum FoodId : uint8_t {
   FOOD_SANDWICH = 0, FOOD_CURRY, FOOD_SOUP, FOOD_ONIGIRI,   // meals
   FOOD_CAKE, FOOD_COOKIE, FOOD_ICECREAM,                     // sweets
   FOOD_MILK, FOOD_JUICE,                                     // drinks
+  FOOD_PIE, FOOD_STEW, FOOD_PARFAIT,                         // cooked in the kitchen, not sold
   FOOD_COUNT
 };
-#define FOOD_MEALS 4
-#define FOOD_SWEETS 3
-#define FOOD_DRINKS 2
+#define FOOD_SHOP_COUNT 9        // the shop sells the first nine; the rest come from the kitchen
+#define FOOD_DRINKS 2            // the food menu lists meals and sweets with what the kitchen makes
 #define FOOD_STACK_MAX 99
 // Bath and sleep extras
 #define SOAP_PRICE 10            // one bubble bath
@@ -160,11 +160,13 @@ enum CapsuleResult : uint8_t { CAP_NO_COINS = 0, CAP_LIMIT, CAP_HAT, CAP_DECOR, 
 enum TallyId : uint8_t {
   TALLY_MEALS = 0, TALLY_GAMES, TALLY_BATHS, TALLY_WALKS, TALLY_HARVEST,
   TALLY_STUDY, TALLY_TEETH, TALLY_PERFECT, TALLY_CAPSULE,
+  TALLY_FISH, TALLY_COOK, TALLY_ROUTE, TALLY_CHORES,
   TALLY_COUNT
 };
 enum TrophyId : uint8_t {
   TRO_MEALS = 0, TRO_GAMES, TRO_BATHS, TRO_WALKS, TRO_HARVEST, TRO_COINS, TRO_HATS,
   TRO_DECOR, TRO_STREAK, TRO_LEVEL, TRO_STUDY, TRO_TEETH, TRO_PERFECT, TRO_CAPSULE,
+  TRO_FISH, TRO_ROUTE,
   TRO_COUNT
 };
 static_assert(TRO_COUNT <= 16, "trophies needs a bit each");
@@ -177,6 +179,31 @@ static_assert(TRO_COUNT <= 16, "trophies needs a bit each");
 #define PARENT_BED_MIN 19
 #define PARENT_BED_MAX 22
 enum ParentBlock : uint8_t { PB_NONE = 0, PB_BEDTIME, PB_LIMIT };
+
+// Step adventures: walking with the ball moves it along a route of stops.
+// Each stop holds something; the last one finishes the route and opens the next.
+#define ROUTE_COUNT 4
+#define ROUTE_STOPS 5
+enum AdvResult : uint8_t { ADV_NONE = 0, ADV_COINS, ADV_FOOD, ADV_SEEDS, ADV_FRIEND, ADV_DONE };
+// Fishing at the lake: a few catches a day pay; after that it is just for fun.
+#define FISH_PER_DAY 5
+enum FishResult : uint8_t { FISH_KARP = 0, FISH_GOLDEEN, FISH_BOOT, FISH_SNACK, FISH_SHELL, FISH_PEARL };
+// The kitchen: two foods from the bag make one better dish.
+#define RECIPE_COUNT 3
+struct Recipe { uint8_t a, b, out; };
+// Family: chores the parents tick off, a piggy bank that pays a little interest,
+// an alarm clock, and a diary of the last week.
+#define CHORE_COUNT 6
+#define CHORE_COINS 4
+#define PIGGY_RATE_DIV 20        // 5% a week
+#define PIGGY_INTEREST_MAX 20
+#define DIARY_DAYS 7
+enum DiaryFlag : uint8_t { DF_COOKED = 1, DF_ADVENTURE = 2, DF_TROPHY = 4, DF_RARE = 8, DF_ROUTE = 16 };
+struct DiaryDay {
+  uint16_t day;                 // days since 1970, 0 = empty
+  uint8_t meals, games, baths, walks, fish, study, chores, flags;
+  uint16_t coins;
+};
 struct FoodInfo {
   int8_t food, joy, energy, weight;   // what one serving does
   uint8_t price;
@@ -484,6 +511,47 @@ public:
   uint8_t gamesToday = 0;
   ParentBlock parentBlock() const;
   void saveParentLimits() { save(); }   // the settings page changed them
+
+  // Step adventures, fishing, cooking (phase 10). Player-wide.
+  uint8_t advRoute = 0, advStop = 0;   // the route, and how many of its stops are claimed
+  uint32_t advSteps = 0;               // steps walked on this route
+  uint16_t advWhat = 0;                // what the last stop gave (coins / food id / dex)
+  static uint16_t advNeed(uint8_t stop);   // steps from the route's start to that stop
+  bool advReady() const { return advStop < ROUTE_STOPS && advSteps >= advNeed(advStop); }
+  AdvResult advClaim();
+  uint32_t fishDay = 0;
+  uint8_t fishToday = 0;
+  uint8_t lastFishCoins = 0;
+  uint8_t fishPaidLeft() const { return fishDay == today() ? (fishToday < FISH_PER_DAY ? FISH_PER_DAY - fishToday : 0) : FISH_PER_DAY; }
+  FishResult fishCatch();              // a fish on the line, caught in time
+  static const Recipe &recipe(uint8_t r);
+  bool canCook(uint8_t r) const;
+  bool cook(uint8_t r);
+
+  // Alarm, chores, piggy bank, diary (phase 11).
+  bool alarmOn = false;
+  uint8_t alarmH = 7, alarmM = 0;
+  uint32_t alarmDay = 0, bedRemDay = 0;
+  bool alarmDue() const;               // within the hour after the alarm time, once a day
+  void alarmRang() { alarmDay = today(); save(); }
+  bool bedReminderDue() const;         // the parents' bedtime has come, once a day
+  void bedReminded() { bedRemDay = today(); save(); }
+  void saveAlarm() { save(); }
+  uint32_t choreDay = 0;
+  uint8_t choresDone = 0;              // bit per chore, today
+  bool choreDoneToday(uint8_t c) const { return choreDay == today() && (choresDone & (1 << c)); }
+  bool doChore(uint8_t c);
+  uint32_t piggy = 0, piggyDay = 0;    // savings, and the day interest was last paid
+  uint16_t piggyLastInterest = 0;
+  bool piggyDeposit(uint32_t amount);
+  uint32_t piggyWithdraw();
+  uint8_t piggyDaysLeft() const;
+  uint16_t piggyNextInterest() const;
+  DiaryDay diary[DIARY_DAYS] = {};
+  uint32_t diaryCoinBase = 0;
+  void diaryRoll();
+  void diaryFlag(uint8_t f) { diaryRoll(); diary[0].flags |= f; pendingSave = true; }
+  uint16_t diaryCoins(uint8_t i) const { return i == 0 ? (uint16_t)(coinsEarned - diaryCoinBase) : diary[i].coins; }
   bool isDozeHour() const;
 
   // combat stats: real gen 1 base + level + IV + training

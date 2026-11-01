@@ -547,6 +547,7 @@ void Pet::addSteps(uint32_t n) {
   }
   stepCount += n;
   if (stepCount > STEP_MAX) stepCount = STEP_MAX;
+  if (advSteps < 60000) advSteps += n;          // the adventure route moves too
   stepsUnsaved += n;
   if (stepsUnsaved >= 20) {
     stepsUnsaved = 0;
@@ -1372,6 +1373,15 @@ void Pet::rollCoinDay() {
   missionDone = 0;
   gamesToday = 0;
   pendingSave = true;
+  // a week since the piggy bank last paid: 5% interest, a little at least, not too much
+  if (piggy && piggyDay && d >= piggyDay + 7) {
+    uint32_t i = piggy / PIGGY_RATE_DIV;
+    if (!i && piggy >= 20) i = 1;
+    if (i > PIGGY_INTEREST_MAX) i = PIGGY_INTEREST_MAX;
+    piggy += i;
+    piggyLastInterest = (uint16_t)i;
+    piggyDay = d;
+  }
 }
 
 uint16_t Pet::earnCoins(uint16_t amount, bool capped) {
@@ -1546,12 +1556,15 @@ const FoodInfo &Pet::foodInfo(uint8_t f) {
     {   8,  18,   0,   8,  12, true  },   // ice cream
     {  10,   0,  20,   0,  12, false },   // milk
     {   5,  10,   5,   2,   8, false },   // juice
+    {  20,  30,   0,   8,   0, true  },   // berry pie (cooked)
+    {  60,  15,  10,   3,   0, false },   // stew (cooked)
+    {  15,  35,   5,   8,   0, true  },   // parfait (cooked)
   };
   return T_[f < FOOD_COUNT ? f : 0];
 }
 
 bool Pet::buyFood(uint8_t f) {
-  if (f >= FOOD_COUNT || foodCount[f] >= FOOD_STACK_MAX) return false;
+  if (f >= FOOD_SHOP_COUNT || foodCount[f] >= FOOD_STACK_MAX) return false;   // cooked dishes are not sold
   if (!spendCoins(foodInfo(f).price)) return false;
   foodCount[f]++;
   save();
@@ -1564,6 +1577,7 @@ bool Pet::eatFood(uint8_t f) {
   const FoodInfo &fi = foodInfo(f);
   if (fullness >= 90 && fi.food > 0) noteOverfeed(fi.sweet ? 2 : 1);   // already full: a binge
   bumpTally(TALLY_MEALS);
+  if (f >= FOOD_SHOP_COUNT) addBond(2);   // home-cooked
   fullness = clamp100(fullness + fi.food);
   joy = clamp100(joy + fi.joy);
   energy = clamp100(energy + fi.energy);
@@ -1747,13 +1761,14 @@ CapsuleResult Pet::spinCapsule() {
     for (uint8_t d = 0; d < DEC_COUNT; d++) if (!ownsDecor(d)) free[n++] = 100 + d;
     if (n) {
       uint8_t pick = free[random(n)];
+      diaryFlag(DF_RARE);
       if (pick >= 100) { decorOwned |= 1 << (pick - 100); capWhat = pick - 100; res = CAP_DECOR; }
       else { hatsOwned |= 1 << pick; capWhat = pick; res = CAP_HAT; }
     } else {                                             // owns everything: a big coin prize
       capWhat = 50; earnCoins(50, false); res = CAP_COINS;
     }
   } else if (r < 50) {                                   // a serving of food
-    uint8_t f = (uint8_t)random(FOOD_COUNT);
+    uint8_t f = (uint8_t)random(FOOD_SHOP_COUNT);
     if (foodCount[f] < FOOD_STACK_MAX) foodCount[f]++;
     capWhat = f; res = CAP_FOOD;
   } else if (r < 60) {
@@ -1800,6 +1815,20 @@ void Pet::bumpTally(uint8_t t, uint16_t n) {
   uint32_t v = (uint32_t)tally[t] + n;
   tally[t] = v > 60000 ? 60000 : (uint16_t)v;
   pendingSave = true;
+  diaryRoll();
+  uint8_t *f = nullptr;
+  switch (t) {
+    case TALLY_MEALS: f = &diary[0].meals; break;
+    case TALLY_GAMES: f = &diary[0].games; break;
+    case TALLY_BATHS: f = &diary[0].baths; break;
+    case TALLY_WALKS: f = &diary[0].walks; break;
+    case TALLY_FISH:  f = &diary[0].fish; break;
+    case TALLY_STUDY: f = &diary[0].study; break;
+    case TALLY_CHORES: f = &diary[0].chores; break;
+    case TALLY_COOK:  diary[0].flags |= DF_COOKED; break;
+    default: break;
+  }
+  if (f) *f = (uint8_t)(*f + n > 255 ? 255 : *f + n);
 }
 
 static uint8_t bitCount16(uint16_t v) { uint8_t n = 0; while (v) { n += v & 1; v >>= 1; } return n; }
@@ -1820,6 +1849,8 @@ void Pet::trophyProgress(uint8_t t, uint32_t &cur, uint32_t &goal) const {
     case TRO_TEETH:   cur = tally[TALLY_TEETH];   goal = 14;  break;
     case TRO_PERFECT: cur = tally[TALLY_PERFECT]; goal = 1;   break;
     case TRO_CAPSULE: cur = tally[TALLY_CAPSULE]; goal = 10;  break;
+    case TRO_FISH:    cur = tally[TALLY_FISH];    goal = 20;  break;
+    case TRO_ROUTE:   cur = tally[TALLY_ROUTE];   goal = 1;   break;
     default: cur = 0; goal = 1; break;
   }
   if (cur > goal) cur = goal;
@@ -1832,6 +1863,7 @@ int8_t Pet::checkTrophies() {
     trophyProgress(t, c, g);
     if (c < g) continue;
     trophies |= 1 << t;
+    diaryFlag(DF_TROPHY);
     earnCoins(TROPHY_COINS, false);
     save();
     return (int8_t)t;
@@ -1891,6 +1923,169 @@ ParentBlock Pet::parentBlock() const {
   }
   if (parentGames && coinDay == today() && gamesToday >= parentGames) return PB_LIMIT;
   return PB_NONE;
+}
+
+// ---------- step adventures ----------
+
+uint16_t Pet::advNeed(uint8_t stop) {
+  // a route is about a day of a child's walking; the first stop comes quickly
+  static const uint16_t NEED[ROUTE_STOPS] = { 300, 800, 1500, 2500, 4000 };
+  return NEED[stop < ROUTE_STOPS ? stop : ROUTE_STOPS - 1];
+}
+
+AdvResult Pet::advClaim() {
+  if (!advReady()) return ADV_NONE;
+  diaryFlag(DF_ADVENTURE);
+  if (advStop == ROUTE_STOPS - 1) {                      // the end of the route
+    earnCoins(10, false);
+    advWhat = 10;
+    advSteps = advSteps > advNeed(advStop) ? advSteps - advNeed(advStop) : 0;   // the extra steps carry on
+    advStop = 0;
+    advRoute = (uint8_t)((advRoute + 1) % ROUTE_COUNT);
+    bumpTally(TALLY_ROUTE);
+    diaryFlag(DF_ROUTE);
+    joy = clamp100(joy + 10);
+    addBond(2);
+    save();
+    return ADV_DONE;
+  }
+  advStop++;
+  AdvResult r;
+  int k = random(100);
+  if (k < 35) { advWhat = (uint16_t)(2 + random(4)); earnCoins(advWhat, false); r = ADV_COINS; }
+  else if (k < 65) {
+    uint8_t f = (uint8_t)random(FOOD_SHOP_COUNT);
+    if (foodCount[f] < FOOD_STACK_MAX) foodCount[f]++;
+    advWhat = f; r = ADV_FOOD;
+  } else if (k < 80) {
+    seedCount = seedCount + 2 > FOOD_STACK_MAX ? FOOD_STACK_MAX : seedCount + 2;
+    advWhat = 2; r = ADV_SEEDS;
+  } else { joy = clamp100(joy + 5); addBond(2); advWhat = 0; r = ADV_FRIEND; }   // the screen picks who
+  save();
+  return r;
+}
+
+// ---------- fishing ----------
+
+FishResult Pet::fishCatch() {
+  if (fishDay != today()) { fishDay = today(); fishToday = 0; }
+  bool pays = fishToday < FISH_PER_DAY;
+  if (fishToday < 255) fishToday++;
+  bumpTally(TALLY_FISH);
+  joy = clamp100(joy + 2);
+  registerCare();
+  int k = random(100);
+  FishResult r = k < 35 ? FISH_KARP : k < 50 ? FISH_GOLDEEN : k < 65 ? FISH_BOOT
+               : k < 85 ? FISH_SNACK : k < 95 ? FISH_SHELL : FISH_PEARL;
+  lastFishCoins = 0;
+  if (pays) {
+    static const uint8_t COINS[6] = { 1, 3, 0, 0, 0, 10 };   // about 7 coins a day from the paying five
+    if (COINS[r]) lastFishCoins = (uint8_t)earnCoins(COINS[r], false);
+    if (r == FISH_SNACK && foodCount[FOOD_ONIGIRI] < FOOD_STACK_MAX) foodCount[FOOD_ONIGIRI]++;
+    if (r == FISH_SHELL && seedCount < FOOD_STACK_MAX) seedCount++;
+  }
+  save();
+  return r;
+}
+
+// ---------- the kitchen ----------
+
+const Recipe &Pet::recipe(uint8_t r) {
+  static const Recipe R_[RECIPE_COUNT] = {
+    { FOOD_COOKIE, FOOD_JUICE, FOOD_PIE },
+    { FOOD_SOUP, FOOD_ONIGIRI, FOOD_STEW },
+    { FOOD_ICECREAM, FOOD_MILK, FOOD_PARFAIT },
+  };
+  return R_[r % RECIPE_COUNT];
+}
+
+bool Pet::canCook(uint8_t r) const {
+  const Recipe &x = recipe(r);
+  return r < RECIPE_COUNT && foodCount[x.a] && foodCount[x.b] && foodCount[x.out] < FOOD_STACK_MAX;
+}
+
+bool Pet::cook(uint8_t r) {
+  if (!canCook(r)) return false;
+  const Recipe &x = recipe(r);
+  foodCount[x.a]--;
+  foodCount[x.b]--;
+  foodCount[x.out]++;
+  bumpTally(TALLY_COOK);
+  registerCare();
+  save();
+  return true;
+}
+
+// ---------- alarm, chores, piggy bank, diary ----------
+
+bool Pet::alarmDue() const {
+  if (!alarmOn || !lastSeenEpoch || alarmDay == today()) return false;
+  int now = (int)((lastSeenEpoch / 60) % 1440), at = alarmH * 60 + alarmM;
+  return now >= at && now < at + 60;
+}
+
+bool Pet::bedReminderDue() const {
+  if (!parentBed || !lastSeenEpoch || bedRemDay == today()) return false;
+  int h = (int)((lastSeenEpoch / 3600) % 24);
+  return h == parentBed;
+}
+
+bool Pet::doChore(uint8_t c) {
+  if (c >= CHORE_COUNT) return false;
+  if (choreDay != today()) { choreDay = today(); choresDone = 0; }
+  if (choresDone & (1 << c)) return false;
+  choresDone |= 1 << c;
+  earnCoins(CHORE_COINS, false);
+  joy = clamp100(joy + 3);
+  addBond(1);
+  bumpTally(TALLY_CHORES);
+  save();
+  return true;
+}
+
+bool Pet::piggyDeposit(uint32_t amount) {
+  if (!amount || coins < amount) return false;
+  coins -= amount;
+  piggy += amount;
+  if (!piggyDay) piggyDay = today();   // the week starts with the first coin
+  save();
+  return true;
+}
+
+uint32_t Pet::piggyWithdraw() {
+  uint32_t a = piggy;
+  if (!a) return 0;
+  uint32_t v = coins + a;
+  coins = v > COIN_MAX ? COIN_MAX : v;
+  piggy = 0;
+  piggyDay = 0;                        // a fresh week on the next deposit
+  save();
+  return a;
+}
+
+uint8_t Pet::piggyDaysLeft() const {
+  if (!piggyDay) return 7;
+  uint32_t d = today();
+  return d >= piggyDay + 7 ? 0 : (uint8_t)(piggyDay + 7 - d);
+}
+
+uint16_t Pet::piggyNextInterest() const {
+  uint32_t i = piggy / PIGGY_RATE_DIV;
+  if (!i && piggy >= 20) i = 1;
+  return (uint16_t)(i > PIGGY_INTEREST_MAX ? PIGGY_INTEREST_MAX : i);
+}
+
+void Pet::diaryRoll() {
+  uint32_t d = today();
+  if (!d || diary[0].day == (uint16_t)d) return;
+  if (diary[0].day) {                  // close yesterday's page and turn it
+    diary[0].coins = (uint16_t)(coinsEarned - diaryCoinBase);
+    for (int i = DIARY_DAYS - 1; i > 0; i--) diary[i] = diary[i - 1];
+  }
+  memset(&diary[0], 0, sizeof(DiaryDay));
+  diary[0].day = (uint16_t)d;
+  diaryCoinBase = coinsEarned;
+  pendingSave = true;
 }
 
 // Howard Hinnant's days_from_civil, inverted: exact for any date after 1970.
@@ -2192,6 +2387,22 @@ void Pet::save() {
   prefs.putUChar("pbed", parentBed);
   prefs.putUChar("pgam", parentGames);
   prefs.putUChar("gmtd", gamesToday);
+  prefs.putUChar("advR", advRoute);
+  prefs.putUChar("advN", advStop);
+  prefs.putUInt("advS", advSteps);
+  prefs.putUInt("fshd", fishDay);
+  prefs.putUChar("fshn", fishToday);
+  prefs.putBool("alOn", alarmOn);
+  prefs.putUChar("alH", alarmH);
+  prefs.putUChar("alM", alarmM);
+  prefs.putUInt("alD", alarmDay);
+  prefs.putUInt("brD", bedRemDay);
+  prefs.putUInt("chrD", choreDay);
+  prefs.putUChar("chrB", choresDone);
+  prefs.putUInt("pig", piggy);
+  prefs.putUInt("pigD", piggyDay);
+  prefs.putBytes("diary", diary, sizeof(diary));
+  prefs.putUInt("dcb", diaryCoinBase);
 }
 
 void Pet::load() {
@@ -2363,6 +2574,23 @@ void Pet::load() {
   if (parentBed && (parentBed < PARENT_BED_MIN || parentBed > PARENT_BED_MAX)) parentBed = 0;
   parentGames = prefs.getUChar("pgam", 0);
   gamesToday = prefs.getUChar("gmtd", 0);
+  advRoute = prefs.getUChar("advR", 0) % ROUTE_COUNT;
+  advStop = prefs.getUChar("advN", 0);
+  if (advStop > ROUTE_STOPS) advStop = 0;
+  advSteps = prefs.getUInt("advS", 0);
+  fishDay = prefs.getUInt("fshd", 0);
+  fishToday = prefs.getUChar("fshn", 0);
+  alarmOn = prefs.getBool("alOn", false);
+  alarmH = prefs.getUChar("alH", 7) % 24;
+  alarmM = prefs.getUChar("alM", 0) % 60;
+  alarmDay = prefs.getUInt("alD", 0);
+  bedRemDay = prefs.getUInt("brD", 0);
+  choreDay = prefs.getUInt("chrD", 0);
+  choresDone = prefs.getUChar("chrB", 0);
+  piggy = prefs.getUInt("pig", 0);
+  piggyDay = prefs.getUInt("pigD", 0);
+  if (prefs.getBytesLength("diary") == sizeof(diary)) prefs.getBytes("diary", diary, sizeof(diary));
+  diaryCoinBase = prefs.getUInt("dcb", 0);
   // seeding: the current pet counts as raised (old saves)
   if (speciesId >= 1) registerSpecies(speciesId);
 }
