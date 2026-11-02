@@ -20,7 +20,7 @@ and installed straight from your browser.
 ### What you need
 | Part | What for | Notes |
 |---|---|---|
-| **[Waveshare ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75)** | The whole pet: round 466×466 screen, touch, motion sensor, clock, audio | Get the **Standard** or **-G** version. **Not "-B"** (its own case does not fit) and not the different "1.75**C**" board |
+| **[Waveshare ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75)** | The whole pet: round 466×466 screen, touch, motion sensor, clock, audio | Get the **Standard** or **-G** version. **Not "-B"** (its own case does not fit) and not the different "1.75**C**" board. **Alternative:** [this kit on Amazon](https://www.amazon.com/dp/B0F8867487), the same board sold with a speaker and a GPS antenna (the GPS is not used) |
 | **microSD card** | The Pokémon sprites | Any size from 1 GB |
 | **USB-C data cable** | Installing and charging | A charge-only cable will not be seen by the computer |
 | **3D-printed Pokéball case** | The ball | **[Download it on MakerWorld](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)**, print profiles included (a remix of yoyothechicken's [Pokeball](https://makerworld.com/es/models/839922-pokeball)) |
