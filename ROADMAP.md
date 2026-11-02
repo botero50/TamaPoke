@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 2 November 2026, with Phase 29._
+_Last updated: 2 November 2026, with Phase 30._
 
 ## Done
 | Phase | What | Release |
@@ -19,6 +19,7 @@ _Last updated: 2 November 2026, with Phase 29._
 | 27 | Trophies past 16 (now 18): "10 gold badges" and "All 3 arcade prizes" | v1.10 |
 | 28 | The places come alive (the Center's healing machine and an original jingle, plus an animation in the garden, beach, library, contest, jobs, adventure; idle life in the park, store, school, music hall), the map as a fifth bottom button, a slimmer steps gauge | v1.11 |
 | 29 | A talkative Pokemon (147 phrases in 35 groups, 8 languages, never one of the last six) and honest weather (rain needs 0.3 mm really falling, drizzle is never rain, grey skies need 60% cloud, no pretend rain with Wi-Fi, a stale sky clears after 75 min) | v1.12 |
+| 30 | The quick wash is a real shower (water, no bubbles); the bubble bath keeps the bubble game; food with none in the bag is bought and eaten in one tap from the food menu | v1.13 |
 
 ## Next
 | # | Item | Needs | Notes |

@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.28"
+#define FW_VERSION "3.14-funpack.29"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -8027,13 +8027,15 @@ void startBath() {
   bathPending = true;
   bathPlay = false;
   bathPops = 0;
-  for (int i = 0; i < 14; i++) bathSpawn(i, now, false);
+  if (bathKind == 1) for (int i = 0; i < 14; i++) bathSpawn(i, now, false);   // the shower (kind 0) is water, not bubbles
+  else for (int i = 0; i < 14; i++) bubbles[i].popAt = now;              // nothing left to pop
 }
 
 // a finger on a bubble pops it; the first pop stretches the wash into a game
 bool bathTap(int16_t x, int16_t y) {
   uint32_t now = millis();
   if (!bathUntil || now + 300 > bathUntil) return false;
+  if (bathKind != 1) return false;   // a shower: a tap is a pat, as anywhere else
   float t = now / 220.0f;
   for (int i = 0; i < 14; i++) {
     if (bubbles[i].popAt) continue;
@@ -8093,6 +8095,30 @@ void drawBath() {
     return;
   }
   uint32_t left = bathUntil - now;
+  if (bathKind != 1) {                                     // the quick wash: a shower over it
+    const uint16_t pipe = C565(0xa8, 0xb0, 0xbc), water = C565(0x9f, 0xd4, 0xf4), drop = C565(0xdf, 0xf4, 0xff);
+    const int hx = CX, hy = 112;
+    gfx->fillRect(hx - 4, hy - 12, 8, 10, pipe);                      // a short stub: a pipe to the top would cross the header
+    gfx->fillRoundRect(hx - 34, hy - 4, 68, 14, 7, pipe);              // the shower head
+    gfx->drawRoundRect(hx - 34, hy - 4, 68, 14, 7, UI_INK);
+    bool flowing = left > 500;                                         // the water stops at the end
+    for (int k = 0; k < 9; k++) {
+      int x = hx - 28 + k * 7;
+      int y0 = hy + 12, y1 = PET_GROUND - 6;
+      if (!flowing) y0 += (int)((500 - left) / 500.0f * (y1 - y0));   // the last of it falls away
+      int sway = (int)(sinf(now * 0.01f + k) * 2);
+      for (int y = y0 + (int)((now / 4 + k * 13) % 18); y < y1; y += 18)
+        gfx->drawFastVLine(x + sway + (y - hy) / 40 * ((k & 1) ? 1 : -1), y, 10, (k & 1) ? water : drop);
+    }
+    if (flowing) for (int k = 0; k < 6; k++) {                         // splashes at its feet
+      int sx = CX - 50 + k * 20, ph = (int)((now / 90 + k * 3) % 6);
+      gfx->drawLine(sx, PET_GROUND - 2, sx - 3 - ph, PET_GROUND - 6 - ph, drop);
+      gfx->drawLine(sx, PET_GROUND - 2, sx + 3 + ph, PET_GROUND - 6 - ph, drop);
+    }
+    for (int k = 0; k < 3; k++)                                        // a little steam
+      gfx->fillCircle(CX - 60 + k * 60 + (int)(sinf(now * 0.002f + k) * 8), 150 - (int)((now / 40 + k * 30) % 50), 8, lerp565(water, UI_WHITE, 6, 8));
+    return;
+  }
   const uint16_t rim = C565(0x8f, 0xd0, 0xf0), rimIn = C565(0xdf, 0xf4, 0xff);
   float t = now / 220.0f;
   bool ending = left <= 800;
@@ -10275,12 +10301,13 @@ void renderFood() {
     for (uint8_t i = 0; i < foodCatSize(c); i++) {
       uint8_t f = foodCatItem(c, i);
       bool have = pet.foodCount[f] > 0;
-      drawFoodRow(i, SPR_FOODS[f], T(foodName(f)), pet.foodCount[f], have ? UI_BG_DAY : UI_TRACK_TEXT);
-      if (!have && f < FOOD_SHOP_COUNT) {  // none: what it costs in the shop (cooked dishes are not sold)
+      bool sold = f < FOOD_SHOP_COUNT, afford = sold && pet.coins >= Pet::foodInfo(f).price;
+      drawFoodRow(i, SPR_FOODS[f], T(foodName(f)), pet.foodCount[f], have || afford ? UI_BG_DAY : UI_TRACK_TEXT);
+      if (!have && sold) {                 // none: one tap buys a serving here (cooked dishes are not sold)
         char pr[8];
         snprintf(pr, sizeof(pr), "%u", Pet::foodInfo(f).price);
         int y = FOOD_ROW_Y(i);
-        uiText(UIF_TINY, PANEL_X + PANEL_W - 26, uiMidY(UIF_TINY, y, FOOD_ROW_H), pr, UI_INK, 2);
+        uiText(UIF_TINY, PANEL_X + PANEL_W - 26, uiMidY(UIF_TINY, y, FOOD_ROW_H), pr, afford ? UI_INK : UI_BAR_BAD, 2);
         drawMap(SPR_ICON_COIN, 16, PANEL_X + PANEL_W - 30 - uiTextWidth(UIF_TINY, pr) - 18, y + 15, 1, false);
       }
     }
@@ -10337,7 +10364,12 @@ void foodTap(int16_t x, int16_t y) {
   uint8_t c = (uint8_t)foodCat;
   int i = foodRowHit(x, y);
   if (i < 0 || i >= foodCatSize(c)) return;
-  if (feedFromBag(foodCatItem(c, i))) foodOpen = false;
+  uint8_t f = foodCatItem(c, i);
+  if (!pet.foodCount[f] && f < FOOD_SHOP_COUNT) {          // none in the bag: buy a serving right here
+    if (!pet.buyFood(f)) { sfxPlay(SFX_DENY); fpShowToast(S_NOT_ENOUGH, UI_BAR_BAD); return; }
+    sfxPlay(SFX_PLAY);
+  }
+  if (feedFromBag(f)) foodOpen = false;
 }
 
 // ===========================================================================

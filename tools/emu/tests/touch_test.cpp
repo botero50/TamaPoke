@@ -359,6 +359,28 @@ int main(int argc, char **argv) {
     click(233, 76 + 46 + 52 + 23);         // meals row 1: the curry
     if (foodOpen || pet.foodCount[FOOD_CURRY] != 0) { printf("FAIL: tapping the curry did not eat it\n"); return 1; }
     printf("PASS: food -> meals -> the curry is eaten from the bag\n");
+    // phase 30: none in the bag? one tap buys a serving and eats it
+    pump(80);
+    pet.foodCount[FOOD_CURRY] = 0; pet.fullness = 30;
+    uint32_t coins0 = pet.coins = 200;
+    click(fbx, fby);
+    click(233, 76 + 46 + 52 + 23);         // MEALS
+    click(233, 76 + 46 + 52 + 23);         // the curry, none in the bag
+    // coins went down (eating then pays back care and mission coins, so not by exactly the price;
+    // buyFood's price is checked in coins_test)
+    if (foodOpen || pet.coins >= coins0 || pet.foodCount[FOOD_CURRY] != 0 || pet.fullness <= 30) {
+      printf("FAIL: tapping a curry it had none of did not buy and eat it (open %d cat %d coins %u count %u full %u)\n",
+             foodOpen, foodCat, (unsigned)pet.coins, pet.foodCount[FOOD_CURRY], pet.fullness); return 1;
+    }
+    pump(80);
+    pet.coins = 0; pet.fullness = 30;
+    click(fbx, fby);
+    click(233, 76 + 46 + 52 + 23);
+    click(233, 76 + 46 + 52 + 23);         // no coins
+    if (!foodOpen || pet.coins != 0 || pet.fullness != 30) { printf("FAIL: buying with no coins changed something\n"); return 1; }
+    click(20, 233); click(20, 233);        // out of the list and the menu
+    pet.coins = 1000;
+    printf("PASS: food -> meals -> none left: one tap buys and eats; no coins refuses\n");
   }
 
   // the bath and sleep menus (rows at 122 + 52 i, so +23 is mid-row)
@@ -524,8 +546,21 @@ int main(int argc, char **argv) {
     printf("PASS: settings -> parents -> bedtime refuses games\n");
     pump(90);                              // let the toast go
 
-    // the shower: a finger on a bubble pops it and turns the wash into a game
-    pet.sleeping = false; pet.hygiene = 40;
+    // phase 30: the quick wash is a shower -- no bubbles, a tap pops nothing, and it still cleans
+    {
+      extern uint8_t bathKind;
+      pet.sleeping = false; pet.hygiene = 40;
+      bathKind = 0; startBath(); pump(2);
+      click(233, 200);
+      if (bathPops != 0 || bathPlay) { printf("FAIL: a tap in the shower popped a bubble\n"); return 1; }
+      for (int k = 0; k < 120 && bathUntil; k++) pump(4);
+      if (bathUntil || pet.hygiene != 100) { printf("FAIL: the shower did not end in a clean pet\n"); return 1; }
+      printf("PASS: the quick wash is a shower: nothing to pop, and clean\n");
+      pump(30);
+    }
+    // the bubble bath: a finger on a bubble pops it and turns the wash into a game
+    { extern uint8_t bathKind; bathKind = 1; }
+    pet.sleeping = false; pet.hygiene = 40; pet.soapCount = 3;
     startBath();
     pump(2);
     int bx = 0, by = 0, pick = -1;
