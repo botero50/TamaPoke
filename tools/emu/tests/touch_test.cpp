@@ -392,26 +392,37 @@ int main(int argc, char **argv) {
   {
     pump(10);
     uint32_t seedBefore = g_seed;
-    click(394, 154);                       // the map button
+    click(394, 154);                       // phase 28: the old floating map spot does nothing now
+    if (mapOpen) { printf("FAIL: the old map spot still opens the map\n"); return 1; }
+    click(349, 388);                       // the map button, now the fifth in the bottom row
     if (!mapOpen) { printf("FAIL: the map button did not open GO OUT\n"); return 1; }
     click(155, 214);                     // map tile 2: the Pokemon Center (rows 128 + 60 r)
     if (placeScene != 3) { printf("FAIL: the center row did not open the center\n"); return 1; }
     pet.sickness = SICK_COLD; pet.centerDay = 0;
     click(110 + 58, 380 + 22);             // HEAL
     if (pet.isSick()) { printf("FAIL: HEAL did not cure it\n"); return 1; }
+    {                                      // phase 28: the machine plays first, then "Healed!"
+      extern uint8_t placeFx; extern uint32_t placeMsgUntil;
+      if (placeFx == 0) { printf("FAIL: HEAL did not start the healing animation\n"); return 1; }
+      uint32_t c0 = pet.coins;
+      click(110 + 58, 380 + 22);           // a second HEAL while it heals does nothing
+      if (pet.coins != c0) { printf("FAIL: healing twice at once charged again\n"); return 1; }
+      for (int k = 0; k < 200 && placeFx; k++) pump(1);
+      if (placeFx || !placeMsgUntil) { printf("FAIL: the healing did not end with its message\n"); return 1; }
+    }
     click(240 + 58, 380 + 22);             // BACK
     if (placeScene) { printf("FAIL: BACK did not leave the center\n"); return 1; }
     printf("PASS: map -> Pokemon Center -> heal -> back\n");
 
     pet.seedCount = 1; pet.plantEpoch = 0;
-    click(394, 154);
+    click(349, 388);
     click(311, 214);                     // map tile 3: the garden
     click(110 + 58, 380 + 22);             // PLANT
     if (!pet.plantEpoch || pet.seedCount) { printf("FAIL: PLANT did not plant the seed\n"); return 1; }
     click(240 + 58, 380 + 22);
     printf("PASS: map -> garden -> a seed is planted\n");
 
-    click(394, 154);
+    click(349, 388);
     click(311, 154);                     // map tile 1: the store
     click(110 + 58, 380 + 22);             // GO IN: the shop opens over the store
     if (!shopOpen || placeScene != 2) { printf("FAIL: the store did not open the shop\n"); return 1; }
@@ -423,7 +434,7 @@ int main(int argc, char **argv) {
     // the capsule machine, left in the store
     pet.coins = 100; pet.capDay = 0; pet.capSpins = 0;
     uint16_t capsBefore = pet.tally[TALLY_CAPSULE];
-    click(394, 154);
+    click(349, 388);
     click(311, 154);                     // the store
     click(80, 250);                        // the machine
     if (pet.tally[TALLY_CAPSULE] != capsBefore + 1 || pet.capSpins != 1) { printf("FAIL: tapping the machine did not turn a capsule\n"); return 1; }
@@ -432,7 +443,7 @@ int main(int argc, char **argv) {
 
     // the school: a full math quiz, all right; then 10 minutes of homework
     pet.sleeping = false; pet.parentBed = 0; pet.parentGames = 0;
-    click(394, 154);
+    click(349, 388);
     click(155, 274);                     // map tile 4: the school
     if (placeScene != 5) { printf("FAIL: the school row did not open the school\n"); return 1; }
     click(233, 380 + 22);                  // MATH (middle button)
@@ -534,7 +545,7 @@ int main(int argc, char **argv) {
     // the lake: cast, wait for the bite, strike
     pet.sleeping = false;
     uint16_t fishBefore = pet.tally[TALLY_FISH];
-    click(394, 154);
+    click(349, 388);
     click(311, 274);                       // map tile 5: the lake
     if (placeScene != 7) { printf("FAIL: the lake tile did not open the lake (%u)\n", placeScene); return 1; }
     click(110 + 58, 380 + 22);             // FISH: cast
@@ -549,7 +560,7 @@ int main(int argc, char **argv) {
 
     // an adventure stop reached by walking
     pet.advRoute = 0; pet.advStop = 0; pet.advSteps = 400;
-    click(394, 154);
+    click(349, 388);
     click(155, 334);                       // map tile 6: adventure
     if (placeScene != 8) { printf("FAIL: the adventure tile did not open the route\n"); return 1; }
     click(110 + 58, 380 + 22);             // OPEN
@@ -559,7 +570,7 @@ int main(int argc, char **argv) {
 
     // the kitchen: a cookie and a juice, stirred into a pie
     pet.foodCount[FOOD_COOKIE] = 1; pet.foodCount[FOOD_JUICE] = 1; pet.foodCount[FOOD_PIE] = 0;
-    click(394, 154);
+    click(349, 388);
     click(311, 334);                       // map tile 7: the kitchen
     if (placeScene != 9) { printf("FAIL: the kitchen tile did not open the kitchen\n"); return 1; }
     click(233, 110 + 28);                  // recipe 0: the pie
@@ -710,7 +721,7 @@ int main(int argc, char **argv) {
       extern uint8_t mapPage; extern bool mailOpen;
       uint32_t today = pet.lastSeenEpoch / 86400;
       pet.castleDay = 0; pet.contestWeek = 0; pet.jobDay = 0; pet.jobKind = 0;
-      click(394, 154);                       // the map
+      click(349, 388);                       // the map
       click(357, 376);                       // next page
       if (mapPage != 1) { printf("FAIL: the arrow did not turn the map page\n"); return 1; }
       click(155, 154);                       // page 2, tile 0: the beach
@@ -718,16 +729,18 @@ int main(int argc, char **argv) {
       click(110 + 58, 380 + 22);             // CASTLE
       if (pet.castleDay != today) { printf("FAIL: CASTLE did not build one\n"); return 1; }
       click(240 + 58, 380 + 22);             // BACK
-      click(394, 154);
+      click(349, 388);
       click(311, 212);                       // tile 3: the contest
       if (placeScene != 13) { printf("FAIL: the contest tile did not open the contest\n"); return 1; }
       click(110 + 58, 380 + 22);             // ENTER
       if (!pet.contestDoneThisWeek()) { printf("FAIL: ENTER did not enter the contest\n"); return 1; }
       click(240 + 58, 380 + 22);
-      click(394, 154);
+      click(349, 388);
       click(311, 270);                       // tile 5: jobs
       click(233, 118 + 28);                  // the cafe
-      if (!pet.atWork() || placeScene) { printf("FAIL: picking the cafe did not send it to work\n"); return 1; }
+      if (!pet.atWork()) { printf("FAIL: picking the cafe did not send it to work\n"); return 1; }
+      for (int k = 0; k < 120 && placeScene; k++) pump(1);   // phase 28: it walks out of the door first
+      if (placeScene) { printf("FAIL: the place did not close after the walk out\n"); return 1; }
       pet.jobKind = 0; pet.jobUntil = 0;     // back home for the rest of the test
       {                                      // phase 21: tile 6, the Nursery
         extern bool nurPick;
@@ -735,7 +748,7 @@ int main(int argc, char **argv) {
         party.slots[0] = PartyMon(); party.slots[0].dex = 3; party.slots[0].ivAtk = 30;
         party.box[0] = PartyMon(); party.box[0].dex = 26;
         pet.nursery = NurseryState(); pet.eggBred = false; pet.coins = 100;
-        click(394, 154);
+        click(349, 388);
         click(155, 154 + 3 * 58);
         if (placeScene != 16) { printf("FAIL: tile 6 did not open the Nursery (%u)\n", placeScene); return 1; }
         click(110 + 58, 380 + 22);           // LEAVE TWO
@@ -783,7 +796,7 @@ int main(int argc, char **argv) {
       pump(90);
 
       // each place has its tune; leaving it goes quiet
-      click(394, 154);
+      click(349, 388);
       click(155, 154);                       // the park
       pump(2);
       if (audioMusicNow() != MUS_TWINKLE) { printf("FAIL: the park did not play its tune (%u)\n", audioMusicNow()); return 1; }

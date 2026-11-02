@@ -3,7 +3,7 @@
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://botero50.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
-![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.26-8A2BE2)
+![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.27-8A2BE2)
 ![Code](https://img.shields.io/badge/code-MIT-blue)
 ![Languages](https://img.shields.io/badge/languages-8-FFCB05)
 [![Stars](https://img.shields.io/github/stars/botero50/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/botero50/TamaPoke/stargazers)
@@ -50,7 +50,7 @@ Built on crenberries428's 3.14, all in 8 languages:
 - **Restful nights**: asleep, its needs hold, so nobody wakes up to a starving pet.
 - **Coins and daily missions**, a **shop** with food, toys, 20 hats and outfits, and a **try-on mirror**.
 - **A room of its own** with furniture and wallpapers, sceneries for the main screen, trophies and a photo album.
-- **Places to go**: park, store, Pokémon Center, garden, school, lake, kitchen, beach, library, music hall, contest and part-time jobs.
+- **Places to go**: park, store, Pokémon Center, garden, school, lake, kitchen, beach, library, music hall, contest and part-time jobs, each with its own animations (the Center heals with a machine and a jingle).
 - **The Nursery**: two favourites from the party or box leave an egg for the next raising.
 - **Wi-Fi time and the real weather**: fog, rain, storms, settling snow, and snow from New York for places where it never snows.
 - **Family features**: a homework timer, a math quiz, chores, a piggy bank, an alarm, a diary, and parent limits for bedtime and games.

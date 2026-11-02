@@ -106,11 +106,15 @@ static const Note N_VICTORY[] = { {784, 120}, {784, 120}, {784, 120}, {1047, 320
 // the frequencies are unused: the thunder is all noise, lower and quieter each step
 static const Note N_THUNDER[] = { {1, 220}, {1, 420}, {1, 700} };
 
+// the healing jingle: written for TamaPoke, not the games' Center melody
+static const Note N_HEAL[] = { {523, 110}, {659, 110}, {784, 110}, {659, 110}, {698, 110}, {880, 110},
+                               {1047, 260}, {0, 80}, {784, 140}, {1047, 420} };
+
 static const SfxDef SFX[SFX_COUNT] = {
   {N_TAP, 1}, {N_EAT, 3}, {N_PLAY, 2}, {N_HEART, 2}, {N_HATCH, 4},
   {N_EVOLVE, 5}, {N_MEDAL, 5}, {N_DENY, 2}, {N_BYE, 3}, {N_LEVEL, 2},
   {N_HIT, 2}, {N_BEAM, 3}, {N_STATUS, 3}, {N_SUPER, 3}, {N_FAINT, 4},
-  {N_VICTORY, 6}, {N_THUNDER, 3},
+  {N_VICTORY, 6}, {N_THUNDER, 3}, {N_HEAL, 10},
 };
 
 // A loop, not a one-shot: the task walks it and starts over.

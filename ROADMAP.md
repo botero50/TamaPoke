@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 2 November 2026, with Phase 27._
+_Last updated: 2 November 2026, with Phase 28._
 
 ## Done
 | Phase | What | Release |
@@ -17,6 +17,7 @@ _Last updated: 2 November 2026, with Phase 27._
 | 25 | Show it to the world: the posts (published by the owner), social preview image, new tour GIF, repo description, a short README with "Build your own" and the screens | done |
 | 26 | Arcade night: tickets from the Fun Pack games (30 a day), a prize counter (arcade cap, star visor, arcade cabinet, capsule, cake), the weekly records board, bronze/silver/gold badges per game; plus a Wi-Fi name typed in any letter case still connects | v1.9 |
 | 27 | Trophies past 16 (now 18): "10 gold badges" and "All 3 arcade prizes" | v1.10 |
+| 28 | The places come alive (the Center's healing machine and an original jingle, plus an animation in the garden, beach, library, contest, jobs, adventure; idle life in the park, store, school, music hall), the map as a fifth bottom button, a slimmer steps gauge | v1.11 |
 
 ## Next
 | # | Item | Needs | Notes |

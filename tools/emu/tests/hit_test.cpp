@@ -169,15 +169,15 @@ int main(){
     ck(pet.sleeping, "the bath icon does not wake a sleeping pet");
     // and what is drawn greyed is exactly what is refused: one answer, so the
     // dimming can never point at a different icon than the tap handler does
-    bool grey[4];
-    for (int i = 0; i < 4; i++) grey[i] = uiButtonDisabled(i);
-    ck(!grey[BTN_LIGHT_IDX] && grey[0] && grey[2] && grey[3],
+    bool grey[5];
+    for (int i = 0; i < 5; i++) grey[i] = uiButtonDisabled(i);
+    ck(!grey[BTN_LIGHT_IDX] && grey[0] && grey[2] && grey[3] && grey[4],
        "and it is the only icon drawn lit while asleep");
 
     // the light icon must
     onTap((int16_t)lx, (int16_t)ly);
     ck(!pet.sleeping, "the light icon does");
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 5; i++)
       if (uiButtonDisabled(i)) bad++, printf("FAIL  icon %d still greyed awake\n", i);
     ck(true, "and awake, every icon is live again");
   }
@@ -185,7 +185,7 @@ int main(){
   // the home icons must not overlap each other now that they are bigger
   {
     int worst = 9999;
-    for (int i = 0; i + 1 < 4; i++) {
+    for (int i = 0; i + 1 < 5; i++) {
       int ax, ay, ah, bx2, by2, bh;
       uiButtonAt(i, &ax, &ay, &ah);
       uiButtonAt(i + 1, &bx2, &by2, &bh);

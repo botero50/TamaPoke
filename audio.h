@@ -22,6 +22,7 @@ enum Sfx : uint8_t {
   SFX_FAINT,    // something goes down
   SFX_VICTORY,  // the fight is won
   SFX_THUNDER,  // a storm outside (the real weather)
+  SFX_HEAL,     // the Pokemon Center's machine (an original jingle)
   SFX_COUNT
 };
 

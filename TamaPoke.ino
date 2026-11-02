@@ -43,7 +43,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.26"
+#define FW_VERSION "3.14-funpack.27"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -660,7 +660,7 @@ struct Btn {
 // can draw it (0 apple, 1 blueberry, 2 pear, 3 candy). Not saved.
 static uint8_t eatItem = 0;
 
-#define BTN_COUNT 4
+#define BTN_COUNT 5
 // Referred to by NAME, never by literal index. Removing the ball icon shifted
 // every index by one and drawButtons() still had `i != 2` meaning LIGHT -- which
 // silently made the BATH button the one that wakes the pet.
@@ -668,14 +668,18 @@ static uint8_t eatItem = 0;
 #define BTN_LIGHT 1
 #define BTN_BATH  2
 #define BTN_TRAIN 3
+#define BTN_MAP   4   // phase 28: the map left its floating spot on the right for the row
+// Five on the panel's curve (y = 406 - dx^2/729), 58 px apart: 52 px buttons fit
+// the round screen where five 60 px ones would clip at the ends.
 Btn buttons[BTN_COUNT] = {
-  { 134, 393, SPR_ICON_FOOD },   // eat
-  { 200, 405, SPR_ICON_LIGHT },  // light
-  { 266, 405, SPR_ICON_CLEAN },  // bath
-  { 332, 393, SPR_ICON_TRAIN },  // train
+  { 117, 388, SPR_ICON_FOOD },   // eat
+  { 175, 401, SPR_ICON_LIGHT },  // light
+  { 233, 406, SPR_ICON_CLEAN },  // bath
+  { 291, 401, SPR_ICON_TRAIN },  // train
+  { 349, 388, SPR_PLACE_MAP },   // the map: places to go
 };
-#define BTN_HALF 30  // 60x60 button -- bigger and more widely spaced than before
-#define BTN_HIT 40   // touch radius (a little more generous)
+#define BTN_HALF 26  // 52x52 button
+#define BTN_HIT 30   // touch radius: about half the spacing, so neighbours never share a tap
 
 // egg cracks ('k' pixels over the sprite)
 static const uint8_t CRACK1[][2] = { {15,8},{16,9},{15,10} };
@@ -2235,7 +2239,6 @@ void onTap(int16_t x, int16_t y) {
     feedMenuUntil = 0;
     return;
   }
-  if (mapButtonHit(x, y)) { sfxPlay(SFX_TAP); mapOpen = true; return; }
   if (int tb = topBarHit(x, y)) {
     sfxPlay(SFX_TAP);
     if (tb == 1) { missionsOpen = true; questView = false; }
@@ -2277,6 +2280,7 @@ void onTap(int16_t x, int16_t y) {
       if (i == BTN_FOOD) { foodOpen = true; foodCat = -1; }
       else if (i == BTN_LIGHT) { if (pet.sleeping) pet.toggleLight(); else sleepOpen = true; }
       else if (i == BTN_BATH) bathOpen = true;
+      else if (i == BTN_MAP) mapOpen = true;
       else if (!fpBlockedBySick()) trainOpen = true;
       return;
     }
@@ -4272,7 +4276,6 @@ void render() {
     drawHeader(name, gNight ? UI_INK_NIGHT : nameOnSky(d.accent), statusMsg());
     drawStreakBadge();
     drawTopBar();
-    drawMapButton();
     drawDecor();
     drawPet();
     drawEatFood();
@@ -5046,8 +5049,9 @@ static void drawFootprint(int x, int y, uint16_t col) {
 // STEP_GOAL and turns gold when it is met. No label text: a footprint says
 // "steps" in every language without a row in the string table.
 void drawStepPlate() {
-  const float A0 = 6.0f, A1 = 42.0f;     // degrees above 9 o'clock, bottom to top
-  const int R_IN = 166, R_OUT = 234;
+  // phase 28: a slimmer plate, about a third of the old one, clear of the pet
+  const float A0 = 12.0f, A1 = 34.0f;    // degrees above 9 o'clock, bottom to top
+  const int R_IN = 198, R_OUT = 234;
   uint32_t steps = pet.stepsToday();
   uint16_t ink = inkColor();
   fillArcBand(R_IN, R_OUT, A0, A1, gNight ? C565(0x1c, 0x26, 0x44) : UI_WHITE);
@@ -5078,17 +5082,20 @@ void drawStepPlate() {
   // significant first. Each digit sits where the text radius meets its row, so the
   // column bends with the panel's edge and costs ~40 px of width instead of the
   // 60 a flat row of five needs. They stay upright: the font cannot rotate.
-  drawFootprint(66, 100, ink);
-  drawFootprint(78, 106, ink);
+  {                                       // one footprint just inside the top edge
+    const float a = (A1 - 4.0f) * RAD;
+    drawFootprint(CX - (int)(212 * cosf(a)), CY - (int)(212 * sinf(a)), ink);
+  }
   char s[8];
   int n = snprintf(s, sizeof(s), "%lu", (unsigned long)steps);
-  const int PITCH = 17, R_TXT = 194;
+  const int PITCH = 13, R_TXT = 213;
+  const int MIDY = CY - (int)(R_TXT * sinf((A0 + A1 - 6.0f) / 2 * RAD));   // the band's middle, below the footprint
   for (int i = 0; i < n; i++) {
-    int cy = 162 + (int)((i - (n - 1) / 2.0f) * PITCH);
+    int cy = MIDY + (int)((i - (n - 1) / 2.0f) * PITCH);
     int dy = CY - cy;
     int cx = CX - (int)sqrtf((float)(R_TXT * R_TXT - dy * dy));
     char c[2] = {s[i], 0};
-    uiText(UIF_SMALL, cx, cy - 8 + 14, c, ink, 1);   // centred on the column
+    uiText(UIF_TINY, cx, cy + 5, c, ink, 1);   // centred on the column
   }
 }
 
@@ -8360,9 +8367,9 @@ void drawButtons() {
   // Soft pastel tile per icon (indexed by BTN_*), a darker ring of the same hue
   // and a drop shadow, so the row reads as raised buttons.
   const uint16_t tint[BTN_COUNT]   = { C565(255, 230, 224), C565(255, 244, 204),
-                                       C565(220, 238, 255), C565(226, 232, 248) };
+                                       C565(220, 238, 255), C565(226, 232, 248), C565(222, 244, 222) };
   const uint16_t accent[BTN_COUNT] = { C565(232, 110, 96), C565(232, 180, 60),
-                                       C565(90, 160, 220), C565(110, 128, 190) };
+                                       C565(90, 160, 220), C565(110, 128, 190), C565(90, 170, 100) };
   for (int i = 0; i < BTN_COUNT; i++) {
     bool off = uiButtonDisabled(i);   // asleep only LIGHT works
     int bx = buttons[i].cx - BTN_HALF, by = buttons[i].cy - BTN_HALF;
@@ -8374,7 +8381,7 @@ void drawButtons() {
       gfx->drawRoundRect(bx + 1, by + 1, bs - 2, bs - 2, 13, accent[i]);
     }
     gfx->drawRoundRect(bx, by, bs, bs, 14, inkColor());
-    if (!off) drawMap(buttons[i].icon, 16, buttons[i].cx - 24, buttons[i].cy - 24, 3, false);
+    if (!off) drawMap(buttons[i].icon, 16, buttons[i].cx - 24, buttons[i].cy - 24, 3, false);   // 48 px in a 52 px tile
   }
 }
 
@@ -10557,6 +10564,14 @@ enum : uint8_t { PLACE_NONE = 0, PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GA
                  PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY };
 
 uint32_t placeAnimUntil = 0;      // the park walk animation
+// An action's animation (phase 28): what is playing, when it began, where, and in
+// which place -- leaving the place drops it rather than finishing it elsewhere.
+enum : uint8_t { FX_NONE = 0, FX_HEAL, FX_PLANT, FX_HARVEST, FX_CHEST, FX_CASTLE, FX_SHELL, FX_BOOK, FX_JUDGES, FX_JOB };
+uint8_t placeFx = FX_NONE, placeFxScene = 0;
+uint32_t placeFxAt = 0;
+int16_t placeFxX = 0, placeFxY = 0;
+#define HEAL_MS 3500
+#define JOB_WALK_MS 1200
 uint32_t placeMsgUntil = 0;
 char placeMsg[48] = "";
 int16_t placeFriend = 0;          // the wild Pokemon met in the park, while it is shown
@@ -10612,7 +10627,136 @@ static void drawPlaceButtons(StrId act, bool actOn) {
   uiTextFit(UIF_SMALL, PLACE_BACK_X + PLACE_BTN_W / 2, uiMidY(UIF_SMALL, PLACE_BTN_Y, PLACE_BTN_H), T(S_LEAVE), UI_INK, 1, PLACE_BTN_W - 10);
 }
 
+static void fxStart(uint8_t kind, int16_t x = 0, int16_t y = 0) {
+  placeFx = kind; placeFxAt = millis(); placeFxScene = placeScene; placeFxX = x; placeFxY = y;
+}
+static void fxSparkle(int x, int y, int r, uint16_t c) {
+  gfx->drawLine(x - r, y, x + r, y, c);
+  gfx->drawLine(x, y - r, x, y + r, c);
+  gfx->drawLine(x - r / 2, y - r / 2, x + r / 2, y + r / 2, c);
+  gfx->drawLine(x - r / 2, y + r / 2, x + r / 2, y - r / 2, c);
+}
+static void fxConfetti(uint32_t e) {
+  static const uint16_t C[4] = { C565(0xe8, 0x50, 0x3a), C565(0xff, 0xcb, 0x05), C565(0x4f, 0x93, 0xc4), C565(0x58, 0xb8, 0x68) };
+  for (int k = 0; k < 24; k++) {
+    int x = (k * 53 + 40) % 400 + 33 + (int)(sinf(e * 0.004f + k) * 10);
+    int y = 80 + (int)((e * (0.12f + (k % 5) * 0.02f)) + k * 17) % 300;
+    gfx->fillRect(x, y, 6, 4, C[k % 4]);
+  }
+}
+// what an action looks like, and what happens when it ends
+static void drawPlaceFx() {
+  extern uint8_t townRibbon, townScore;   // the contest's, defined with the town
+  if (!placeFx) return;
+  if (placeScene != placeFxScene) { placeFx = FX_NONE; return; }
+  uint32_t now = millis(), e = now - placeFxAt;
+  switch (placeFx) {
+    case FX_HEAL: {                     // sparkles and hearts rise around it; the machine is in the scene
+      if (e >= HEAL_MS) { placeFx = FX_NONE; placeSay(T(S_HEALED)); return; }
+      if (e > 1700) {
+        float t = (e - 1700) / 1800.0f;
+        for (int k = 0; k < 7; k++) {
+          int x = 150 + (int)(sinf(k * 2.1f + e * 0.003f) * 46);
+          int y = FP_GROUND - 20 - (int)(fmodf(t * 160 + k * 23, 160));
+          if (k % 2) drawHeartShape(x, y, 4);
+          else fxSparkle(x, y, 6, C565(0xff, 0x9c, 0xc0));
+        }
+      }
+      return;
+    }
+    case FX_PLANT: {                    // a watering can tips over the plot
+      if (e >= 1500) { placeFx = FX_NONE; return; }
+      int cx = CX - 70, cy = FP_GROUND - 90 + (int)(sinf(e * 0.01f) * 3);
+      gfx->fillRoundRect(cx - 18, cy - 12, 36, 24, 6, C565(0x4f, 0x93, 0xc4));
+      gfx->drawLine(cx + 18, cy - 6, cx + 40, cy + 10, C565(0x4f, 0x93, 0xc4));
+      gfx->drawLine(cx + 18, cy - 5, cx + 40, cy + 11, C565(0x4f, 0x93, 0xc4));
+      for (int k = 0; k < 6; k++) {
+        int dy = (int)((e / 3 + k * 11) % 50);
+        gfx->fillCircle(cx + 42 + (k % 3) * 6, cy + 14 + dy, 2, C565(0x9f, 0xd4, 0xf4));
+      }
+      return;
+    }
+    case FX_HARVEST: {                  // the fruits pop up and fall into the basket
+      if (e >= 1200) { placeFx = FX_NONE; return; }
+      static const uint16_t FC[3] = { UI_BAR_BAD, UI_BAR_WARN, C565(0xa0, 0x60, 0xc8) };
+      for (int k = 0; k < 3; k++) {
+        float t = e / 1200.0f;
+        int x = CX - 30 + k * 30 + (int)(t * (k - 1) * 30);
+        int y = FP_GROUND - 70 - (int)(sinf(t * 3.1416f) * 70) + k * 4;
+        gfx->fillCircle(x, y, 9, FC[k]);
+        fxSparkle(x + 10, y - 10, 4, UI_WHITE);
+      }
+      return;
+    }
+    case FX_CHEST: {                    // a chest opens with sparkles
+      if (e >= 1400) { placeFx = FX_NONE; return; }
+      int cx = CX, cy = 230;
+      gfx->fillRoundRect(cx - 34, cy, 68, 36, 6, C565(0xb0, 0x7a, 0x45));
+      gfx->drawRoundRect(cx - 34, cy, 68, 36, 6, UI_INK);
+      int lift = e < 400 ? (int)(e / 400.0f * 18) : 18;
+      gfx->fillRoundRect(cx - 36, cy - 14 - lift, 72, 16, 6, C565(0x9c, 0x5a, 0x34));
+      gfx->drawRoundRect(cx - 36, cy - 14 - lift, 72, 16, 6, UI_INK);
+      gfx->fillRect(cx - 5, cy + 6, 10, 10, UI_BAR_WARN);
+      if (e > 350) for (int k = 0; k < 6; k++) fxSparkle(cx - 40 + k * 16, cy - 20 - (int)((e - 350) / 12 + k * 9) % 60, 5, C565(0xff, 0xd9, 0x5c));
+      return;
+    }
+    case FX_CASTLE: {                   // the castle rises in three stages
+      if (e >= 1500) { placeFx = FX_NONE; return; }
+      int stage = 1 + (int)(e / 500), cx = 360, cy = 300;
+      uint16_t sand = C565(0xe0, 0xc0, 0x80);
+      gfx->fillRect(cx - 30, cy - 20, 60, 30, sand);
+      if (stage >= 2) for (int k = 0; k < 3; k++) gfx->fillRect(cx - 30 + k * 24, cy - 34, 12, 14, sand);
+      if (stage >= 3) { gfx->fillRect(cx - 2, cy - 54, 3, 22, UI_INK); gfx->fillTriangle(cx + 1, cy - 54, cx + 16, cy - 48, cx + 1, cy - 42, UI_BAR_BAD); }
+      for (int k = 0; k < 4; k++) gfx->fillCircle(cx - 40 + k * 26, cy + 12 - (int)((e / 6 + k * 13) % 30), 2, sand);
+      return;
+    }
+    case FX_SHELL: {                    // the shell flies up to the corner
+      if (e >= 700) { placeFx = FX_NONE; return; }
+      float t = e / 700.0f;
+      int x = placeFxX + (int)((392 - placeFxX) * t), y = placeFxY + (int)((96 - placeFxY) * t) - (int)(sinf(t * 3.1416f) * 40);
+      fpEllipse(x, y, 12 - (int)(t * 6), 9 - (int)(t * 4), C565(0xf8, 0xc8, 0xd0));
+      fxSparkle(x, y, 8 + (int)(t * 6), UI_WHITE);
+      return;
+    }
+    case FX_BOOK: {                     // the cover swings open over the page
+      if (e >= 800) { placeFx = FX_NONE; return; }
+      int w = (int)(150 * (1.0f - e / 800.0f));
+      gfx->fillRoundRect(CX, 112, w, 170, 10, C565(0xb5, 0x32, 0x24));
+      gfx->drawRoundRect(CX, 112, w, 170, 10, UI_INK);
+      return;
+    }
+    case FX_JUDGES: {                   // three score cards, one after another, then confetti
+      if (e >= 3200) { placeFx = FX_NONE; return; }
+      for (int k = 0; k < 3; k++) {
+        uint32_t at = 300 + k * 450;
+        if (e < at) continue;
+        float f = e - at < 250 ? (e - at) / 250.0f : 1.0f;             // the card flips up
+        int x = 120 + k * 113, h = (int)(44 * f);
+        gfx->fillRect(x - 20, 172 - h, 40, h, UI_WHITE);   // held up in front, above the ribbon counts
+        gfx->drawRect(x - 20, 172 - h, 40, h, UI_INK);
+        if (f >= 1.0f) {
+          char n[4];
+          int v = (int)townScore / 25 + (k == 1 ? 1 : 0) - (k == 2 ? 1 : 0);
+          snprintf(n, sizeof(n), "%d", v < 1 ? 1 : v > 10 ? 10 : v);
+          uiText(UIF_SMALL, x, 162, n, UI_INK, 1);
+        }
+      }
+      if (e > 1700 && townRibbon) fxConfetti(e - 1700);
+      return;
+    }
+    case FX_JOB: {                      // off to work: out of the door
+      if (e >= JOB_WALK_MS) { placeFx = FX_NONE; placeScene = PLACE_NONE; return; }
+      int x = 150 + (int)(e / (float)JOB_WALK_MS * 360);
+      gfx->fillRect(400, FP_GROUND - 120, 46, 120, C565(0x7e, 0x55, 0x30));   // the door
+      gfx->fillCircle(410, FP_GROUND - 60, 3, UI_BAR_WARN);
+      fpDrawPet(x, FP_GROUND, PMD_WALKR, 3);
+      return;
+    }
+  }
+}
+
 static void drawPlaceMsg() {
+  drawPlaceFx();
   if (!placeMsgUntil) return;
   if (millis() > placeMsgUntil) { placeMsgUntil = 0; placeFriend = 0; return; }
   gfx->fillRoundRect(63, 112, 340, 52, 16, UI_WHITE);
@@ -10680,6 +10824,11 @@ static void parkScene(uint32_t now) {
     }
     placeSay(b);
   }
+  for (int k = 0; k < 5; k++) {                                                // leaves drift down
+    int lx = 60 + k * 85 + (int)(sinf(now * 0.002f + k) * 18);
+    int ly = 110 + (int)((now / (28 + k * 3) + k * 70) % 260);
+    fpEllipse(lx, ly, 5, 3, (k & 1) ? C565(0xe8, 0xa0, 0x30) : C565(0x58, 0xb8, 0x68));
+  }
   fpDrawPet(x, FP_GROUND, act, 4);
   if (placeFriend && placeMsgUntil) fpThumb(placeFriend, 340, FP_GROUND - 40, 2, false);
 }
@@ -10696,16 +10845,33 @@ static void storeScene() {
       drawMap(ic, 16, 92 + k * 48, sy, 2, false);
     }
   }
-  fpThumb(DEX_MEOWTH, 360, 262, 2, false);
+  fpThumb(DEX_MEOWTH, 360, 262 + (int)(sinf(millis() * 0.004f) * 3), 2, false);   // the shopkeeper bobs
   drawCounter(290, C565(0x9c, 0x5a, 0x34));
   drawCapsuleMachine();
   fpDrawPet(205, FP_GROUND, PMD_IDLE, 3);
 }
 
 static void centerScene() {
+  uint32_t now = millis();
   drawIndoor(C565(0xf8, 0xc8, 0xd0), C565(0xe8, 0xe8, 0xf0));
   drawMap(SPR_PLACE_CROSS, 16, CX - 32, 120, 4, false);
-  fpThumb(DEX_CHANSEY, 330, 262, 2, false);
+  bool healing = placeFx == FX_HEAL && placeScene == placeFxScene;
+  uint32_t e = healing ? now - placeFxAt : 0;
+  int nod = healing && e < 500 ? (int)(sinf(e * 0.0126f) * 6) : 0;               // Chansey nods
+  fpThumb(DEX_CHANSEY, 340, 262 + nod, 2, false);
+  // the healing machine: six ball slots on the counter
+  int mx = 225, my = 252;
+  gfx->fillRoundRect(mx - 66, my - 4, 132, 40, 10, C565(0xd8, 0xd8, 0xe4));
+  gfx->drawRoundRect(mx - 66, my - 4, 132, 40, 10, UI_INK);
+  for (int i = 0; i < 6; i++) {
+    int bx = mx - 50 + i * 20, by = my + 16;
+    bool lit = healing ? (e < 1700 ? (int)(e / 260) % 6 == i || (int)(e / 260) >= 6 : (e / 150) % 2 == 0)
+                       : (now / 500) % 6 == (uint32_t)i;                          // idle: a soft glow walks along
+    gfx->fillCircle(bx, by, 7, UI_BAR_BAD);
+    gfx->fillRect(bx - 7, by, 15, 7, UI_WHITE);
+    gfx->drawCircle(bx, by, 7, UI_INK);
+    if (lit) { gfx->fillCircle(bx, by, 5, C565(0xff, 0xf4, 0x90)); gfx->drawCircle(bx, by, 9, C565(0xff, 0xd9, 0x5c)); }
+  }
   drawCounter(290, C565(0xe0, 0x50, 0x60));
   fpDrawPet(150, FP_GROUND, PMD_IDLE, 3);
 }
@@ -10730,6 +10896,17 @@ static void gardenScene() {
       char b[24];
       snprintf(b, sizeof(b), T(S_GROWING_FMT), g);
       uiTextFit(UIF_SMALL, CX, 186, b, fpInk(), 1, 300);
+    }
+  }
+  {                                                                            // butterflies
+    uint32_t now = millis();
+    for (int k = 0; k < 2; k++) {
+      int bx = 120 + k * 200 + (int)(sinf(now * 0.0011f + k * 2) * 70), by = 150 + (int)(sinf(now * 0.0017f + k) * 30);
+      int flap = (now / 120 + k) % 2 ? 7 : 3;
+      uint16_t wc = k ? C565(0xff, 0xcb, 0x05) : C565(0xf0, 0x8a, 0xa4);
+      gfx->fillTriangle(bx, by, bx - 9, by - flap, bx - 9, by + flap, wc);
+      gfx->fillTriangle(bx, by, bx + 9, by - flap, bx + 9, by + flap, wc);
+      gfx->drawFastVLine(bx, by - 4, 8, UI_INK);
     }
   }
   fpDrawPet(110, FP_GROUND, PMD_IDLE, 3);
@@ -10803,20 +10980,22 @@ void placeTap(int16_t x, int16_t y) {
       shopOpen = true; shopCat = -1; shopPage = 0; shopConfirm = -1; mirrorItem = -1;   // the shop opens over the store
       break;
     case PLACE_CENTER: {
+      if (placeFx == FX_HEAL) break;                 // already healing
       CenterResult r = pet.centerHeal();
       if (r == CENTER_NO_COINS) { sfxPlay(SFX_DENY); placeSay(T(S_NOT_ENOUGH)); }
-      else { sfxPlay(SFX_HEART); placeSay(T(S_HEALED)); }
+      else { sfxPlay(SFX_HEAL); placeMsgUntil = 0; fxStart(FX_HEAL); }   // "Healed!" comes when the machine is done
       break;
     }
     case PLACE_GARDEN: {
       if (pet.gardenReady()) {
         int8_t f = pet.harvest();
+        fxStart(FX_HARVEST);
         char b[48];
         snprintf(b, sizeof(b), T(S_GOT_FOOD_FMT), T(foodName((uint8_t)f)));
         sfxPlay(SFX_MEDAL);
         placeSay(b);
       } else if (!pet.plantEpoch) {
-        if (pet.plantSeed()) { sfxPlay(SFX_TAP); }
+        if (pet.plantSeed()) { sfxPlay(SFX_TAP); fxStart(FX_PLANT); }
         else { sfxPlay(SFX_DENY); placeSay(T(S_NEED_SEED)); }
       }
       break;
@@ -11038,7 +11217,20 @@ static void renderSchool() {
   char b[32];
   switch (schoolMode) {
     case SCH_ROOM:
-      drawChalkboard("1 + 2 = 3");
+      {
+        static const char SUM[] = "1 + 2 = 3";                // written out a stroke at a time
+        char part[12];
+        uint32_t n = (now / 350) % 14;
+        strncpy(part, SUM, sizeof(part) - 1);
+        part[n < 9 ? n : 9] = 0;
+        drawChalkboard(part);
+        int kx = 400, ky = 96;                                  // the classroom clock
+        gfx->fillCircle(kx, ky, 18, UI_WHITE);
+        gfx->drawCircle(kx, ky, 18, UI_INK);
+        float a = now * 0.0006f;
+        gfx->drawLine(kx, ky, kx + (int)(sinf(a) * 14), ky - (int)(cosf(a) * 14), UI_INK);
+        gfx->drawLine(kx, ky, kx + (int)(sinf(a / 12) * 9), ky - (int)(cosf(a / 12) * 9), UI_INK);
+      }
       fpDrawPet(CX, FP_GROUND, PMD_IDLE, 3);
       drawSchoolButton(0, S_STUDY, UI_BAR_OK, UI_WHITE);
       drawSchoolButton(1, S_QUIZ, UI_BAR_WARN, UI_INK);
@@ -11770,6 +11962,7 @@ static void adventureScene(uint32_t now) {
 
 static void adventureClaim() {
   AdvResult r = pet.advClaim();
+  if (r != ADV_NONE) fxStart(FX_CHEST);
   char b[48];
   switch (r) {
     case ADV_NONE: sfxPlay(SFX_DENY); placeSay(T(S_ADV_HINT)); return;
@@ -13320,7 +13513,7 @@ static void beachScene(uint32_t now) {
       fpEllipse(shellX[i], shellY[i], 12, 9, C565(0xf8, 0xc8, 0xd0));
       for (int k = -1; k <= 1; k++) gfx->drawLine(shellX[i], shellY[i] + 8, shellX[i] + k * 8, shellY[i] - 6, C565(0xc7, 0x5f, 0x80));
     }
-  if (pet.castleDay == pet.lastSeenEpoch / 86400) {        // today's castle
+  if (pet.castleDay == pet.lastSeenEpoch / 86400 && placeFx != FX_CASTLE) {   // today's castle (while it rises, the effect draws it)
     int cx = 360, cy = 300;
     gfx->fillRect(cx - 30, cy - 20, 60, 30, C565(0xe0, 0xc0, 0x80));
     for (int k = 0; k < 3; k++) gfx->fillRect(cx - 30 + k * 24, cy - 34, 12, 14, C565(0xe0, 0xc0, 0x80));
@@ -13344,6 +13537,8 @@ static void libraryScene(uint32_t now) {
     typeChipSmall(300, 186, d.type1);
     if (d.type2 < TYPE_COUNT) typeChipSmall(300, 224, d.type2);
   } else townUntil = 0;
+  for (int k = 0; k < 3; k++)                                // dust in the light
+    gfx->fillCircle(330 + (int)(sinf(now * 0.0009f + k * 2) * 40), 90 + (int)((now / 60 + k * 50) % 150), 1 + k % 2, C565(0xff, 0xf0, 0xc8));
   fpDrawPet(150, FP_GROUND, PMD_IDLE, 3);
 }
 
@@ -13351,7 +13546,7 @@ static void musicScene(uint32_t now) {
   drawIndoor(C565(0x50, 0x3c, 0x78), C565(0x7e, 0x55, 0x30));
   gfx->fillRect(60, 300, 346, 20, C565(0xb0, 0x7a, 0x45));  // the stage
   for (int k = 0; k < 5; k++)                                 // spotlights
-    gfx->fillTriangle(90 + k * 70, 90, 70 + k * 70, 300, 110 + k * 70, 300, lerp565(C565(0x50, 0x3c, 0x78), UI_WHITE, 1, 6));
+    gfx->fillTriangle(90 + k * 70, 90, 70 + k * 70 + (int)(sinf(now * 0.0015f + k) * 24), 300, 110 + k * 70 + (int)(sinf(now * 0.0015f + k) * 24), 300, lerp565(C565(0x50, 0x3c, 0x78), UI_WHITE, 1, 6));
   bool dancing = townUntil && now < townUntil;
   int bob = dancing ? (int)(fabsf(sinf(now * 0.012f)) * 18) : 0;
   fpDrawPet(CX, 300 - bob, PMD_IDLE, 3);
@@ -13531,7 +13726,14 @@ static void jobsScene(uint32_t) {
     uiTextFit(UIF_SMALL, 104, y + 26, T(JOB[i]), UI_INK, 0, 170);
     uiTextFit(UIF_TINY, 360, y + 44, T(S_JOB_INFO), UI_INK, 2, 110);
   }
-  if (pet.jobDoneToday()) uiTextFit(UIF_SMALL, CX, 356, T(S_JOB_TOMORROW), UI_INK, 1, 300);
+  if (pet.jobDoneToday() && placeFx != FX_JOB) uiTextFit(UIF_SMALL, CX, 356, T(S_JOB_TOMORROW), UI_INK, 1, 300);
+  {                                                       // the clock on the wall
+    uint32_t now = millis();
+    gfx->fillCircle(410, 100, 16, UI_WHITE);
+    gfx->drawCircle(410, 100, 16, UI_INK);
+    float a = now * 0.0006f;
+    gfx->drawLine(410, 100, 410 + (int)(sinf(a) * 12), 100 - (int)(cosf(a) * 12), UI_INK);
+  }
 }
 
 void typeChipSmall(int cx, int y, uint8_t t) {
@@ -13587,13 +13789,13 @@ bool placeTapTown(int16_t x, int16_t y) {
   switch (placeScene) {
     case PLACE_BEACH:
       if (act) {
-        if (pet.buildCastle()) { sfxPlay(SFX_MEDAL); placeSay(T(S_CASTLE_DONE)); }
+        if (pet.buildCastle()) { sfxPlay(SFX_MEDAL); placeSay(T(S_CASTLE_DONE)); fxStart(FX_CASTLE); }
         else { sfxPlay(SFX_DENY); placeSay(T(S_CASTLE_AGAIN)); }
         return true;
       }
       for (int i = 0; i < 3; i++) {
         if (abs(x - shellX[i]) > 22 || abs(y - shellY[i]) > 20) continue;
-        if (pet.findShell()) { sfxPlay(SFX_MEDAL); placeSay(T(S_SHELL_FOUND)); shellX[i] = (int16_t)(100 + random(266)); shellY[i] = (int16_t)(300 + random(60)); }
+        if (pet.findShell()) { sfxPlay(SFX_MEDAL); placeSay(T(S_SHELL_FOUND)); fxStart(FX_SHELL, shellX[i], shellY[i]); shellX[i] = (int16_t)(100 + random(266)); shellY[i] = (int16_t)(300 + random(60)); }
         else { sfxPlay(SFX_DENY); placeSay(T(S_SHELLS_DONE)); }
         return true;
       }
@@ -13606,6 +13808,7 @@ bool placeTapTown(int16_t x, int16_t y) {
       if (!townDex) townDex = 25;
       townUntil = millis() + 7000;
       placeMsgUntil = 0;
+      fxStart(FX_BOOK);
       sfxPlay(SFX_TAP);
       return true;
     case PLACE_MUSIC:
@@ -13626,6 +13829,7 @@ bool placeTapTown(int16_t x, int16_t y) {
       {
         townScore = (uint8_t)min(255, pet.contestScore() + (int)random(21));
         townRibbon = pet.enterContest(townScore);
+        fxStart(FX_JUDGES);
         static const StrId RES[4] = { S_RIB_NONE, S_RIB_BRONZE, S_RIB_SILVER, S_RIB_GOLD };
         sfxPlay(townRibbon ? SFX_VICTORY : SFX_TAP);
         placeSay(T(RES[townRibbon]));
@@ -13639,7 +13843,7 @@ bool placeTapTown(int16_t x, int16_t y) {
       for (int i = 0; i < 3; i++) {
         int jy = 118 + i * 68;
         if (x < 90 || x > 376 || y < jy || y > jy + 56) continue;
-        if (pet.startJob((uint8_t)(JOB_CAFE + i))) { sfxPlay(SFX_TAP); placeScene = PLACE_NONE; }   // off it goes
+        if (pet.startJob((uint8_t)(JOB_CAFE + i))) { sfxPlay(SFX_TAP); fxStart(FX_JOB); }   // off it goes, out of the door (drawPlaceFx closes the place)
         else { sfxPlay(SFX_DENY); placeSay(T(pet.jobDoneToday() ? S_JOB_TOMORROW : S_TOO_TIRED)); }
         return true;
       }
