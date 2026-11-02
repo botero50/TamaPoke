@@ -107,6 +107,30 @@ int main(){
     ck(q.tickets == 77 && q.weekHi[MINI_MOLE] == 9 && q.weekId == p.weekId, "tickets and the week's bests persist");
   }
 
+  // --- phase 27: the two arcade trophies, past the old limit of 16
+  {
+    Pet p; fresh(p, 20400);
+    p.trophies = 0; p.coinsEarned = 0;
+    for (int g = 0; g < 9; g++) p.miniHi[g] = 250;   // nine golds
+    ck(p.goldBadges() == 9, "nine gold badges");
+    while (p.checkTrophies() >= 0) {}                 // whatever else is already earned
+    ck(!p.hasTrophy(TRO_GOLD), "nine golds: not yet");
+    p.miniHi[9] = 250;
+    uint32_t c0 = p.coins;
+    ck(p.checkTrophies() == TRO_GOLD && p.hasTrophy(TRO_GOLD) && p.coins == c0 + TROPHY_COINS, "the tenth gold: Gold collector, and its coins");
+    ck(p.checkTrophies() != TRO_GOLD, "and only once");
+    p.tickets = 500;
+    p.winPrize(PRIZE_CAP); p.winPrize(PRIZE_VISOR);
+    while (p.checkTrophies() >= 0) {}
+    ck(!p.hasTrophy(TRO_PRIZES), "two prizes: not yet");
+    p.winPrize(PRIZE_CABINET);
+    ck(p.checkTrophies() == TRO_PRIZES && p.hasTrophy(TRO_PRIZES), "all three: Prize winner");
+    ck(TRO_PRIZES >= 16 && (p.trophies >> 16) != 0, "these live past bit 16");
+    p.setClock(p.lastSeenEpoch);
+    Pet q; q.begin();
+    ck(q.hasTrophy(TRO_GOLD) && q.hasTrophy(TRO_PRIZES) && q.trophies == p.trophies, "and they persist");
+  }
+
   if (bad) printf("FAILURES\n");
   return bad?1:0;
 }

@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 2 November 2026, with Phase 26._
+_Last updated: 2 November 2026, with Phase 27._
 
 ## Done
 | Phase | What | Release |
@@ -14,18 +14,23 @@ _Last updated: 2 November 2026, with Phase 26._
 | 22 | Wi-Fi time sync and the real weather (Open-Meteo) | v1.7 |
 | 23 | Weather polish: fog, thunder, snow on the ground, puddles, snow from New York, 30-minute refresh, Wi-Fi diagnostics | v1.7 |
 | 24 | Restful nights (asleep 20:00-08:00 the bars hold; bedtime from 21:00; an unplugged night counts as sleep) and the try-on mirror in the shop | v1.8 |
-| 25 (prepared) | Show it to the world: posts in `Desktop\Tamapoke-backup\share`, social preview image, new tour GIF, repo description, a short README with "Build your own" and the screens | on GitHub |
-| 26 | Arcade night: tickets from the Fun Pack games (30 a day), a prize counter (arcade cap, star visor, arcade cabinet, capsule, cake), the weekly records board, bronze/silver/gold badges per game; plus a Wi-Fi name typed in any letter case still connects | v1.9 (pending) |
+| 25 | Show it to the world: the posts (published by the owner), social preview image, new tour GIF, repo description, a short README with "Build your own" and the screens | done |
+| 26 | Arcade night: tickets from the Fun Pack games (30 a day), a prize counter (arcade cap, star visor, arcade cabinet, capsule, cake), the weekly records board, bronze/silver/gold badges per game; plus a Wi-Fi name typed in any letter case still connects | v1.9 |
+| 27 | Trophies past 16 (now 18): "10 gold badges" and "All 3 arcade prizes" | v1.10 |
 
 ## Next
 | # | Item | Needs | Notes |
 |---|---|---|---|
-| 1 | **Checks on the real ball** | the family | Nursery sprites and the next-day egg; SD photo (DIARY -> ALBUM -> PHOTO); tilt direction in the maze, Catch and Balance; how hard the shake race is; New York snow on its first snowy day; a hat in the mirror sits as it does once bought; the arcade prizes. (Wi-Fi sync and weather: confirmed working on 2 Nov.) |
-| 2 | **Phase 25: the posts** | the owner's accounts | MakerWorld thank-you and Make, r/esp32, r/tamagotchi, Hackster, r/arduino, Hackaday, in the order of `checklist.md`. No faces, names, city or Wi-Fi name |
-| 3 | **Phase 27: friend visits and trading** | a second ball | Uses the existing ESP-NOW battle link; cannot be tested with one ball |
-| 4 | **Battery saver** | a battery fitted | The ball reports no battery now (`bat=-1`) |
-| 5 | **SD content packs** | only if space runs out | Firmware at ~75%; revisit near 90% |
-| 6 | **Translations review** | native speakers | FR, DE, IT, PT, ZH and KO were machine-written |
+| 1 | **Checks on the real ball** | the family | Nursery sprites and the next-day egg; SD photo (DIARY -> ALBUM -> PHOTO); tilt direction in the maze, Catch and Balance; how hard the shake race is; New York snow on its first snowy day; a hat in the mirror sits as it does once bought; the arcade prizes and hats on a Venusaur. (Wi-Fi sync and weather: confirmed working on 2 Nov.) |
+| 2 | **Anything that comes up while playing** | the family | Fixed as small fixes; bigger ideas get a plan first |
+
+## Later
+| Item | Needs | Notes |
+|---|---|---|
+| **Friend visits and trading** | a second ball | "Not for now" (2 Nov). Would use the existing ESP-NOW battle link |
+| **Battery saver** | a battery fitted | The ball reports no battery now (`bat=-1`) |
+| **SD content packs** | only if space runs out | Firmware at 74%; revisit near 90% |
+| **Translations review** | native speakers | FR, DE, IT, PT, ZH and KO were machine-written |
 
 ## Decisions on record
 - **Weather:** Open-Meteo (free, no key). The location comes from the browser, rounded
@@ -45,5 +50,10 @@ _Last updated: 2 November 2026, with Phase 26._
   are worked out from the records (1x, 2x, 3x each game's "good score"), so they need no save.
   The cabinet is a decoration beside the pet, not room furniture, and there is no trophy for
   gold badges: the trophy list is full at 16.
+- **The thunder sound stays** as it is (the owner likes the sound effects), with no setting.
+  It is already silent at night and while the pet sleeps.
+- **The cabinet in the room:** decorations are drawn over any background, so with the room
+  scenery picked the cabinet stands beside the pet in the room. No furniture slot needed.
+- **Trophies** are 32 bits since phase 27: the low 16 in `trph`, the rest in `trphX`.
 - **Posting:** crenberries428's repo has issues and discussions off, so the thank-you note
   goes on their MakerWorld case page. Printables dropped: the case is only on MakerWorld.

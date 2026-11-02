@@ -273,9 +273,10 @@ enum TrophyId : uint8_t {
   TRO_MEALS = 0, TRO_GAMES, TRO_BATHS, TRO_WALKS, TRO_HARVEST, TRO_COINS, TRO_HATS,
   TRO_DECOR, TRO_STREAK, TRO_LEVEL, TRO_STUDY, TRO_TEETH, TRO_PERFECT, TRO_CAPSULE,
   TRO_FISH, TRO_ROUTE,
+  TRO_GOLD, TRO_PRIZES,                      // the arcade (phase 27)
   TRO_COUNT
 };
-static_assert(TRO_COUNT <= 16, "trophies needs a bit each");
+static_assert(TRO_COUNT <= 32, "trophies needs a bit each");
 #define TROPHY_COINS 10
 // Brushing teeth (bath menu), homework time and the math quiz (the school).
 #define TEETH_PER_DAY 2
@@ -703,10 +704,10 @@ public:
   void pickScenery(int8_t b);   // an unowned one is ignored; picking the one in use puts it back
   uint16_t tally[TALLY_COUNT] = { 0 };
   uint32_t coinsEarned = 0;     // every coin ever earned (a trophy)
-  uint16_t trophies = 0;        // bit per TrophyId
+  uint32_t trophies = 0;        // bit per TrophyId (low 16 in "trph", the rest in "trphX")
   void bumpTally(uint8_t t, uint16_t n = 1);
   void trophyProgress(uint8_t t, uint32_t &cur, uint32_t &goal) const;
-  bool hasTrophy(uint8_t t) const { return t < TRO_COUNT && (trophies & (1 << t)); }
+  bool hasTrophy(uint8_t t) const { return t < TRO_COUNT && (trophies & (1UL << t)); }
   int8_t checkTrophies();       // awards the first newly reached one, -1 if none
 
   // Teeth, study, quiz, parent limits (phase 9).

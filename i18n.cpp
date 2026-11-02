@@ -93,7 +93,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the try-on mirror
     "PROBAR", "Como me veo?",
     // the arcade
-    "PREMIOS", "RECORDS", "Boletos", "Lo ganaste!", "Faltan boletos", "GORRA ARCADE", "VISERA ESTRELLA", "MAQUINITA", "SEMANA", "MEJOR", "Medalla de bronce!", "Medalla de plata!", "Medalla de oro!", },
+    "PREMIOS", "RECORDS", "Boletos", "Lo ganaste!", "Faltan boletos", "GORRA ARCADE", "VISERA ESTRELLA", "MAQUINITA", "SEMANA", "MEJOR", "Medalla de bronce!", "Medalla de plata!", "Medalla de oro!",
+    // arcade trophies
+    "10 medallas de oro", "Los 3 premios del arcade", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -181,7 +183,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the try-on mirror
     "TRY ON", "How do I look?",
     // the arcade
-    "PRIZES", "RECORDS", "Tickets", "You won it!", "Not enough tickets", "ARCADE CAP", "STAR VISOR", "ARCADE CABINET", "WEEK", "BEST", "Bronze badge!", "Silver badge!", "Gold badge!", },
+    "PRIZES", "RECORDS", "Tickets", "You won it!", "Not enough tickets", "ARCADE CAP", "STAR VISOR", "ARCADE CABINET", "WEEK", "BEST", "Bronze badge!", "Silver badge!", "Gold badge!",
+    // arcade trophies
+    "10 gold badges", "All 3 arcade prizes", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -268,7 +272,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the try-on mirror
     "ESSAYER", "Je suis comment ?",
     // the arcade
-    "PRIX", "RECORDS", "Tickets", "Tu l'as gagne !", "Pas assez de tickets", "CASQUETTE ARCADE", "VISIERE ETOILE", "BORNE D'ARCADE", "SEMAINE", "MEILLEUR", "Badge de bronze !", "Badge d'argent !", "Badge d'or !", },
+    "PRIX", "RECORDS", "Tickets", "Tu l'as gagne !", "Pas assez de tickets", "CASQUETTE ARCADE", "VISIERE ETOILE", "BORNE D'ARCADE", "SEMAINE", "MEILLEUR", "Badge de bronze !", "Badge d'argent !", "Badge d'or !",
+    // arcade trophies
+    "10 badges d'or", "Les 3 prix de l'arcade", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -355,7 +361,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the try-on mirror
     "ANPROBE", "Wie sehe ich aus?",
     // the arcade
-    "PREISE", "REKORDE", "Tickets", "Gewonnen!", "Nicht genug Tickets", "ARCADE-KAPPE", "STERNVISIER", "SPIELAUTOMAT", "WOCHE", "BESTE", "Bronze-Abzeichen!", "Silber-Abzeichen!", "Gold-Abzeichen!", },
+    "PREISE", "REKORDE", "Tickets", "Gewonnen!", "Nicht genug Tickets", "ARCADE-KAPPE", "STERNVISIER", "SPIELAUTOMAT", "WOCHE", "BESTE", "Bronze-Abzeichen!", "Silber-Abzeichen!", "Gold-Abzeichen!",
+    // arcade trophies
+    "10 Gold-Abzeichen", "Alle 3 Arcade-Preise", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -442,7 +450,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the try-on mirror
     "PROVA", "Come sto?",
     // the arcade
-    "PREMI", "RECORD", "Biglietti", "L'hai vinto!", "Biglietti insufficienti", "BERRETTO ARCADE", "VISIERA STELLA", "CABINATO", "SETTIMANA", "MIGLIORE", "Medaglia di bronzo!", "Medaglia d'argento!", "Medaglia d'oro!", },
+    "PREMI", "RECORD", "Biglietti", "L'hai vinto!", "Biglietti insufficienti", "BERRETTO ARCADE", "VISIERA STELLA", "CABINATO", "SETTIMANA", "MIGLIORE", "Medaglia di bronzo!", "Medaglia d'argento!", "Medaglia d'oro!",
+    // arcade trophies
+    "10 medaglie d'oro", "I 3 premi dell'arcade", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -529,7 +539,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the try-on mirror
     "PROVAR", "Como estou?",
     // the arcade
-    "PREMIOS", "RECORDES", "Bilhetes", "Voce ganhou!", "Faltam bilhetes", "BONE ARCADE", "VISEIRA ESTRELA", "FLIPERAMA", "SEMANA", "MELHOR", "Medalha de bronze!", "Medalha de prata!", "Medalha de ouro!", },
+    "PREMIOS", "RECORDES", "Bilhetes", "Voce ganhou!", "Faltam bilhetes", "BONE ARCADE", "VISEIRA ESTRELA", "FLIPERAMA", "SEMANA", "MELHOR", "Medalha de bronze!", "Medalha de prata!", "Medalha de ouro!",
+    // arcade trophies
+    "10 medalhas de ouro", "Os 3 premios do arcade", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -618,7 +630,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the try-on mirror
     "试穿", "我看起来怎么样?",
     // the arcade
-    "奖品", "纪录", "彩票", "你赢到了!", "彩票不够", "街机帽", "星星遮阳帽", "街机", "本周", "最佳", "铜牌!", "银牌!", "金牌!", },
+    "奖品", "纪录", "彩票", "你赢到了!", "彩票不够", "街机帽", "星星遮阳帽", "街机", "本周", "最佳", "铜牌!", "银牌!", "金牌!",
+    // arcade trophies
+    "10枚金牌", "3件街机奖品", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -706,7 +720,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the try-on mirror
     "입어보기", "나 어때?",
     // the arcade
-    "경품", "기록", "티켓", "받았어요!", "티켓이 부족해요", "아케이드 모자", "별 썬캡", "오락기", "이번 주", "최고", "동메달!", "은메달!", "금메달!", },
+    "경품", "기록", "티켓", "받았어요!", "티켓이 부족해요", "아케이드 모자", "별 썬캡", "오락기", "이번 주", "최고", "동메달!", "은메달!", "금메달!",
+    // arcade trophies
+    "금메달 10개", "아케이드 경품 3개", },
 };
 
 // Medal names in their three lengths [language][medal].

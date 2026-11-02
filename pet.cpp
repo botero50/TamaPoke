@@ -2396,6 +2396,8 @@ void Pet::trophyProgress(uint8_t t, uint32_t &cur, uint32_t &goal) const {
     case TRO_CAPSULE: cur = tally[TALLY_CAPSULE]; goal = 10;  break;
     case TRO_FISH:    cur = tally[TALLY_FISH];    goal = 20;  break;
     case TRO_ROUTE:   cur = tally[TALLY_ROUTE];   goal = 1;   break;
+    case TRO_GOLD:    cur = goldBadges();         goal = 10;  break;
+    case TRO_PRIZES:  cur = prizeOwned(PRIZE_CAP) + prizeOwned(PRIZE_VISOR) + prizeOwned(PRIZE_CABINET); goal = 3; break;
     default: cur = 0; goal = 1; break;
   }
   if (cur > goal) cur = goal;
@@ -2407,7 +2409,7 @@ int8_t Pet::checkTrophies() {
     uint32_t c, g;
     trophyProgress(t, c, g);
     if (c < g) continue;
-    trophies |= 1 << t;
+    trophies |= 1UL << t;
     diaryFlag(DF_TROPHY);
     earnCoins(TROPHY_COINS, false);
     save();
@@ -2943,7 +2945,8 @@ void Pet::save() {
   prefs.putChar("scnP", sceneryPick);
   prefs.putBytes("tly", tally, sizeof(tally));
   prefs.putUInt("cnern", coinsEarned);
-  prefs.putUShort("trph", trophies);
+  prefs.putUShort("trph", (uint16_t)trophies);
+  prefs.putUShort("trphX", (uint16_t)(trophies >> 16));
   prefs.putUInt("tthd", teethDay);
   prefs.putUChar("tthn", teethToday);
   prefs.putUInt("stdd", studyDay);
@@ -3181,7 +3184,7 @@ void Pet::load() {
     if (n) prefs.getBytes("tly", tally, n < sizeof(tally) ? n : sizeof(tally));
   }
   coinsEarned = prefs.getUInt("cnern", 0);
-  trophies = prefs.getUShort("trph", 0) & ((1 << TRO_COUNT) - 1);
+  trophies = ((uint32_t)prefs.getUShort("trph", 0) | ((uint32_t)prefs.getUShort("trphX", 0) << 16)) & ((1UL << TRO_COUNT) - 1);
   teethDay = prefs.getUInt("tthd", 0);
   teethToday = prefs.getUChar("tthn", 0);
   studyDay = prefs.getUInt("stdd", 0);

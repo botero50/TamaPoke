@@ -43,7 +43,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.25"
+#define FW_VERSION "3.14-funpack.26"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -11312,7 +11312,7 @@ static StrId trophyName(uint8_t t) {
   static const StrId T_[TRO_COUNT] = {
     S_TRO_MEALS, S_TRO_GAMES, S_TRO_BATHS, S_TRO_WALKS, S_TRO_HARVEST, S_TRO_COINS, S_TRO_HATS,
     S_TRO_DECOR, S_TRO_STREAK, S_TRO_LEVEL, S_TRO_STUDY, S_TRO_TEETH, S_TRO_PERFECT, S_TRO_CAPSULE,
-    S_TRO_FISH, S_TRO_ROUTE
+    S_TRO_FISH, S_TRO_ROUTE, S_TRO_GOLD, S_TRO_PRIZES
   };
   return T_[t % TRO_COUNT];
 }

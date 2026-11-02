@@ -51,6 +51,9 @@ int main(){
   pet.nursery.aDex = 3; pet.nursery.bDex = 134; pet.nursery.aIv[0] = 29; pet.nursery.bShiny = 1;
   pet.nursery.since = 1793570433; pet.nursery.week = 2963;
   pet.nursery.eggDex = 1; pet.nursery.eggIv[3] = 27; pet.nursery.eggA = 3; pet.nursery.eggB = 9;
+  // trophies both sides of bit 16 (phase 27 widened them), and the arcade
+  pet.trophies = (1UL << TRO_MEALS) | (1UL << TRO_ROUTE) | (1UL << TRO_PRIZES);
+  pet.tickets = 321; pet.weekHi[MINI_MOLE] = 17;
   // renameTrainer() persists, and save() writes every field -- so this is also
   // what commits everything set above. save() itself is private on purpose.
   pet.renameTrainer("DYLAN");
@@ -129,6 +132,8 @@ int main(){
   bool moves = true;
   for (int i=0;i<MOVE_SLOTS;i++) if (p2.moves[i]!=pet.moves[i]) moves=false;
   ck(moves, "and the moveset");
+  ck(p2.trophies == ((1UL << TRO_MEALS) | (1UL << TRO_ROUTE) | (1UL << TRO_PRIZES)), "trophies on both sides of bit 16");
+  ck(p2.tickets == 321 && p2.weekHi[MINI_MOLE] == 17, "the arcade's tickets and weekly bests");
   ck(p2.nursery.aDex==3 && p2.nursery.bDex==134 && p2.nursery.aIv[0]==29 && p2.nursery.bShiny==1 &&
      p2.nursery.since==1793570433 && p2.nursery.week==2963, "the two at the Nursery");
   ck(p2.nursery.eggDex==1 && p2.nursery.eggIv[3]==27 && p2.nursery.eggA==3 && p2.nursery.eggB==9,
