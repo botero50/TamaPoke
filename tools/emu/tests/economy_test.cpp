@@ -19,7 +19,7 @@ static void ck(bool ok,const char*w){printf("%s  %s\n",ok?"PASS":"FAIL",w); if(!
 static const uint32_t DAY = 86400;
 static uint32_t at(uint32_t d, int h){ return d * DAY + (uint32_t)h * 3600 + 90; }
 
-struct Player { const char *name; int feeds, pets, baths, games, score, steps; bool bedtime; };
+struct Player { const char *name; int feeds, pets, baths, games, score, steps; bool bedtime, missions; };
 
 // One day of play. Stats are topped up between actions: this measures coins,
 // not whether the creature survives the player.
@@ -36,16 +36,23 @@ static uint32_t playDay(Pet &p, uint32_t d, const Player &pl) {
     else p.applyMiniResult((uint8_t)(i % MINI_COUNT), (uint8_t)pl.score);
   }
   p.addSteps((uint32_t)pl.steps);
+  // a normal player also goes where the day's missions point (the park, the lake, a book...):
+  // their rewards are counted here, what the places themselves pay or cost is not
+  if (pl.missions)
+    for (uint8_t i = 0; i < MISSIONS_PER_DAY; i++) {
+      uint8_t m = p.missionAt(i);
+      if (m != MIS_STEPS && m != MIS_STEPS_BIG && !p.missionComplete(i)) p.noteMission(m, Pet::missionGoal(m));
+    }
   if (pl.bedtime) { p.lastSeenEpoch = at(d, 21); p.toggleLight(); p.toggleLight(); }
   return p.coins - before;
 }
 
 int main(){
   const Player PLAYERS[3] = {
-    // name          feeds pets baths games score steps  bed
-    { "light day",      3,   2,    0,    2,    8,  1000, false },
-    { "normal day",     6,   5,    1,    5,   12,  3000, true  },
-    { "busy day",      10,  10,    2,   15,   25,  8000, true  },
+    // name          feeds pets baths games score steps  bed    missions
+    { "light day",      3,   2,    0,    2,    8,  1000, false, false },
+    { "normal day",     6,   5,    1,    5,   12,  3000, true,  true  },
+    { "busy day",      10,  10,    2,   15,   25,  8000, true,  true  },
   };
   uint32_t avg[3];
   for (int k = 0; k < 3; k++) {

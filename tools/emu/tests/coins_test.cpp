@@ -25,7 +25,7 @@ static void fresh(Pet &p, uint32_t day){
   p.fullness = p.joy = p.energy = p.hygiene = 60;
   p.sickness = SICK_NONE;
   p.coins = 0; p.coinsToday = 0; p.coinDay = 0; p.stepCoinK = 0;
-  p.missionProg[0] = p.missionProg[1] = p.missionProg[2] = 0; p.missionDone = 0;
+  memset(p.missionProg, 0, sizeof(p.missionProg)); p.missionDone = 0; p.missionKindDay = 0;
   p.bedtimeDay = 0; p.stepCount = 0; p.stepDay = 0;
   p.lastCareDay = day;          // today's care already counted: no daily bonus noise
   p.lastSeenEpoch = atDay(day, 12);
@@ -46,14 +46,16 @@ static uint32_t dayWith(Pet &p, uint8_t m){
 }
 
 int main(){
-  // --- the day's three missions are distinct and stable
+  // --- the day's six missions are distinct and stable (missions_test covers the pick)
   {
     Pet p; fresh(p, 20000);
-    uint8_t a = p.missionAt(0), b = p.missionAt(1), c = p.missionAt(2);
-    ck(a != b && b != c && a != c, "three different missions");
+    uint8_t a = p.missionAt(0), b = p.missionAt(1), c = p.missionAt(5);
+    bool distinct = true;
+    for (int i = 0; i < MISSIONS_PER_DAY; i++) for (int j = i + 1; j < MISSIONS_PER_DAY; j++) distinct = distinct && p.missionAt(i) != p.missionAt(j);
+    ck(distinct, "six different missions");
     ck(a < MIS_COUNT && b < MIS_COUNT && c < MIS_COUNT, "all from the list");
     p.lastSeenEpoch = atDay(20000, 20);
-    ck(p.missionAt(0) == a && p.missionAt(2) == c, "the same all day");
+    ck(p.missionAt(0) == a && p.missionAt(5) == c, "the same all day");
     bool changes = false;
     for (uint32_t d = 20001; d < 20010 && !changes; d++) {
       p.lastSeenEpoch = atDay(d, 12);
@@ -81,7 +83,7 @@ int main(){
   {
     Pet p; fresh(p, 20000);
     uint32_t before = p.coins;
-    p.missionDone = 0x87;   // missions out of the way: measure the game alone
+    p.missionDone = 0xBF;   // missions out of the way: measure the game alone
     p.coinDay = 20000;
     p.applyMiniResult(MINI_LR, 10);
     ck(p.coins - before == 2, "a game pays 1 + score/10 (score 10 = 2)");
@@ -103,7 +105,7 @@ int main(){
   // --- steps pay per thousand, never twice, and stop at the step cap
   {
     Pet p; fresh(p, 20000);
-    p.missionDone = 0x87; p.coinDay = 20000;
+    p.missionDone = 0xBF; p.coinDay = 20000;
     p.addSteps(999);
     ck(p.coins == 0, "999 steps: nothing yet");
     p.addSteps(1);
@@ -123,11 +125,11 @@ int main(){
     ck(d != 0, "found a day with the petting mission");
     fresh(p, d);
     int s = slotOf(p, MIS_PET);
-    p.caress(); p.caress();
-    ck(!p.missionComplete(s) && p.missionProgress(s) == 2, "2 of 3 pets");
+    for (int k = 0; k < 4; k++) p.caress();
+    ck(!p.missionComplete(s) && p.missionProgress(s) == 4, "4 of 5 pets");
     uint32_t c = p.coins;
     p.caress();
-    ck(p.missionComplete(s), "the third completes it");
+    ck(p.missionComplete(s), "the fifth completes it");
     ck(p.coins - c >= COIN_MISSION, "and pays the mission reward");
     c = p.coins;
     p.caress();
@@ -142,16 +144,16 @@ int main(){
     p.addSteps(10);
     ck(p.missionComplete(s), "2 000 steps complete the walking mission");
 
-    // all three done -> the bonus, once
+    // all six done -> the bonus, once
     fresh(p, 20000);
     p.coinDay = 20000;
-    p.missionDone = 0x03;
-    p.missionProg[2] = Pet::missionGoal(p.missionAt(2)) - 1;
+    p.missionDone = 0x1F;
+    p.missionProg[5] = Pet::missionGoal(p.missionAt(5)) - 1;
     c = p.coins;
-    uint8_t m = p.missionAt(2);
-    if (m == MIS_STEPS) p.addSteps(2000);
+    uint8_t m = p.missionAt(5);
+    if (m == MIS_STEPS || m == MIS_STEPS_BIG) p.addSteps(5000);
     else p.noteMission(m, Pet::missionGoal(m));
-    ck((p.missionDone & 0x87) == 0x87, "all three done");
+    ck((p.missionDone & 0xBF) == 0xBF, "all six done");
     ck(p.coins - c >= COIN_MISSION + COIN_ALL_MISSIONS, "and the bonus is paid");
   }
 
@@ -183,7 +185,7 @@ int main(){
     p.coins = 50;
     ck(!p.spendCoins(60) && p.coins == 50, "cannot spend what you do not have");
     ck(p.spendCoins(20) && p.coins == 30, "spending takes the coins");
-    p.coinDay = 20000; p.missionDone = 0x01; p.missionProg[1] = 2;
+    p.coinDay = 20000; p.missionKindDay = 20000; p.missionDone = 0x01; p.missionProg[1] = 2;
     p.saveNow();
     Pet q; q.begin();
     ck(q.coins == 30 && q.missionDone == 0x01 && q.missionProg[1] == 2, "coins and missions survive a reboot");
@@ -195,6 +197,7 @@ int main(){
   {
     Pet p; fresh(p, 20000);
     p.hatsOwned = 0; p.hatOn = -1; p.hatDx = p.hatDy = 0; p.hatDex = 0;
+    p.coinDay = 20000; p.missionDone = 0xBF;   // missions out of the way: buying pays one back
     p.coins = Pet::hatPrice(HAT_CROWN) - 1;
     ck(!p.buyHat(HAT_CROWN) && !p.ownsHat(HAT_CROWN) && p.coins == Pet::hatPrice(HAT_CROWN) - 1,
        "one coin short: no crown, no coins taken");
@@ -229,6 +232,7 @@ int main(){
   {
     Pet p; fresh(p, 20000);
     p.decorOwned = 0; p.slotL = p.slotR = -1;
+    p.coinDay = 20000; p.missionDone = 0xBF;   // missions out of the way: buying pays one back
     p.coins = Pet::decorPrice(DEC_BED) - 1;
     ck(!p.buyDecor(DEC_BED) && !p.ownsDecor(DEC_BED), "one coin short: no bed");
     p.coins = 1000;
@@ -274,6 +278,7 @@ int main(){
   {
     Pet p; fresh(p, 20000);
     for (int i = 0; i < FOOD_COUNT; i++) p.foodCount[i] = 0;
+    p.coinDay = 20000; p.missionDone = 0xBF;   // missions out of the way: buying pays one back
     p.coins = Pet::foodInfo(FOOD_CURRY).price - 1;
     ck(!p.buyFood(FOOD_CURRY) && p.foodCount[FOOD_CURRY] == 0, "one coin short: no curry");
     p.coins = 500;

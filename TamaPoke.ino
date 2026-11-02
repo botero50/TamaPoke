@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.29"
+#define FW_VERSION "3.14-funpack.30"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -2223,7 +2223,10 @@ void onTap(int16_t x, int16_t y) {
   if (mailOpen) { mailOpen = false; return; }   // any tap folds the letter away
   if (mapOpen) { mapMenuTap(x, y); return; }
   if (placeScene) { placeTap(x, y); return; }
-  if (missionsOpen && questButtonHit(x, y)) { questView = !questView; sfxPlay(SFX_TAP); return; }   // missions <-> quest
+  if (missionsOpen) {                                       // the tabs: missions | adventure
+    int tab = missionTabHit(x, y);
+    if (tab >= 0) { questView = tab == 1; sfxPlay(SFX_TAP); return; }
+  }
   if (missionsOpen || walletOpen) { missionsOpen = walletOpen = false; return; }
   if (hatPadTap(x, y)) return;
   if (feedMenuUntil) {       // food picker
@@ -9629,53 +9632,91 @@ static void drawPanelBase() {
 static StrId missionText(uint8_t m) {
   static const StrId T_[MIS_COUNT] = {
     S_MIS_FEED, S_MIS_FEED_FAV, S_MIS_PLAY, S_MIS_STEPS, S_MIS_BATH,
-    S_MIS_PET, S_MIS_TRAIN_ATK, S_MIS_TRAIN_SPE, S_MIS_TRAIN_DEF, S_MIS_SCORE
+    S_MIS_PET, S_MIS_TRAIN_ATK, S_MIS_TRAIN_SPE, S_MIS_TRAIN_DEF, S_MIS_SCORE,
+    S_MIS_BUBBLE, S_MIS_TEETH, S_MIS_NAP, S_MIS_HOMEMEAL, S_MIS_SCORE, S_MIS_TICKETS,
+    S_MIS_CAPSULE, S_MIS_QUIZ, S_MIS_CONTEST, S_MIS_STEPS, S_MIS_PARK, S_MIS_ADV,
+    S_MIS_FISH, S_MIS_BEACH, S_MIS_CENTER, S_MIS_COOK, S_MIS_GARDEN, S_MIS_CHORES,
+    S_MIS_READ, S_MIS_STUDY, S_MIS_SONG, S_MIS_MAIL, S_MIS_PIGGY, S_MIS_BUY_FOOD,
+    S_MIS_SHOP, S_MIS_DECOR
   };
   return T_[m % MIS_COUNT];
 }
 
+// The two tabs across the top of the missions panel: today's missions | the adventure.
+#define MTAB_Y (PANEL_Y + 12)
+#define MTAB_H 34
+#define MTAB_W ((PANEL_W - 34) / 2)
+#define MTAB_X(i) (PANEL_X + 14 + (i) * (MTAB_W + 6))
+
+static void drawMissionTabs() {
+  bool ready = pet.questStepReady();
+  for (int i = 0; i < 2; i++) {
+    bool on = (i == 1) == questView;
+    uint16_t bg = on ? UI_BAR_OK : (i == 1 && ready) ? UI_BAR_WARN : UI_BG_DAY;
+    gfx->fillRoundRect(MTAB_X(i), MTAB_Y, MTAB_W, MTAB_H, 12, bg);
+    gfx->drawRoundRect(MTAB_X(i), MTAB_Y, MTAB_W, MTAB_H, 12, UI_INK);
+    if (on) gfx->drawRoundRect(MTAB_X(i) + 1, MTAB_Y + 1, MTAB_W - 2, MTAB_H - 2, 11, UI_INK);
+    uiTextFit(UIF_TINY, MTAB_X(i) + MTAB_W / 2, uiMidY(UIF_TINY, MTAB_Y, MTAB_H), T(i ? S_QUEST : S_MISSIONS_TITLE), UI_INK, 1, MTAB_W - 10);
+  }
+}
+
+// -1 off the tabs, else 0 (missions) or 1 (adventure)
+int missionTabHit(int16_t x, int16_t y) {
+  if (y < MTAB_Y - 4 || y > MTAB_Y + MTAB_H + 4) return -1;
+  for (int i = 0; i < 2; i++) if (x >= MTAB_X(i) && x <= MTAB_X(i) + MTAB_W) return i;
+  return -1;
+}
+
+static void drawCheck(int cx, int cy, int r, bool done) {
+  if (done) {
+    gfx->fillCircle(cx, cy, r, UI_BAR_OK);
+    for (int k = 0; k < 2; k++) {
+      gfx->drawLine(cx - 5, cy + k, cx - 1, cy + 4 + k, UI_WHITE);
+      gfx->drawLine(cx - 1, cy + 4 + k, cx + 6, cy - 4 + k, UI_WHITE);
+    }
+  } else {
+    gfx->drawCircle(cx, cy, r, UI_INK);
+    gfx->drawCircle(cx, cy, r - 1, UI_INK);
+  }
+}
+
+#define MROW_Y(i) (PANEL_Y + 52 + (i) * 37)
+#define MROW_H 34
+
 void renderMissions() {
+  pet.missionsToday();
   drawPanelBase();
-  drawQuestButton();
+  drawMissionTabs();
   if (questView) { renderQuest(); return; }
-  uiTextFit(UIF_MID, CX, PANEL_Y + 38, T(S_MISSIONS_TITLE), UI_INK, 1, PANEL_W - 60);
   for (uint8_t i = 0; i < MISSIONS_PER_DAY; i++) {
     uint8_t m = pet.missionAt(i);
     uint8_t goal = Pet::missionGoal(m);
     bool done = pet.missionComplete(i);
-    int y = PANEL_Y + 52 + i * 64;
-    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, 58, 12, done ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : UI_BG_DAY);
-    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, 58, 12, UI_INK);
-    int cx = PANEL_X + 36, cy = y + 29;
-    if (done) {
-      gfx->fillCircle(cx, cy, 11, UI_BAR_OK);
-      for (int k = 0; k < 2; k++) {
-        gfx->drawLine(cx - 5, cy + k, cx - 1, cy + 4 + k, UI_WHITE);
-        gfx->drawLine(cx - 1, cy + 4 + k, cx + 6, cy - 4 + k, UI_WHITE);
-      }
-    } else {
-      gfx->drawCircle(cx, cy, 11, UI_INK);
-      gfx->drawCircle(cx, cy, 10, UI_INK);
-    }
-    char t[40];
-    snprintf(t, sizeof(t), T(missionText(m)), (unsigned)(m == MIS_STEPS ? goal * 100 : goal));
-    uiTextFit(UIF_SMALL, PANEL_X + 56, y + 26, t, UI_INK, 0, 236);
+    bool steps = m == MIS_STEPS || m == MIS_STEPS_BIG;
+    int y = MROW_Y(i);
+    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, MROW_H, 10, done ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : UI_BG_DAY);
+    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, MROW_H, 10, UI_INK);
+    drawCheck(PANEL_X + 32, y + MROW_H / 2, 9, done);
+    char t[48];
+    snprintf(t, sizeof(t), T(missionText(m)), (unsigned)(steps ? goal * 100 : goal));
+    uiTextFit(UIF_TINY, PANEL_X + 48, uiMidY(UIF_TINY, y, MROW_H), t, UI_INK, 0, PANEL_W - 160);
     char pr[16];
     uint8_t pg = done ? goal : pet.missionProgress(i);
-    if (m == MIS_STEPS) snprintf(pr, sizeof(pr), "%u/%u", (unsigned)pg * 100, (unsigned)goal * 100);
+    if (steps) snprintf(pr, sizeof(pr), "%u.%uk/%uk", (unsigned)pg / 10, (unsigned)pg % 10, (unsigned)goal / 10);
     else snprintf(pr, sizeof(pr), "%u/%u", pg, goal);
-    uiText(UIF_TINY, PANEL_X + 56, y + 48, pr, UI_INK, 0);
+    uiText(UIF_TINY, PANEL_X + PANEL_W - 52, uiMidY(UIF_TINY, y, MROW_H), pr, UI_INK, 2);
     char rw[8];
     snprintf(rw, sizeof(rw), "+%u", COIN_MISSION);
-    uiText(UIF_TINY, PANEL_X + PANEL_W - 30, y + 48, rw, done ? UI_BAR_OK : UI_BAR_WARN, 2);
+    uiText(UIF_TINY, PANEL_X + PANEL_W - 22, uiMidY(UIF_TINY, y, MROW_H), rw, done ? UI_BAR_OK : UI_BAR_WARN, 2);
   }
+  int fy = PANEL_Y + 276;                     // the footer: the all-done bonus and the purse
   char b[40];
   snprintf(b, sizeof(b), T(S_ALL_MISSIONS_FMT), COIN_ALL_MISSIONS);
-  uiTextFit(UIF_SMALL, CX, PANEL_Y + 264, b, (pet.missionDone & 0x80) ? UI_BAR_OK : UI_INK, 1, PANEL_W - 60);
-  drawMap(SPR_ICON_COIN, 16, CX - 60, PANEL_Y + 272, 2, false);
+  uiTextFit(UIF_SMALL, PANEL_X + 20, uiMidY(UIF_SMALL, fy, 32), b, (pet.missionDone & 0x80) ? UI_BAR_OK : UI_INK, 0, PANEL_W - 150);
+  drawMap(SPR_ICON_COIN, 16, PANEL_X + PANEL_W - 122, fy, 2, false);
   char c[12];
   snprintf(c, sizeof(c), "%lu", (unsigned long)pet.coins);
-  uiText(UIF_MID, CX - 20, PANEL_Y + 298, c, UI_INK, 0);
+  uiTextFit(UIF_MID, PANEL_X + PANEL_W - 84, uiMidY(UIF_MID, fy, 32), c, UI_INK, 0, 70);
   gfx->flush();
 }
 
@@ -13967,39 +14008,33 @@ void drawAwaySign() {
 // Halloween and winter decorations on the main screen.
 // ===========================================================================
 
-#define QBTN_X (PANEL_X + PANEL_W - 104)
-#define QBTN_Y (PANEL_Y + 14)
-#define QBTN_W 88
-#define QBTN_H 34
-
-void drawQuestButton() {
-  bool ready = pet.questStepReady();
-  gfx->fillRoundRect(QBTN_X, QBTN_Y, QBTN_W, QBTN_H, 12, questView ? UI_BAR_OK : ready ? UI_BAR_WARN : UI_BG_DAY);
-  gfx->drawRoundRect(QBTN_X, QBTN_Y, QBTN_W, QBTN_H, 12, UI_INK);
-  uiTextFit(UIF_TINY, QBTN_X + QBTN_W / 2, uiMidY(UIF_TINY, QBTN_Y, QBTN_H), T(questView ? S_LEAVE : S_QUEST), UI_INK, 1, QBTN_W - 8);
-}
-
-bool questButtonHit(int16_t x, int16_t y) { return x >= QBTN_X && x <= QBTN_X + QBTN_W && y >= QBTN_Y && y <= QBTN_Y + QBTN_H; }
-
 void renderQuest() {
   pet.questRoll();
-  static const StrId QT[QUEST_COUNT] = { S_QUEST_1, S_QUEST_2, S_QUEST_3, S_QUEST_4 };
-  static const StrId QK[12] = { S_QK_PARK, S_QK_BEACH, S_QK_READ, S_QK_FISH, S_QK_COOK, S_QK_MEAL, S_QK_ADV, S_QK_CENTER, S_QK_BATH, S_QK_SONG, S_QK_GAME, S_QK_STUDY };
+  static const StrId QT[QUEST_COUNT] = { S_QUEST_1, S_QUEST_2, S_QUEST_3, S_QUEST_4, S_QUEST_5, S_QUEST_6,
+                                         S_QUEST_7, S_QUEST_8, S_QUEST_9, S_QUEST_10, S_QUEST_11, S_QUEST_12 };
+  static const StrId QK[QK_COUNT] = { S_QK_PARK, S_QK_BEACH, S_QK_READ, S_QK_FISH, S_QK_COOK, S_QK_MEAL, S_QK_ADV, S_QK_CENTER,
+                                      S_QK_BATH, S_QK_SONG, S_QK_GAME, S_QK_STUDY, S_MIS_GARDEN, S_QK_CHORE, S_MIS_NAP, S_MIS_TEETH,
+                                      S_MIS_QUIZ, S_MIS_CAPSULE, S_QK_SHOP, S_QK_TICKETS, S_QK_STEPS, S_MIS_FEED_FAV };
+  // Pikachu, Meowth, Chansey, Jigglypuff, Bulbasaur, Psyduck, Snorlax, Eevee, Squirtle, Magikarp, Clefairy, Abra
+  static const int16_t WHO[QUEST_COUNT] = { 25, 52, 113, 39, 1, 54, 143, 133, 7, 129, 35, 63 };
   uint8_t q = pet.questToday();
-  static const int16_t WHO[QUEST_COUNT] = { 25, 52, 113, 39 };   // Pikachu, Meowth, Chansey, Jigglypuff
-  fpThumb(WHO[q], PANEL_X + 46, PANEL_Y + 40, 1, false);
-  uiTextFit(UIF_SMALL, PANEL_X + 80, PANEL_Y + 82, T(QT[q]), UI_INK, 0, PANEL_W - 100);
+  const UiFont *rf = &UIF_SMALL;                 // one size for all four rows: small if they all fit
+  for (uint8_t i = 0; i < QUEST_STEPS; i++)
+    if (uiTextWidth(UIF_SMALL, T(QK[Pet::questStepKind(q, i) % QK_COUNT])) > PANEL_W - 80) rf = &UIF_TINY;
+  fpThumb(WHO[q], PANEL_X + 36, PANEL_Y + 72, 1, false);
+  uiTextFit(UIF_SMALL, PANEL_X + 62, uiMidY(UIF_SMALL, PANEL_Y + 52, 38), T(QT[q]), UI_INK, 0, PANEL_W - 80);
   for (uint8_t i = 0; i < QUEST_STEPS; i++) {
-    int y = PANEL_Y + 100 + i * 60;
+    int y = PANEL_Y + 96 + i * 50;
     bool done = pet.questStep > i, next = pet.questStep == i;
-    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, 52, 12, done ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : next ? UI_BG_DAY : UI_WHITE);
-    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, 52, 12, done || next ? UI_INK : UI_TRACK_TEXT);
-    int cx = PANEL_X + 36, cy = y + 26;
-    if (done) { gfx->fillCircle(cx, cy, 11, UI_BAR_OK); gfx->drawLine(cx - 5, cy, cx - 1, cy + 4, UI_WHITE); gfx->drawLine(cx - 1, cy + 4, cx + 6, cy - 4, UI_WHITE); }
+    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, 44, 12, done ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : next ? UI_BG_DAY : UI_WHITE);
+    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, 44, 12, done || next ? UI_INK : UI_TRACK_TEXT);
+    int cx = PANEL_X + 34, cy = y + 22;
+    if (done) drawCheck(cx, cy, 11, true);
     else { char n[2] = { (char)('1' + i), 0 }; gfx->drawCircle(cx, cy, 11, UI_INK); uiText(UIF_TINY, cx, cy + 5, n, UI_INK, 1); }
-    uiTextFit(UIF_SMALL, PANEL_X + 56, uiMidY(UIF_SMALL, y, 52), T(QK[Pet::questStepKind(q, i)]), done || next ? UI_INK : UI_TRACK_TEXT, 0, 236);
+    uiTextFit(*rf, PANEL_X + 54, uiMidY(*rf, y, 44), T(QK[Pet::questStepKind(q, i) % QK_COUNT]), done || next ? UI_INK : UI_TRACK_TEXT, 0, PANEL_W - 80);
   }
-  if (pet.questStep < QUEST_STEPS && !pet.questStepReady()) uiTextFit(UIF_SMALL, CX, PANEL_Y + 296, T(S_QUEST_NEXT_DAY), UI_TRACK_TEXT, 1, PANEL_W - 60);
+  if (pet.questStep < QUEST_STEPS && !pet.questStepReady())
+    uiTextFit(UIF_TINY, CX, uiMidY(UIF_TINY, PANEL_Y + 292, 20), T(S_QUEST_NEXT_DAY), UI_TRACK_TEXT, 1, PANEL_W - 60);
   gfx->flush();
 }
 

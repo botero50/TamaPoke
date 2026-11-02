@@ -200,6 +200,7 @@ int main(){
   {
     Pet p; fresh(p, 20000);
     p.hatsOwned = 0; p.coins = 1000;
+    p.coinDay = 20000; p.missionDone = 0xBF;   // missions out of the way: buying pays one back
     ck(p.buyHat(HAT_VIKING) && p.ownsHat(HAT_VIKING) && !p.ownsHat(HAT_CAP), "a new hat is bought into the high bits");
     p.wearHat(HAT_VIKING);
     p.furnOwned = 0; p.furnWallL = p.furnWallR = p.furnBackL = p.furnBackR = -1; p.rugOn = false; p.wallpaper = -1; p.sceneryPick = -1;
@@ -326,6 +327,7 @@ int main(){
     int books = 0, songs = 0;
     for (int i = 0; i < 6; i++) { books += p.readBook(); songs += p.playSong(); }
     ck(books == BOOKS_PER_DAY && songs == SONGS_PER_DAY, "three books and three songs a day");
+    p.coinDay = 20000; p.missionDone = 0xBF;   // missions out of the way: buying pays one back
     uint32_t c = p.coins;
     ck(p.enterContest(120) == RIB_GOLD && p.ribbons[2] == 1 && p.coins == c + 20, "120 points: gold, 20 coins");
     ck(p.contestDoneThisWeek() && p.enterContest(120) == RIB_NONE, "once a week");
@@ -357,18 +359,20 @@ int main(){
 
   // --- phase 19: the weekly quest, Halloween and winter, the anniversary
   {
-    Pet p; fresh(p, 20003);                // week 2857: quest (20003/7) % 4
-    p.questWeek = 0; p.questStep = 0; p.questStepDay = 0; p.hatsOwned = 0;
+    Pet p; fresh(p, 20000);                // week 2857 (days 19999-20005): quest (20000/7) % QUEST_COUNT
+    p.questWeek = 0; p.questStep = 0; p.questStepDay = 0; p.hatsOwned = 0; p.questDoneFlash = false;
     uint8_t q = p.questToday();
     QuestKind k0 = Pet::questStepKind(q, 0), k1 = Pet::questStepKind(q, 1), k2 = Pet::questStepKind(q, 2);
     ck(!p.questNote(k1) && p.questStep == 0, "out of order: nothing");
     ck(p.questNote(k0) && p.questStep == 1, "the first step");
     ck(!p.questNote(k1) && p.questStep == 1, "the next step waits for another day");
-    p.lastSeenEpoch = atDay(20004, 12);
+    p.lastSeenEpoch = atDay(20001, 12);
     ck(p.questNote(k1) && p.questStep == 2, "the second step, the next day");
-    p.lastSeenEpoch = atDay(20005, 12);
-    ck(p.questNote(k2) && p.questStep == 3 && p.questDoneFlash && p.hatsOwned != 0, "the third: done, and a hat");
-    p.lastSeenEpoch = atDay(20003 + 7, 12);
+    p.lastSeenEpoch = atDay(20002, 12);
+    ck(p.questNote(k2) && p.questStep == 3 && !p.questDoneFlash, "the third step");
+    p.lastSeenEpoch = atDay(20003, 12);
+    ck(p.questNote(Pet::questStepKind(q, 3)) && p.questStep == 4 && p.questDoneFlash && p.hatsOwned != 0, "the fourth: done, and a hat");
+    p.lastSeenEpoch = atDay(20000 + 7, 12);
     p.questRoll();
     ck(p.questStep == 0 && p.questToday() != q, "a new week: a new quest from the start");
     fresh(p, 20750);                       // 2026-10-24

@@ -51,7 +51,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Fun Pack
     "SACO", "REFLEJOS", "PELOTA", "DIVERSION",
     // coins and daily missions
-    "MONEDAS", "MISIONES DE HOY", "Dale de comer %u veces", "Su baya favorita", "Juega %u minijuegos", "Camina %u pasos", "Dale un bano", "Acaricialo %u veces", "Un juego de fuerza", "Un juego de velocidad", "Un juego de defensa", "Saca %u puntos", "Por jugar hoy: %u/%u", "Las 3: +%u extra", "COMO GANAR", "Jugar y cuidarlo", "+%u cada 1000 pasos", "Primer cuidado del dia +%u", "Cada mision +%u", "Medalla nueva +%u", "A dormir sin luz +%u", "La tienda llega pronto!",
+    "MONEDAS", "MISIONES DE HOY", "Dale de comer %u veces", "Su baya favorita", "Juega %u minijuegos", "Camina %u pasos", "Dale un bano", "Acaricialo %u veces", "Un juego de fuerza", "Un juego de velocidad", "Un juego de defensa", "Saca %u puntos", "Por jugar hoy: %u/%u", "Todas: +%u extra", "COMO GANAR", "Jugar y cuidarlo", "+%u cada 1000 pasos", "Primer cuidado del dia +%u", "Cada mision +%u", "Medalla nueva +%u", "A dormir sin luz +%u", "La tienda llega pronto!",
     // shop, bag and hats
     "TIENDA", "MOCHILA", "SOMBREROS", "GORRA", "LAZO", "FLOR", "GORRO", "DE FIESTA", "DE PAJA", "DE BRUJA", "DE NAVIDAD", "CHISTERA", "CORONA", "COMPRAR", "NO", "TUYO", "Faltan monedas", "Comprado!", "PUESTO", "QUITAR SOMBRERO", "MOVER SOMBRERO", "Aun no tienes nada", "LISTO",
     // toys and decorations
@@ -119,7 +119,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "Gane monedas para nosotros", "Es nuestro cumple-mes!", "Hay pastel?", "Gracias por otro mes juntos", "Dulce o truco!", "Buu! Te asuste?",
     "Me gustan las calabazas", "Felices fiestas!", "Habra regalos?", "Me encantan las luces", "Busquemos huevos!", "Un huevo de colores!",
     "Vamos a la playa!", "Viva el verano!", "Siempre estare contigo", "Confio en ti", "Juntos somos fuertes", "Eres el mejor entrenador",
-    "Siento que voy a cambiar...", "Algo me esta pasando!", },
+    "Siento que voy a cambiar...", "Algo me esta pasando!",
+    // phase 31
+    "Un bano de burbujas", "Lavale los dientes", "Una siesta o una nana", "Come algo casero", "Gana %u tickets", "Gira la capsula", "Haz el quiz de tipos", "Entra al concurso", "Pasea por el parque", "Llega a una parada", "Pesca %u veces", "Juega en la playa", "Visita el Centro", "Cocina un plato", "Planta o cosecha", "Haz %u tareas", "Lee un libro", "Estudia un rato", "Pon una cancion", "Abre una carta", "Ahorra en la alcancia", "Compra comida", "Compra algo", "Decora su casa", "Ayuda con una tarea", "Compra en la tienda", "Gana tickets en el arcade", "Camina 3000 pasos", "El huerto de Bulbasaur", "A Psyduck le duele la cabeza", "La gran siesta de Snorlax", "La fiesta de Eevee", "Squirtle va a la playa", "Magikarp quiere volar", "La noche de luna de Clefairy", "Abra va a la escuela", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -165,7 +167,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Fun Pack
     "PUNCH BAG", "REACTION", "BALL GAME", "FUN",
     // coins and daily missions
-    "COINS", "TODAY'S MISSIONS", "Feed it %u times", "Its favourite berry", "Play %u minigames", "Walk %u steps", "Give it a bath", "Pet it %u times", "A strength game", "A speed game", "A defence game", "Score %u points", "From play today: %u/%u", "All 3: +%u extra", "HOW TO EARN", "Play and care", "+%u per 1000 steps", "First care of the day +%u", "Each mission +%u", "New badge +%u", "Bedtime, light off +%u", "The shop is coming soon!",
+    "COINS", "TODAY'S MISSIONS", "Feed it %u times", "Its favourite berry", "Play %u minigames", "Walk %u steps", "Give it a bath", "Pet it %u times", "A strength game", "A speed game", "A defence game", "Score %u points", "From play today: %u/%u", "All of them: +%u extra", "HOW TO EARN", "Play and care", "+%u per 1000 steps", "First care of the day +%u", "Each mission +%u", "New badge +%u", "Bedtime, light off +%u", "The shop is coming soon!",
     // shop, bag and hats
     "SHOP", "BAG", "HATS", "CAP", "BOW", "FLOWER", "BEANIE", "PARTY HAT", "STRAW HAT", "WITCH HAT", "SANTA HAT", "TOP HAT", "CROWN", "BUY", "NO", "OWNED", "Not enough coins", "Bought!", "WEARING", "TAKE HAT OFF", "MOVE HAT", "Nothing here yet", "DONE",
     // toys and decorations
@@ -233,7 +235,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "I earned coins for us", "It's our birthday month!", "Is there cake?", "Thanks for another month together", "Trick or treat!", "Boo! Did I scare you?",
     "I love pumpkins", "Happy holidays!", "Will there be presents?", "I love the lights", "Let's hunt for eggs!", "A colourful egg!",
     "Let's go to the beach!", "Hooray for summer!", "I'll always be with you", "I trust you", "Together we're strong", "You're the best trainer",
-    "I feel like I'm about to change...", "Something is happening to me!", },
+    "I feel like I'm about to change...", "Something is happening to me!",
+    // phase 31
+    "A bubble bath", "Brush its teeth", "A nap or a lullaby", "Eat a home-cooked dish", "Win %u tickets", "Spin the capsule", "Play the type quiz", "Enter the contest", "A walk in the park", "Reach an adventure stop", "Fish %u times", "Play at the beach", "Visit the Center", "Cook a dish", "Plant or harvest", "Do %u chores", "Read a book", "Study for a while", "Play a song", "Open a letter", "Save in the piggy bank", "Buy some food", "Buy something", "Decorate its home", "Help with a chore", "Buy at the shop", "Win arcade tickets", "Walk 3000 steps", "Bulbasaur's garden", "Psyduck's headache", "Snorlax's big nap", "Eevee's birthday party", "Squirtle's beach day", "Magikarp wants to fly", "Clefairy's moon night", "Abra's first school day", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -278,7 +282,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Fun Pack
     "SAC", "REFLEXES", "BALLE", "AMUSEMENT",
     // coins and daily missions
-    "PIECES", "MISSIONS DU JOUR", "Nourris-le %u fois", "Sa baie preferee", "Joue a %u mini-jeux", "Marche %u pas", "Donne-lui un bain", "Caresse-le %u fois", "Un jeu de force", "Un jeu de vitesse", "Un jeu de defense", "Marque %u points", "Jeu aujourd hui: %u/%u", "Les 3: +%u en plus", "COMMENT GAGNER", "Jouer et soigner", "+%u par 1000 pas", "Premier soin du jour +%u", "Chaque mission +%u", "Nouveau badge +%u", "Au lit sans lumiere +%u", "La boutique arrive bientot !",
+    "PIECES", "MISSIONS DU JOUR", "Nourris-le %u fois", "Sa baie preferee", "Joue a %u mini-jeux", "Marche %u pas", "Donne-lui un bain", "Caresse-le %u fois", "Un jeu de force", "Un jeu de vitesse", "Un jeu de defense", "Marque %u points", "Jeu aujourd hui: %u/%u", "Toutes: +%u en plus", "COMMENT GAGNER", "Jouer et soigner", "+%u par 1000 pas", "Premier soin du jour +%u", "Chaque mission +%u", "Nouveau badge +%u", "Au lit sans lumiere +%u", "La boutique arrive bientot !",
     // shop, bag and hats
     "BOUTIQUE", "SAC", "CHAPEAUX", "CASQUETTE", "NOEUD", "FLEUR", "BONNET", "CHAPEAU FETE", "DE PAILLE", "DE SORCIERE", "PERE NOEL", "HAUT-DE-FORME", "COURONNE", "ACHETER", "NON", "A TOI", "Pas assez de pieces", "Achete !", "PORTE", "ENLEVER", "DEPLACER", "Rien pour l instant", "FINI",
     // toys and decorations
@@ -346,7 +350,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "J'ai gagne des pieces", "C'est notre anniversaire !", "Il y a du gateau ?", "Merci pour ce mois ensemble", "Des bonbons ou un sort !", "Bouh ! Je t'ai fait peur ?",
     "J'adore les citrouilles", "Joyeuses fetes !", "Il y aura des cadeaux ?", "J'adore les lumieres", "Cherchons des oeufs !", "Un oeuf colore !",
     "Allons a la plage !", "Vive l'ete !", "Je serai toujours avec toi", "J'ai confiance en toi", "Ensemble on est forts", "Tu es le meilleur dresseur",
-    "Je sens que je vais changer...", "Il m'arrive quelque chose !", },
+    "Je sens que je vais changer...", "Il m'arrive quelque chose !",
+    // phase 31
+    "Un bain moussant", "Brosse-lui les dents", "Sieste ou berceuse", "Un plat fait maison", "Gagne %u tickets", "Tourne la capsule", "Fais le quiz des types", "Va au concours", "Promenade au parc", "Atteins une etape", "Peche %u fois", "Joue a la plage", "Va au Centre", "Cuisine un plat", "Plante ou recolte", "Fais %u taches", "Lis un livre", "Etudie un peu", "Mets une chanson", "Ouvre une lettre", "Epargne dans la tirelire", "Achete a manger", "Achete quelque chose", "Decore sa maison", "Aide a une tache", "Achete a la boutique", "Gagne des tickets", "Marche 3000 pas", "Le jardin de Bulbizarre", "La migraine de Psykokwak", "La grande sieste de Ronflex", "La fete d'Evoli", "Carapuce a la plage", "Magicarpe veut voler", "La nuit de lune de Melofee", "Abra va a l'ecole", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -391,7 +397,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Fun Pack
     "SANDSACK", "REAKTION", "BALLSPIEL", "SPASS",
     // coins and daily missions
-    "MUENZEN", "HEUTIGE AUFGABEN", "%u mal fuettern", "Seine Lieblingsbeere", "Spiele %u Minispiele", "Gehe %u Schritte", "Bade es", "Streichle es %u mal", "Ein Kraftspiel", "Ein Tempospiel", "Ein Abwehrspiel", "Erziele %u Punkte", "Heute durch Spiel: %u/%u", "Alle 3: +%u extra", "SO VERDIENST DU", "Spielen und pflegen", "+%u je 1000 Schritte", "Erste Pflege am Tag +%u", "Jede Aufgabe +%u", "Neuer Orden +%u", "Ins Bett, Licht aus +%u", "Der Laden kommt bald!",
+    "MUENZEN", "HEUTIGE AUFGABEN", "%u mal fuettern", "Seine Lieblingsbeere", "Spiele %u Minispiele", "Gehe %u Schritte", "Bade es", "Streichle es %u mal", "Ein Kraftspiel", "Ein Tempospiel", "Ein Abwehrspiel", "Erziele %u Punkte", "Heute durch Spiel: %u/%u", "Alle: +%u extra", "SO VERDIENST DU", "Spielen und pflegen", "+%u je 1000 Schritte", "Erste Pflege am Tag +%u", "Jede Aufgabe +%u", "Neuer Orden +%u", "Ins Bett, Licht aus +%u", "Der Laden kommt bald!",
     // shop, bag and hats
     "LADEN", "BEUTEL", "HUETE", "KAPPE", "SCHLEIFE", "BLUME", "MUETZE", "PARTYHUT", "STROHHUT", "HEXENHUT", "NIKOLAUSHUT", "ZYLINDER", "KRONE", "KAUFEN", "NEIN", "DEINS", "Zu wenig Muenzen", "Gekauft!", "TRAEGT", "HUT AB", "HUT VERSCHIEBEN", "Noch nichts da", "FERTIG",
     // toys and decorations
@@ -459,7 +465,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "Ich habe Muenzen verdient", "Wir haben Geburtstag!", "Gibt es Kuchen?", "Danke fuer noch einen Monat", "Suesses oder Saures!", "Buh! Erschreckt?",
     "Ich liebe Kuerbisse", "Frohe Feiertage!", "Gibt es Geschenke?", "Ich liebe die Lichter", "Lass uns Eier suchen!", "Ein buntes Ei!",
     "Ab an den Strand!", "Hurra, Sommer!", "Ich bin immer bei dir", "Ich vertraue dir", "Zusammen sind wir stark", "Du bist der beste Trainer",
-    "Ich glaube, ich veraendere mich...", "Mit mir passiert etwas!", },
+    "Ich glaube, ich veraendere mich...", "Mit mir passiert etwas!",
+    // phase 31
+    "Ein Schaumbad", "Zaehne putzen", "Nickerchen oder Schlaflied", "Etwas Selbstgekochtes", "Gewinne %u Tickets", "Dreh die Kapsel", "Mach das Typenquiz", "Mach beim Wettbewerb mit", "Spaziergang im Park", "Erreiche eine Station", "Angle %u mal", "Spiel am Strand", "Besuch das Center", "Koche ein Gericht", "Pflanzen oder ernten", "Mach %u Aufgaben", "Lies ein Buch", "Lerne ein bisschen", "Spiel ein Lied", "Oeffne einen Brief", "Spar im Sparschwein", "Kauf Essen", "Kauf etwas", "Schmueck sein Zuhause", "Hilf im Haushalt", "Kauf im Laden ein", "Gewinn Arcade-Tickets", "Geh 3000 Schritte", "Bisasams Garten", "Enton hat Kopfweh", "Relaxos grosses Nickerchen", "Evolis Geburtstag", "Schiggy am Strand", "Karpador will fliegen", "Piepis Mondnacht", "Abras erster Schultag", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -504,7 +512,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Fun Pack
     "SACCO", "RIFLESSI", "PALLA", "DIVERTIMENTO",
     // coins and daily missions
-    "MONETE", "MISSIONI DI OGGI", "Dagli da mangiare %u volte", "La sua bacca preferita", "Gioca %u minigiochi", "Cammina %u passi", "Fagli il bagno", "Accarezzalo %u volte", "Un gioco di forza", "Un gioco di velocita", "Un gioco di difesa", "Fai %u punti", "Dal gioco oggi: %u/%u", "Tutte e 3: +%u extra", "COME GUADAGNARE", "Giocare e curarlo", "+%u ogni 1000 passi", "Prima cura del giorno +%u", "Ogni missione +%u", "Nuova medaglia +%u", "A letto, luce spenta +%u", "Il negozio arriva presto!",
+    "MONETE", "MISSIONI DI OGGI", "Dagli da mangiare %u volte", "La sua bacca preferita", "Gioca %u minigiochi", "Cammina %u passi", "Fagli il bagno", "Accarezzalo %u volte", "Un gioco di forza", "Un gioco di velocita", "Un gioco di difesa", "Fai %u punti", "Dal gioco oggi: %u/%u", "Tutte: +%u extra", "COME GUADAGNARE", "Giocare e curarlo", "+%u ogni 1000 passi", "Prima cura del giorno +%u", "Ogni missione +%u", "Nuova medaglia +%u", "A letto, luce spenta +%u", "Il negozio arriva presto!",
     // shop, bag and hats
     "NEGOZIO", "ZAINO", "CAPPELLI", "BERRETTO", "FIOCCO", "FIORE", "CUFFIA", "DA FESTA", "DI PAGLIA", "DA STREGA", "DI NATALE", "CILINDRO", "CORONA", "COMPRA", "NO", "TUO", "Monete insufficienti", "Comprato!", "INDOSSATO", "TOGLI CAPPELLO", "SPOSTA CAPPELLO", "Ancora niente", "FATTO",
     // toys and decorations
@@ -572,7 +580,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "Ho guadagnato monete", "E il nostro compleanno!", "C'e la torta?", "Grazie per un altro mese insieme", "Dolcetto o scherzetto!", "Bu! Ti ho spaventato?",
     "Adoro le zucche", "Buone feste!", "Ci saranno regali?", "Adoro le luci", "Cerchiamo le uova!", "Un uovo colorato!",
     "Andiamo al mare!", "Evviva l'estate!", "Saro sempre con te", "Mi fido di te", "Insieme siamo forti", "Sei il miglior allenatore",
-    "Sento che sto per cambiare...", "Mi sta succedendo qualcosa!", },
+    "Sento che sto per cambiare...", "Mi sta succedendo qualcosa!",
+    // phase 31
+    "Un bagno di bolle", "Lavagli i denti", "Pisolino o ninna nanna", "Un piatto fatto in casa", "Vinci %u biglietti", "Gira la capsula", "Fai il quiz dei tipi", "Partecipa alla gara", "Passeggia al parco", "Raggiungi una tappa", "Pesca %u volte", "Gioca in spiaggia", "Visita il Centro", "Cucina un piatto", "Pianta o raccogli", "Fai %u faccende", "Leggi un libro", "Studia un po", "Metti una canzone", "Apri una lettera", "Risparmia nel salvadanaio", "Compra da mangiare", "Compra qualcosa", "Decora la sua casa", "Aiuta in casa", "Compra al negozio", "Vinci biglietti", "Cammina 3000 passi", "L'orto di Bulbasaur", "Il mal di testa di Psyduck", "Il pisolino di Snorlax", "La festa di Eevee", "Squirtle va al mare", "Magikarp vuole volare", "La notte di luna di Clefairy", "Abra va a scuola", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -617,7 +627,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Fun Pack
     "SACO", "REFLEXOS", "BOLA", "DIVERSAO",
     // coins and daily missions
-    "MOEDAS", "MISSOES DE HOJE", "Alimente %u vezes", "Sua baga favorita", "Jogue %u minijogos", "Ande %u passos", "De um banho", "Faca carinho %u vezes", "Um jogo de forca", "Um jogo de velocidade", "Um jogo de defesa", "Faca %u pontos", "Jogando hoje: %u/%u", "As 3: +%u extra", "COMO GANHAR", "Brincar e cuidar", "+%u a cada 1000 passos", "Primeiro cuidado do dia +%u", "Cada missao +%u", "Insignia nova +%u", "Dormir sem luz +%u", "A loja chega em breve!",
+    "MOEDAS", "MISSOES DE HOJE", "Alimente %u vezes", "Sua baga favorita", "Jogue %u minijogos", "Ande %u passos", "De um banho", "Faca carinho %u vezes", "Um jogo de forca", "Um jogo de velocidade", "Um jogo de defesa", "Faca %u pontos", "Jogando hoje: %u/%u", "Todas: +%u extra", "COMO GANHAR", "Brincar e cuidar", "+%u a cada 1000 passos", "Primeiro cuidado do dia +%u", "Cada missao +%u", "Insignia nova +%u", "Dormir sem luz +%u", "A loja chega em breve!",
     // shop, bag and hats
     "LOJA", "MOCHILA", "CHAPEUS", "BONE", "LACO", "FLOR", "GORRO", "DE FESTA", "DE PALHA", "DE BRUXA", "DE NATAL", "CARTOLA", "COROA", "COMPRAR", "NAO", "SEU", "Moedas insuficientes", "Comprado!", "USANDO", "TIRAR CHAPEU", "MOVER CHAPEU", "Nada ainda", "PRONTO",
     // toys and decorations
@@ -685,7 +695,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "Ganhei moedas pra gente", "E nosso aniversario!", "Tem bolo?", "Obrigado por mais um mes juntos", "Gostosuras ou travessuras!", "Bu! Te assustei?",
     "Adoro aboboras", "Boas festas!", "Vai ter presentes?", "Adoro as luzes", "Vamos cacar ovos!", "Um ovo colorido!",
     "Vamos a praia!", "Viva o verao!", "Sempre estarei com voce", "Confio em voce", "Juntos somos fortes", "Voce e o melhor treinador",
-    "Sinto que vou mudar...", "Algo esta acontecendo comigo!", },
+    "Sinto que vou mudar...", "Algo esta acontecendo comigo!",
+    // phase 31
+    "Um banho de espuma", "Escove os dentes", "Soneca ou cancao de ninar", "Coma algo caseiro", "Ganhe %u tickets", "Gire a capsula", "Faca o quiz de tipos", "Entre no concurso", "Passeie no parque", "Chegue a uma parada", "Pesque %u vezes", "Brinque na praia", "Visite o Centro", "Cozinhe um prato", "Plante ou colha", "Faca %u tarefas", "Leia um livro", "Estude um pouco", "Toque uma musica", "Abra uma carta", "Guarde no cofrinho", "Compre comida", "Compre algo", "Decore a casa", "Ajude numa tarefa", "Compre na loja", "Ganhe tickets no arcade", "Ande 3000 passos", "A horta do Bulbasaur", "A dor de cabeca do Psyduck", "A grande soneca do Snorlax", "A festa do Eevee", "Squirtle vai a praia", "Magikarp quer voar", "A noite de lua da Clefairy", "Abra vai a escola", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -800,7 +812,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "我赚了金币", "是我们的生日!", "有蛋糕吗?", "谢谢又陪我一个月", "不给糖就捣蛋!", "哇!吓到你了吗?",
     "我喜欢南瓜", "节日快乐!", "会有礼物吗?", "我喜欢彩灯", "去找彩蛋吧!", "彩色的蛋!",
     "去海边吧!", "夏天万岁!", "我会一直陪着你", "我相信你", "在一起我们很强", "你是最棒的训练家",
-    "我觉得我要变了...", "我身上发生了什么!", },
+    "我觉得我要变了...", "我身上发生了什么!",
+    // phase 31
+    "泡泡浴", "刷牙", "午睡或摇篮曲", "吃一道家常菜", "赢得%u张奖券", "转一次扭蛋", "玩属性测验", "参加比赛", "去公园散步", "到达冒险站点", "钓鱼%u次", "去海滩玩", "去宝可梦中心", "做一道菜", "种植或收获", "做%u件家务", "读一本书", "学习一会儿", "放一首歌", "打开一封信", "存进存钱罐", "买食物", "买点东西", "装饰小屋", "帮忙做家务", "去商店买东西", "在街机赢奖券", "走3000步", "妙蛙种子的菜园", "可达鸭头疼了", "卡比兽的大午觉", "伊布的生日派对", "杰尼龟的海滩日", "鲤鱼王想飞", "皮皮的月亮之夜", "凯西去上学", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -914,7 +928,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     "코인 벌었어", "우리 생일이야!", "케이크 있어?", "함께한 한 달 고마워", "과자 안 주면 장난칠 거야!", "왁! 놀랐지?",
     "호박이 좋아", "즐거운 연휴!", "선물 있을까?", "불빛이 좋아", "달걀 찾으러 가자!", "알록달록 달걀!",
     "해변 가자!", "여름 최고!", "항상 곁에 있을게", "널 믿어", "함께라면 강해", "넌 최고의 트레이너야",
-    "곧 변할 것 같아...", "뭔가 일어나고 있어!", },
+    "곧 변할 것 같아...", "뭔가 일어나고 있어!",
+    // phase 31
+    "거품 목욕", "양치하기", "낮잠이나 자장가", "집밥 먹기", "티켓 %u장 얻기", "캡슐 뽑기", "타입 퀴즈 하기", "콘테스트 참가", "공원 산책", "모험 지점 도착", "낚시 %u번", "해변에서 놀기", "포켓몬센터 방문", "요리하기", "심기 또는 수확", "집안일 %u개", "책 읽기", "공부하기", "노래 틀기", "편지 열기", "저금통에 저금", "음식 사기", "무언가 사기", "집 꾸미기", "집안일 돕기", "상점에서 사기", "오락실 티켓 얻기", "3000걸음 걷기", "이상해씨의 텃밭", "고라파덕의 두통", "잠만보의 긴 낮잠", "이브이의 생일 파티", "꼬부기의 해변 나들이", "잉어킹은 날고 싶어", "삐삐의 달밤", "캐이시의 첫 등교", },
 };
 
 // Medal names in their three lengths [language][medal].

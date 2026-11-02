@@ -107,11 +107,12 @@ enum PillResult : uint8_t {
 #define COIN_STEP_CAP_K 10       // steps past 10 000 a day earn nothing more
 #define COIN_BADGE 15            // a badge won for the first time
 #define COIN_BEDTIME 3           // sent to bed with the light off in the evening
-#define COIN_MISSION 8
-#define COIN_ALL_MISSIONS 10     // extra, for finishing all three
+#define COIN_MISSION 6
+#define COIN_ALL_MISSIONS 12     // extra, for finishing all six
 // A good day is about 60-80 coins (at most ~110): a cap or bow in a day or two,
 // the crown in about a week.
-#define MISSIONS_PER_DAY 3
+#define MISSIONS_PER_DAY 6
+#define MISSION_GROUPS 5         // care, play, outdoors, home, shop: one of each a day, then one more
 #define COIN_GAME_MAX 5          // a game pays 1 + score/10, at most this
 
 // Hats, bought in the shop with coins and worn on the main screen. Append new
@@ -255,10 +256,13 @@ enum Personality : uint8_t { PERS_PLAYFUL = 0, PERS_LAZY, PERS_HUNGRY, PERS_SHY,
 #define BIRTHDAY_DAYS 30                  // a party every month of its life
 // Seasonal events by the date (besides the one-day holiday gifts).
 enum EventId : uint8_t { EVENT_NONE = 0, EVENT_EASTER, EVENT_SUMMER, EVENT_HALLOWEEN, EVENT_WINTER };
-// Story quests (phase 19): one a week, three steps, each on a later day than the last.
-enum QuestKind : uint8_t { QK_PARK = 0, QK_BEACH, QK_READ, QK_FISH, QK_COOK, QK_MEAL, QK_ADV, QK_CENTER, QK_BATH, QK_SONG, QK_GAME, QK_STUDY };
-#define QUEST_COUNT 4
-#define QUEST_STEPS 3
+// Story quests (phase 19, 12 stories since phase 31): one a week, four steps,
+// each on a later day than the last.
+enum QuestKind : uint8_t { QK_PARK = 0, QK_BEACH, QK_READ, QK_FISH, QK_COOK, QK_MEAL, QK_ADV, QK_CENTER, QK_BATH, QK_SONG, QK_GAME, QK_STUDY,
+                           QK_GARDEN, QK_CHORE, QK_NAP, QK_TEETH, QK_QUIZ, QK_CAPSULE, QK_SHOP, QK_TICKETS, QK_STEPS, QK_FAVBERRY, QK_COUNT };
+#define QUEST_COUNT 12
+#define QUEST_STEPS 4
+#define QUEST_WALK_STEPS 3000    // the "long walk" step
 #define QUEST_COINS 30
 #define EASTER_EGGS_PER_DAY 5
 // Trophies: lifetime goals, each pays TROPHY_COINS once. Append at the END:
@@ -317,9 +321,9 @@ struct FoodInfo {
   bool sweet;                         // counts double towards a stomachache, like candy
 };
 static_assert(DEC_COUNT <= 16, "decorOwned needs a bit per item");
-// Daily missions. Which three come up is derived from the day number, so it is
-// the same after a reboot and needs no storage -- only the progress is saved.
-// Append new ones at the END: the day's pick indexes this list.
+// Daily missions. Six a day, picked when the day starts (one from each group,
+// then one more) from the ones she can do, and saved with their progress.
+// Append new ones at the END: the saved pick indexes this list.
 enum MissionId : uint8_t {
   MIS_FEED = 0,     // feed it N times
   MIS_FEED_FAV,     // feed its favourite berry
@@ -331,6 +335,33 @@ enum MissionId : uint8_t {
   MIS_TRAIN_SPE,    // play a speed game
   MIS_TRAIN_DEF,    // play a defence game
   MIS_SCORE,        // score N in any game
+  // phase 31
+  MIS_BUBBLE,       // a bubble bath
+  MIS_TEETH,        // brush its teeth
+  MIS_NAP,          // a nap or a lullaby
+  MIS_HOMEMEAL,     // eat a dish from the kitchen
+  MIS_SCORE_HI,     // score a lot in any game
+  MIS_TICKETS,      // win N arcade tickets
+  MIS_CAPSULE,      // spin the capsule machine
+  MIS_QUIZ,         // play the type quiz
+  MIS_CONTEST,      // enter the weekly contest
+  MIS_STEPS_BIG,    // a long walk
+  MIS_PARK,         // a walk in the park
+  MIS_ADV,          // reach an adventure stop
+  MIS_FISH,         // fish N times
+  MIS_BEACH,        // a shell or a sand castle
+  MIS_CENTER,       // visit the Pokemon Center
+  MIS_COOK,         // cook a dish
+  MIS_GARDEN,       // plant or harvest
+  MIS_CHORES,       // N chores
+  MIS_READ,         // read a book
+  MIS_STUDY,        // study
+  MIS_SONG,         // play a song
+  MIS_MAIL,         // open a letter
+  MIS_PIGGY,        // put coins in the piggy bank
+  MIS_BUY_FOOD,     // buy food
+  MIS_SHOP,         // buy anything
+  MIS_DECOR,        // put out a decoration or furniture
   MIS_COUNT
 };
 
@@ -515,18 +546,25 @@ public:
   uint16_t coinsToday = 0;      // activity coins earned today (against the cap)
   uint32_t coinDay = 0;         // the day coinsToday / missions / step coins belong to
   uint8_t stepCoinK = 0;        // thousands of steps already paid today
-  uint8_t missionProg[MISSIONS_PER_DAY] = { 0, 0, 0 };
-  uint8_t missionDone = 0;      // bit per mission; bit 7 = the all-three bonus paid
+  uint8_t missionProg[MISSIONS_PER_DAY] = { 0 };
+  uint8_t missionKind[MISSIONS_PER_DAY] = { 0 };   // the day's pick, rolled in rollCoinDay()
+  uint32_t missionKindDay = 0;  // the day missionKind belongs to
+  uint8_t missionDone = 0;      // bit per mission; bit 7 = the all-missions bonus paid
   uint32_t bedtimeDay = 0;      // the day the bedtime bonus was last paid
   uint16_t coinFlash = 0;       // the sketch shows "+N" while coinFlashUntil runs
   uint32_t coinFlashUntil = 0;
   // Adds coins; capped = counts against COIN_DAILY_CAP. Returns what was added.
   uint16_t earnCoins(uint16_t amount, bool capped);
   bool spendCoins(uint32_t amount);
-  uint8_t missionAt(uint8_t slot) const;        // today's mission in slot 0..2
+  uint8_t missionAt(uint8_t slot) const;        // today's mission in slot 0..MISSIONS_PER_DAY-1
+  static uint8_t missionGroup(uint8_t m);       // 0..MISSION_GROUPS-1
+  bool missionOpen(uint8_t m, uint32_t day) const;   // can she do it today (the place is open)?
+  void rollMissions(uint32_t day, uint8_t out[MISSIONS_PER_DAY]) const;
+  void missionsToday() { rollCoinDay(); }       // the sketch: make sure today's pick is rolled
   static uint8_t missionGoal(uint8_t m);        // the N in "do it N times"
   uint8_t missionProgress(uint8_t slot) const;  // 0..goal
   bool missionComplete(uint8_t slot) const { return missionDone & (1 << slot); }
+  bool allMissionsDone() const { const uint8_t a = (1 << MISSIONS_PER_DAY) - 1; return (missionDone & a) == a; }
   void noteMission(uint8_t m, uint8_t amount);  // progress any of today's slots for m
   uint16_t coinsCapLeft() const;
 
@@ -1108,6 +1146,7 @@ private:
   void notePlayed();          // any minigame: cures boredom and grumpiness
   void rollCoinDay();         // a new day: reset the cap, the missions, the step coins
   void notePlayedGame(uint8_t cat, uint16_t score);   // coins + missions for a game (cat: MINI_STAT_* or MINI_NO_STAT)
+  void noteBought();          // anything bought in a shop: the missions and the quest step
   void noteOverfeed(uint8_t amount);
   void wakeUp();              // waking applies the grumpiness from the light
   void statusTick();          // per awake minute: sickness, boredom, dozing off

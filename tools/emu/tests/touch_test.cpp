@@ -252,6 +252,14 @@ int main(int argc, char **argv) {
   // the two top buttons: missions on the left, the purse on the right
   click(100, 72);
   if (!missionsOpen) { printf("FAIL: the left top button did not open the missions\n"); return 1; }
+  {
+    extern bool questView;
+    click(312, 105);                       // the AVENTURA tab
+    if (!missionsOpen || !questView) { printf("FAIL: the adventure tab did not switch\n"); return 1; }
+    click(153, 105);                       // back to today's missions
+    if (!missionsOpen || questView) { printf("FAIL: the missions tab did not switch back\n"); return 1; }
+    printf("PASS: the missions panel tabs switch between missions and the adventure\n");
+  }
   click(233, 233);
   if (missionsOpen) { printf("FAIL: a tap did not close the missions\n"); return 1; }
   click(366, 72);

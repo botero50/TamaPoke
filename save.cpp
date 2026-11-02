@@ -41,7 +41,7 @@ const SaveField SAVE_FIELDS[] = {
   { "grmp", SK_BOOL },  { "bord", SK_U16 },
   // coins and daily missions
   { "coin", SK_U32 },  { "cntd", SK_U16 },  { "cnday", SK_U32 },
-  { "stck", SK_U8 },   { "msprg", SK_BYTES }, { "msdon", SK_U8 },
+  { "stck", SK_U8 },   { "msprg", SK_BYTES }, { "msdon", SK_U8 }, { "mskd", SK_BYTES }, { "mskdy", SK_U32 },
   { "bedd", SK_U32 },
   // hats
   { "hats", SK_U16 },   { "hton", SK_I8 },    { "htdx", SK_I8 },
@@ -78,7 +78,7 @@ const SaveField SAVE_FIELDS[] = {
   { "rib", SK_BYTES },  { "jbk", SK_U8 },     { "jbu", SK_U32 },    { "jbd", SK_U32 },
   { "mld", SK_U32 },    { "mlk", SK_U8 },     { "mlr", SK_BOOL },
   // story quests
-  { "qwk", SK_U32 },    { "qst", SK_U8 },     { "qsd", SK_U32 },
+  { "qwk", SK_U32 },    { "qst", SK_U8 },     { "qsd", SK_U32 },   { "qver", SK_U8 },
   // the Nursery
   { "nurs", SK_BYTES }, { "eggB", SK_BOOL },
   // the banked creatures

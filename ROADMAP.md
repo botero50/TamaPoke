@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 2 November 2026, with Phase 30._
+_Last updated: 2 November 2026, with Phase 31._
 
 ## Done
 | Phase | What | Release |
@@ -20,6 +20,7 @@ _Last updated: 2 November 2026, with Phase 30._
 | 28 | The places come alive (the Center's healing machine and an original jingle, plus an animation in the garden, beach, library, contest, jobs, adventure; idle life in the park, store, school, music hall), the map as a fifth bottom button, a slimmer steps gauge | v1.11 |
 | 29 | A talkative Pokemon (147 phrases in 35 groups, 8 languages, never one of the last six) and honest weather (rain needs 0.3 mm really falling, drizzle is never rain, grey skies need 60% cloud, no pretend rain with Wi-Fi, a stale sky clears after 75 min) | v1.12 |
 | 30 | The quick wash is a real shower (water, no bubbles); the bubble bath keeps the bubble game; food with none in the bag is bought and eaten in one tap from the food menu | v1.13 |
+| 31 | Six daily missions from 36 kinds (care, play, outdoors, home, shop: one of each, plus one), only ones she can do today; two tabs (MISIONES DE HOY / AVENTURA) on the missions panel; 12 weekly stories of 4 steps; the Center step of Chansey's story now counts | v1.14 |
 
 ## Next
 | # | Item | Needs | Notes |
@@ -63,3 +64,8 @@ _Last updated: 2 November 2026, with Phase 30._
 - **Trophies** are 32 bits since phase 27: the low 16 in `trph`, the rest in `trphX`.
 - **Posting:** crenberries428's repo has issues and discussions off, so the thank-you note
   goes on their MakerWorld case page. Printables dropped: the case is only on MakerWorld.
+- **Missions** are rolled once when the day starts and saved (`mskd`, `mskdy`), so one that
+  opens at noon (a letter, coins) waits for tomorrow. 6 coins each, 12 for all six: 48 on a
+  perfect day, outside the 50-coin activity cap. An old save rolls today's six fresh.
+- **Stories** never use the contest (once a week, it could leave a story stuck). A story
+  finished under the old 3 steps stays finished (`qver`).
