@@ -26,7 +26,7 @@
   .row { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
   #log { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
          border-radius:10px; padding:.75rem 1rem; margin-top:1rem; max-height:220px; overflow:auto; white-space:pre-wrap; display:none; }
-  #savelog { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
+  #savelog, #wifilog { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
          border-radius:10px; padding:.75rem 1rem; margin-top:1rem; max-height:160px; overflow:auto; white-space:pre-wrap; display:none; }
   .bar { height:10px; background:var(--track); border-radius:5px; overflow:hidden; margin-top:.75rem; display:none; }
   .bar > div { height:100%; width:0; background:var(--ok); transition: width .15s; }
@@ -72,6 +72,30 @@
     <p class="note">Pick the board's port when asked. Close any other tab or program
        using the board first: only one can use the port at a time.</p>
     <pre id="savelog"></pre>
+  </div>
+
+  <h2><span class="num">📶</span>Optional: Wi-Fi for the real time and the weather</h2>
+  <div class="step">
+    <p>The board's clock has no battery of its own, so it forgets the time when the
+       power runs out. With your Wi-Fi it sets the time from the internet by itself
+       (every few hours, for a few seconds) and can show the weather outside: grey
+       skies, rain, snow and the temperature. Do this <b>after</b> installing.</p>
+    <div class="row" style="flex-wrap:wrap;gap:8px">
+      <input id="wssid" placeholder="Wi-Fi name" maxlength="32" autocomplete="off">
+      <input id="wpass" type="password" placeholder="Wi-Fi password" maxlength="64" autocomplete="off">
+    </div>
+    <p><label><input id="wgeo" type="checkbox" checked> Show the weather (asks for this
+       computer's location, rounded to about 1 km)</label></p>
+    <div class="row">
+      <button id="wsend">📶 Send to the board</button>
+      <button id="wforget">Forget Wi-Fi</button>
+    </div>
+    <p class="note">Only 2.4 GHz networks work (the board has no 5 GHz radio). The
+       password stays on the board: it is not in <b>Save my pet</b> backups and is not
+       sent anywhere else. The weather comes from
+       <a href="https://open-meteo.com/">Open-Meteo</a>, which gets only the rounded
+       location.</p>
+    <pre id="wifilog"></pre>
   </div>
 
   <h2><span class="num">1</span>Flash the firmware</h2>
@@ -312,6 +336,52 @@ document.getElementById('petfile').onchange = async (ev) => {
     }
   });
 };
+
+// ---------- Wi-Fi: real time and weather (WIFI / TZ / GEO over serial) ----------
+const wlog = (m) => { const el = document.getElementById('wifilog'); el.style.display = 'block';
+  el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
+const here = () => new Promise((ok) => {
+  if (!navigator.geolocation) return ok(null);
+  navigator.geolocation.getCurrentPosition((p) => ok(p.coords), () => ok(null), { timeout: 15000, maximumAge: 3600000 });
+});
+async function answered(line) {          // DONE, or false on ERR / silence
+  while (true) {
+    const l = await line(3000);
+    if (l === null || l === 'ERR') return false;
+    if (l === 'DONE') return true;
+  }
+}
+document.getElementById('wsend').onclick = async () => {
+  const ssid = document.getElementById('wssid').value.trim(), pass = document.getElementById('wpass').value;
+  if (!ssid) { wlog('Type the Wi-Fi name first.'); return; }
+  if (/[\t\r\n]/.test(ssid + pass)) { wlog('The name or password has a tab or a line break in it.'); return; }
+  let geo = null;
+  if (document.getElementById('wgeo').checked) {
+    wlog('Asking the browser where this computer is...');
+    geo = await here();
+    if (!geo) wlog('No location (refused or unavailable): the clock still works, without the weather.');
+  }
+  await withPort(async (send, line) => {
+    while (await line(200) !== null) {}  // drop the boot chatter
+    await send('TZ ' + (-new Date().getTimezoneOffset()));
+    if (!await answered(line)) { wlog('No answer from the board. Is TamaPoke (funpack.22 or newer) running on it?'); return; }
+    if (geo) {
+      await send('GEO ' + geo.latitude.toFixed(2) + ' ' + geo.longitude.toFixed(2));
+      if (!await answered(line)) { wlog('The board did not take the location.'); return; }
+    }
+    await send('WIFI ' + ssid + '\t' + pass);
+    if (!await answered(line)) { wlog('The board did not take the Wi-Fi details.'); return; }
+    await send('WIFISYNC');
+    await answered(line);
+    wlog('Done! The board connects in a few seconds and sets its clock' + (geo ? ' and the weather.' : '.') +
+         ' Settings -> About on the board shows whether it worked.');
+  });
+};
+document.getElementById('wforget').onclick = () => withPort(async (send, line) => {
+  while (await line(200) !== null) {}
+  await send('WIFIOFF');
+  wlog(await answered(line) ? 'The board forgot the Wi-Fi details.' : 'No answer from the board.');
+});
 
 document.getElementById('connect').onclick = async () => {
   try {

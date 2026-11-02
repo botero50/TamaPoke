@@ -32,6 +32,8 @@
 #include "pet.h"
 #include "sdmon.h"
 #include "rtcbat.h"
+#include "wifisync.h"
+#include "weather.h"
 #include "imu.h"
 #include "steps.h"
 #include "i18n.h"
@@ -41,7 +43,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.21"
+#define FW_VERSION "3.14-funpack.22"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -829,6 +831,7 @@ void setup() {
     Serial.println("RTC has no time: seeded, no offline progression this time");
   }
   pet.syncClock(e);
+  wifiBegin();     // the real time comes back from the internet a little later
 
   audioBegin();  // ES8311 + I2S + amplifier (plays a boot jingle)
 
@@ -879,6 +882,15 @@ void loop() {
   if (lan.live()) {
     linkNowPoll();
     lan.tick(now);
+  }
+  wifiTick(now, lan.live() || linkNowUp());
+  {
+    uint32_t le;
+    if (wifiTakeTime(&le)) {
+      uint32_t cur = rtcEpoch();
+      // without catch-up, like TIME: after a blank RTC the gap is months of nothing
+      if (!cur || (cur > le ? cur - le : le - cur) > 60) { rtcSetEpoch(le); pet.setClock(le); }
+    }
   }
 
   // plays a sound when the creature becomes ready to evolve
@@ -1155,6 +1167,27 @@ void handleSerial() {
     pet.setClock(e);
     Serial.printf("rtc=%u\n", rtcEpoch());
     Serial.println("DONE");
+  } else if (line.startsWith("WIFI ")) {     // WIFI <ssid><TAB><password>
+    String rest = line.substring(5);
+    int tab = rest.indexOf('\t');
+    String ssid = tab >= 0 ? rest.substring(0, tab) : rest;
+    String pass = tab >= 0 ? rest.substring(tab + 1) : String("");
+    if (ssid.length() == 0 || ssid.length() > 32 || pass.length() > 64) Serial.println("ERR");
+    else { wifiSetNetwork(ssid.c_str(), pass.c_str()); Serial.printf("wifi=%s\n", wifiNetwork()); Serial.println("DONE"); }
+  } else if (line == "WIFIOFF") {
+    wifiForget();
+    Serial.println("DONE");
+  } else if (line == "WIFISYNC") {
+    wifiSyncNow();
+    Serial.println("DONE");
+  } else if (line.startsWith("TZ ")) {        // minutes east of UTC
+    wifiSetTz((int16_t)line.substring(3).toInt());
+    Serial.println("DONE");
+  } else if (line.startsWith("GEO ")) {       // GEO <lat> <lon>
+    String rest = line.substring(4);
+    int sp = rest.indexOf(' ');
+    if (sp < 0) Serial.println("ERR");
+    else { wifiSetPlace((float)atof(rest.substring(0, sp).c_str()), (float)atof(rest.substring(sp + 1).c_str())); Serial.println("DONE"); }
   } else if (line.startsWith("RTCSET ")) {  // RTC only (simulate power-offs in tests)
     rtcSetEpoch((uint32_t)line.substring(7).toInt());
     Serial.printf("rtc=%u\n", rtcEpoch());
@@ -1340,6 +1373,8 @@ void handleSerial() {
     Serial.printf("shiny=%d streak=%u/%u bond=%u medals=0x%X(%u) nick=%s\n",
                   pet.shiny, pet.streak, pet.bestStreak, pet.bond, pet.medals,
                   pet.totalMedals, pet.nick);
+    Serial.printf("wifi=%s state=%u synced=%lu weather=%u/%d\n", wifiNetwork(), wifiState(), (unsigned long)wifiLastSync(),
+                  weatherShown(millis()), weatherLast().tempC);
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
                   (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
     Serial.println("DONE");
@@ -3739,6 +3774,29 @@ static void drawGraveyard(uint32_t now, bool night, int h, uint16_t top, uint16_
     }
 }
 
+// Rain, snow or a storm over the scene (the temperature goes by the clock). Drawn
+// after the background and before the creature, so it rains BEHIND it.
+void drawSkyWeather(uint32_t now) {
+  uint8_t wx = weatherShown(now);
+  if (wx == WX_NONE) return;
+  if (wx == WX_RAIN || wx == WX_STORM) {
+    uint16_t rc = C565(0xc8, 0xd8, 0xf0);
+    int n = wx == WX_STORM ? 70 : 44;
+    for (int k = 0; k < n; k++) {
+      int x = (int)((k * 97 + now / 6) % 486) - 10;
+      int y = (int)((k * 151 + now / 2) % 466);
+      gfx->drawLine(x, y, x - 4, y + 14, rc);
+    }
+    if (wx == WX_STORM && (now / 90) % 61 == 0) gfx->fillRect(0, 0, 466, 140, C565(0xf0, 0xf4, 0xff));   // lightning
+  } else if (wx == WX_SNOW) {
+    for (int k = 0; k < 40; k++) {
+      int x = (int)((k * 113 + (int)(sinf(now / 900.0f + k) * 12)) % 466);
+      int y = (int)((k * 131 + now / 14) % 466);
+      gfx->fillCircle(x, y, 2 + (k % 2), UI_WHITE);
+    }
+  }
+}
+
 void drawScene(uint8_t biome, uint32_t now, bool night) {
   int h = sceneHour();
   uint16_t top, bot;
@@ -3756,6 +3814,13 @@ void drawScene(uint8_t biome, uint32_t now, bool night) {
     bot = lerp565(bot, night ? C565(0x2a, 0x3c, 0x66) : C565(0xea, 0xf2, 0xfa), 1, 2);
   }
   if (biome == BIOME_FOREST && !night) bot = lerp565(bot, C565(0xcc, 0xe8, 0xd4), 1, 3);   // forest: faint green haze
+  uint8_t wx = weatherShown(now);
+  bool overcast = wx >= WX_CLOUDY;
+  if (overcast) {  // the weather outside: grey skies, darker when it rains
+    uint16_t grey = night ? C565(0x22, 0x26, 0x30) : wx >= WX_RAIN ? C565(0x88, 0x90, 0x9c) : C565(0xb4, 0xbc, 0xc6);
+    top = lerp565(top, grey, 2, 3);
+    bot = lerp565(bot, grey, 1, 2);
+  }
   if (biome == BIOME_VOLCANO) {  // volcano: ash-red sky, hazier toward the horizon
     top = lerp565(top, night ? C565(0x2a, 0x0e, 0x14) : C565(0x6a, 0x2c, 0x2c), 1, 2);
     bot = lerp565(bot, night ? C565(0x6a, 0x24, 0x1c) : C565(0xf0, 0x7c, 0x3c), 1, 2);
@@ -3766,7 +3831,10 @@ void drawScene(uint8_t biome, uint32_t now, bool night) {
     gfx->fillRect(0, y, 466, 8, lerp565(top, bot, y, HORIZON));
 
   // sol o luna
-  if (night) {
+  if (overcast) {
+    uint16_t cc = night ? C565(0x40, 0x46, 0x54) : wx >= WX_RAIN ? C565(0xa0, 0xa6, 0xb0) : C565(0xe4, 0xe8, 0xec);
+    drawClouds(now, cc, lerp565(cc, top, 1, 2));
+  } else if (night) {
     const int moonY = 122;   // clear of the header text above it
     drawStars(now, top, bot, HORIZON - 10);
     drawMoon(360, moonY, lerp565(top, bot, moonY, HORIZON));
@@ -4077,7 +4145,7 @@ void render() {
   // drawScene covers the full 466x466: no fillScreen(BLACK) beforehand so
   // that an overlapping DMA flush never captures half-painted black (anti-flicker)
   if (pet.sceneryPick == SCENERY_ROOM && !pet.ceremony) drawRoom(gNight);
-  else drawScene(sceneBiome(), millis(), gNight);
+  else { drawScene(sceneBiome(), millis(), gNight); drawSkyWeather(millis()); }
 
   if (pet.ceremony) {
     const DexEntry &d = DEX_TBL[pet.speciesId];
@@ -4751,9 +4819,17 @@ void renderClock() {
       // just above the logo
       uiTextFit(UIF_BIG, CX, 217 - LOGO_H / 2 - 24 - 10 + 21, own, UI_INK, 1, 300);
     }
-    char ver[16];
+    char ver[24];   // 16 cut "funpack.21" to "funpack.2"
     snprintf(ver, sizeof(ver), "v%s", FW_VERSION);
     uiText(UIF_BIG, CX, 290, ver, UI_INK, 1);
+    char wl[64];
+    uint8_t ws = wifiState();
+    if (ws == WIFI_ST_NONE) snprintf(wl, sizeof(wl), "%s", T(S_WIFI_NONE));
+    else if (ws == WIFI_ST_BUSY) snprintf(wl, sizeof(wl), "%s", T(S_WIFI_BUSY));
+    else if (ws == WIFI_ST_FAIL) snprintf(wl, sizeof(wl), "%s", T(S_WIFI_FAIL));
+    else if (wifiLastSync()) snprintf(wl, sizeof(wl), "%s %02u:%02u", T(S_WIFI_OK), (unsigned)(wifiLastSync() / 3600 % 24), (unsigned)(wifiLastSync() / 60 % 60));
+    else snprintf(wl, sizeof(wl), "Wi-Fi: %s", wifiNetwork());
+    uiTextFit(UIF_TINY, CX, 316, wl, UI_TRACK_TEXT, 1, 320);
   }
 
   // page dots, like the player card's
@@ -6637,7 +6713,7 @@ static void lanOffer(bool host) {
     linkMonFrom(m, btlSquad[i]);
     lan.addMon(m);
   }
-  if (!linkNowBegin(&lan)) {          // no radio: say so rather than hanging
+  if (wifiBusy() || !linkNowBegin(&lan)) {   // no radio (or a Wi-Fi sync has it): say so rather than hanging
     lan.state = LINK_REFUSED;
     return;
   }
@@ -7499,6 +7575,11 @@ void drawBattery() {
   int x0 = CX - total / 2;
   if (ts) {
     uiText(UIF_SMALL, x0, 19 + 14, ts, inkColor(), 0);
+  }
+  if (weatherShown(millis()) != WX_NONE) {   // the temperature outside, left of the clock (the menu is on the right)
+    char tc[8];
+    snprintf(tc, sizeof(tc), "%dC", (int)weatherLast().tempC);
+    uiText(UIF_SMALL, x0 - 12, 19 + 14, tc, inkColor(), 2);
   }
   if (pc < 0) return;               // no battery connected
   int x = x0 + tw + (ts ? GAP : 0), y = 22, w = 24, h = 11;
@@ -10623,6 +10704,9 @@ void checkHolidayGift() {
 // One weather a day, the same all day (from the date): mostly fair, sometimes
 // rain, snow in the winter months. It is only the sky; the pet does not mind.
 static uint8_t weatherToday() {   // 0 fair, 1 rain, 2 snow
+  // the real weather when the Wi-Fi has fetched it; otherwise a made-up one, ~1 day in 5
+  uint8_t real = weatherShown(millis());
+  if (real != WX_NONE) return real == WX_SNOW ? 2 : (real == WX_RAIN || real == WX_STORM) ? 1 : 0;
   uint32_t d = pet.lastSeenEpoch / 86400;
   if (!d) return 0;
   uint32_t h = d * 2654435761UL;
@@ -10635,6 +10719,7 @@ static uint8_t weatherToday() {   // 0 fair, 1 rain, 2 snow
 }
 
 void drawWeather() {
+  if (weatherShown(millis()) != WX_NONE) return;      // the real weather draws itself, behind the creature
   uint8_t w = weatherToday();
   if (!w || pet.sceneryPick == SCENERY_ROOM) return;   // indoors: no rain on the carpet
   uint32_t now = millis();

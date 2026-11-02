@@ -146,6 +146,20 @@ struct Link;
 // No radio here at all, which is why lossy_test drives Link directly instead
 // of going through this.
 bool linkNowBegin(Link *) { return false; }
+// no Wi-Fi either: the weather is set by tests and the preview harness
+#include "wifisync.h"
+void wifiBegin() {}
+void wifiTick(uint32_t, bool) {}
+bool wifiBusy() { return false; }
+bool wifiTakeTime(uint32_t *) { return false; }
+void wifiSetNetwork(const char *, const char *) {}
+void wifiForget() {}
+void wifiSetTz(int16_t) {}
+void wifiSetPlace(float, float) {}
+void wifiSyncNow() {}
+uint8_t wifiState() { return WIFI_ST_NONE; }
+uint32_t wifiLastSync() { return 0; }
+const char *wifiNetwork() { return ""; }
 void linkNowEnd() {}
 bool linkNowUp() { return false; }
 void linkNowPoll() {}
