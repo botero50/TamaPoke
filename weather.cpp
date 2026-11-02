@@ -68,3 +68,14 @@ uint8_t weatherShown(uint32_t nowMs) {
 }
 void weatherSetNySnow(bool on) { gNySnow = on; }
 bool weatherNySnow() { return gNySnow; }
+
+bool ssidSameIgnoringCase(const char *a, const char *b) {
+  if (!a || !b) return false;
+  for (; *a && *b; a++, b++) {
+    char x = *a, y = *b;
+    if (x >= 'A' && x <= 'Z') x += 32;
+    if (y >= 'A' && y <= 'Z') y += 32;
+    if (x != y) return false;
+  }
+  return *a == *b;
+}

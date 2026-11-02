@@ -222,6 +222,33 @@ int main(int argc, char **argv) {
   printf("PASS: outside a list goes back to the categories\n");
   trainOpen = false;
 
+  {                                      // phase 26: the arcade's prize counter and records
+    extern uint8_t arcadeView, boardPage;
+    int8_t hat0 = pet.hatOn; uint32_t owned0 = pet.hatsOwned;
+    click(tbx, tby);
+    click(311, 327);                     // tile 5 == ARCADE
+    if (fpMenuCat != 6) { printf("FAIL: ARCADE tile did not open its list (%u)\n", fpMenuCat); return 1; }
+    click(233, 154 + 2 * 50);            // third row: PRIZES
+    if (arcadeView != 1) { printf("FAIL: PRIZES did not open the prize counter\n"); return 1; }
+    pet.tickets = Pet::prizePrice(PRIZE_CAP);
+    click(233, 168);                     // the first prize: the arcade cap
+    if (!pet.ownsHat(HAT_ARCADE) || pet.hatOn != HAT_ARCADE || pet.tickets != 0) { printf("FAIL: the cap was not won and worn\n"); return 1; }
+    click(233, 168 + 50);                // the visor, with no tickets left
+    if (pet.ownsHat(HAT_VISOR)) { printf("FAIL: a prize was won without tickets\n"); return 1; }
+    click(20, 233);                      // outside: back to the Arcade list
+    if (arcadeView || fpMenuCat != 6) { printf("FAIL: outside the counter did not go back to the list\n"); return 1; }
+    click(233, 154 + 3 * 50);            // fourth row: RECORDS
+    if (arcadeView != 2 || boardPage != 0) { printf("FAIL: RECORDS did not open the board\n"); return 1; }
+    pump(2);
+    click(357, 376);                     // next page
+    if (boardPage != 1) { printf("FAIL: the board did not turn a page\n"); return 1; }
+    click(20, 233);
+    click(20, 233);                      // out of the list too
+    arcadeView = 0; fpMenuCat = 0; trainOpen = false;
+    pet.hatOn = hat0; pet.hatsOwned = owned0;
+    printf("PASS: Arcade -> PRIZES wins the cap, no tickets refuses; RECORDS turns a page\n");
+  }
+
   // the two top buttons: missions on the left, the purse on the right
   click(100, 72);
   if (!missionsOpen) { printf("FAIL: the left top button did not open the missions\n"); return 1; }

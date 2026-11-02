@@ -33,6 +33,8 @@ const SaveField SAVE_FIELDS[] = {
   { "medal", SK_U16 },  { "tmedal", SK_U16 }, { "mstone", SK_U16 },
   { "ghi", SK_U16 },    { "shi", SK_U16 },    { "qhi", SK_U16 },
   // Fun Pack: the extra minigames' records and the statuses
+  { "tkt", SK_U16 },    { "tkd", SK_U32 },    { "tkn", SK_U8 },     { "wkhi", SK_BYTES },
+  { "wkid", SK_U32 },
   { "mnhi", SK_BYTES }, { "sick", SK_U8 },    { "sdose", SK_U8 },
   { "sdmin", SK_U32 },  { "stick", SK_U16 },  { "ovf", SK_U8 },
   { "dirt", SK_U8 },    { "lon", SK_BOOL },   { "lont", SK_U8 },

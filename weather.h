@@ -33,3 +33,7 @@ const WeatherNow &weatherLast();
 uint8_t weatherShown(uint32_t nowMs);          // WX_NONE when unknown or stale
 void weatherSetNySnow(bool on);                // the "Snow from New York" switch (on by default)
 bool weatherNySnow();
+
+// The same network name, ignoring letter case ("alejandro" is "Alejandro").
+// Wi-Fi names are case-sensitive, and the first real setup failed on exactly that.
+bool ssidSameIgnoringCase(const char *a, const char *b);

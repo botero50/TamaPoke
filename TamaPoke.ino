@@ -43,7 +43,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.24"
+#define FW_VERSION "3.14-funpack.25"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -243,6 +243,8 @@ bool photoPending = false;   // the next main-screen frame goes into the album
 bool albumOpen = false;      // browsing the photos
 uint8_t albumIdx = 0, albumShown = 255;   // the photo asked for, and the one in the buffer
 uint8_t mapPage = 0;         // the map has two pages of places
+uint8_t arcadeView = 0;      // 1 the prize counter, 2 the weekly records (phase 26)
+uint8_t boardPage = 0;
 bool mailOpen = false;       // the letter of the day
 uint8_t mailShown = 0;       // which letter is on screen
 float gAccX = 0, gAccY = 0, gAccZ = 1;  // the last accelerometer sample
@@ -1389,6 +1391,7 @@ void handleSerial() {
     Serial.printf("wifi=%s state=%u synced=%lu weather=%u/%d ny=%u nysnow=%d\n", wifiNetwork(), wifiState(), (unsigned long)wifiLastSync(),
                   weatherShown(millis()), weatherLast().tempC, weatherLast().nyKind, weatherNySnow());
     { char dg[96]; wifiDiag(dg, sizeof(dg)); Serial.printf("wifidiag %s\n", dg); }
+    Serial.printf("tickets=%u today=%u golds=%u\n", pet.tickets, pet.ticketsToday, pet.goldBadges());
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
                   (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
     Serial.println("DONE");
@@ -1521,6 +1524,7 @@ void onSwipeV(int dir) {
   }
   if (playerOpen) { playerOpen = false; return; }
   if (trainOpen) { trainOpen = false; return; }
+  if (arcadeView) { arcadeView = 0; fpMenuCat = 6; return; }   // back to the Arcade list (FP_CAT_ARCADE + 1, defined further down)
   if (fpMenuCat) { fpMenuCat = 0; trainOpen = true; return; }   // back to the categories
   if (movePickOpen) { movePickOpen = false; return; }
   if (boxOpen) { boxOpen = false; boxSel = 0; return; }   // vertical backs out
@@ -1880,6 +1884,7 @@ void onSwipe(int dir) {
     return;
   }
   if (trainOpen) { trainOpen = false; return; }
+  if (arcadeView) { arcadeView = 0; fpMenuCat = 6; return; }   // back to the Arcade list (FP_CAT_ARCADE + 1, defined further down)
   if (fpMenuCat) { fpMenuCat = 0; trainOpen = true; return; }   // back to the categories
   if (movePickOpen) {   // the picker is paged; without this its later pages
     uint8_t all[64];    // were simply unreachable
@@ -2060,6 +2065,7 @@ void onTap(int16_t x, int16_t y) {
     return;   // modal: nothing else on screen responds until it is answered
   }
   if (fpOpen) { fpTap(x, y); return; }
+  if (arcadeView) { arcadeTap(x, y); return; }
   if (fpMenuCat) { funMenuTap(x, y); return; }
   if (trainOpen) { gamesGridTap(x, y); return; }
   // The menu is modal and has three independent ways out: the CLOSE row, a tap
@@ -4021,7 +4027,7 @@ uint8_t uiCurrentScreen() {
   if (gameOpen || sackOpen || spdOpen || fpOpen || scrubOpen) return SCR_GAME;
   if (shopOpen) return SCR_MENU;               // the shop can open over the store
   if (placeScene) return SCR_GAME;
-  if (trainOpen || fpMenuCat) return SCR_TRAIN;
+  if (trainOpen || fpMenuCat || arcadeView) return SCR_TRAIN;
   if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen || albumOpen) return SCR_MENU;
   return SCR_MAIN;
 }
@@ -4161,6 +4167,10 @@ void render() {
   }
   if (placeScene) {
     renderPlace();
+    return;
+  }
+  if (arcadeView) {
+    renderArcade();
     return;
   }
   if (fpMenuCat) {
@@ -8569,14 +8579,14 @@ void drawMap(const char *const *map, int n, int x, int y, int s, bool silhouette
 #define FPM_ROW_Y(i) (FPM_Y + 56 + (i) * (FPM_ROW_H + 8))
 enum : uint8_t { FP_CAT_ATK = 0, FP_CAT_SPE, FP_CAT_DEF, FP_CAT_BRAIN, FP_CAT_FUN, FP_CAT_ARCADE, FP_CAT_COUNT };
 // an entry is a MINI_* game, or one of the original three
-enum : uint8_t { FP_G_BAG = 100, FP_G_REACT, FP_G_BALL, FP_G_NONE = 255 };
+enum : uint8_t { FP_G_BAG = 100, FP_G_REACT, FP_G_BALL, FP_G_PRIZES, FP_G_BOARD, FP_G_NONE = 255 };
 static const uint8_t FP_CATS[FP_CAT_COUNT][FPM_ROWS] = {
   { FP_G_BAG,   MINI_MOLE,    MINI_MAZE,    MINI_BALLOON, FP_G_NONE  },   // strength
   { FP_G_REACT, MINI_DROP,    MINI_ROPE,    MINI_FLAPPY,  MINI_SHAKE },   // speed
   { FP_G_BALL,  MINI_CATCH,   MINI_BALANCE, FP_G_NONE,    FP_G_NONE  },   // defence
   { MINI_WHO,   MINI_MEMORY,  MINI_SIMON,   MINI_QUIZ,    MINI_SLIDE },   // brain
   { MINI_DANCE, MINI_HIDE,    MINI_LR,      MINI_HL,      FP_G_NONE  },   // fun: joy and bond
-  { MINI_BUBBLES, MINI_DRAW,  FP_G_NONE,    FP_G_NONE,    FP_G_NONE  },   // arcade
+  { MINI_BUBBLES, MINI_DRAW,  FP_G_PRIZES,  FP_G_BOARD,   FP_G_NONE  },   // arcade, its prize counter and records
 };
 
 // shared state (only one game is open at a time)
@@ -8715,6 +8725,7 @@ void drawSickGerm() {
 static void fpFinish(uint8_t g) {
   if (fpOverUntil) return;
   fpNewHi = (fpScore > pet.miniHi[g]);
+  pet.lastTickets = 0; pet.lastBadge = 0;
   fpGain = pet.applyMiniResult(g, (uint8_t)(fpScore > 250 ? 250 : fpScore));
   sfxPlay(fpNewHi && fpScore > 0 ? SFX_MEDAL : SFX_LEVEL);
   fpOverUntil = millis() + 4000;
@@ -9335,6 +9346,8 @@ static StrId fpEntryName(uint8_t e) {
   if (e == FP_G_BAG) return S_GAME_BAG;
   if (e == FP_G_REACT) return S_GAME_REACT;
   if (e == FP_G_BALL) return S_GAME_BALL;
+  if (e == FP_G_PRIZES) return S_PRIZES;
+  if (e == FP_G_BOARD) return S_RECORDS;
   return fpTitle(e);
 }
 
@@ -9357,6 +9370,8 @@ void funMenuTap(int16_t x, int16_t y) {
   if (e == FP_G_BAG) startSack();
   else if (e == FP_G_REACT) startSpeedGame();
   else if (e == FP_G_BALL) startGame();
+  else if (e == FP_G_PRIZES) { arcadeView = 1; }
+  else if (e == FP_G_BOARD) { arcadeView = 2; boardPage = 0; pet.weekRoll(); }
   else startFunPackGame((uint8_t)e);
 }
 
@@ -9463,6 +9478,20 @@ static void fpRenderResult() {
     snprintf(c, sizeof(c), "+%u", pet.coinFlash);
     drawMap(SPR_ICON_COIN, 16, CX - 50, 300, 2, false);
     uiText(UIF_BIG, CX - 10, 330, c, UI_BAR_WARN, 0);
+  }
+  if (pet.lastTickets) {
+    char t[24];
+    snprintf(t, sizeof(t), "+%u %s", (unsigned)pet.lastTickets, T(S_TICKETS));
+    uiTextFit(UIF_SMALL, CX, 368, t, C565(0x4f, 0x93, 0xc4), 1, 300);
+  }
+  if (pet.lastBadge) {
+    static const StrId B[3] = { S_BADGE_1, S_BADGE_2, S_BADGE_3 };
+    static const uint16_t BC[3] = { C565(0xc0, 0x80, 0x40), C565(0x90, 0x98, 0xa4), C565(0xe0, 0xa8, 0x00) };
+    const char *bt = T(B[pet.lastBadge - 1]);
+    int bw = uiTextWidth(UIF_SMALL, bt);
+    gfx->fillCircle(CX - bw / 2 - 4, 392, 9, BC[pet.lastBadge - 1]);
+    gfx->drawCircle(CX - bw / 2 - 4, 392, 9, UI_INK);
+    uiTextFit(UIF_SMALL, CX + 12, 398, bt, BC[pet.lastBadge - 1], 1, 240);
   }
   gfx->flush();
 }
@@ -9665,7 +9694,7 @@ static StrId hatName(uint8_t h) {
     S_HAT_CAP, S_HAT_BOW, S_HAT_FLOWER, S_HAT_BEANIE, S_HAT_PARTY,
     S_HAT_STRAW, S_HAT_WITCH, S_HAT_SANTA, S_HAT_TOPHAT, S_HAT_CROWN,
     S_HAT_CHEF, S_HAT_PIRATE, S_HAT_CATEARS, S_HAT_BUNNY, S_HAT_HEADPHONES,
-    S_HAT_GRAD, S_HAT_WREATH, S_HAT_HELMET, S_HAT_BERET, S_HAT_VIKING
+    S_HAT_GRAD, S_HAT_WREATH, S_HAT_HELMET, S_HAT_BERET, S_HAT_VIKING, S_HAT_ARCADE, S_HAT_VISOR
   };
   return T_[h % HAT_COUNT];
 }
@@ -9787,18 +9816,29 @@ void startBath();
 extern uint32_t bathUntil;
 bool feedFromBag(uint8_t f);   // defined with the food menu
 
-static uint8_t catCount(uint8_t c) {
+// everything there is in a category (the bag) ...
+static uint8_t catCountAll(uint8_t c) {
   return c == CAT_HATS ? HAT_COUNT + ACC_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_COUNT - DEC_TOY_COUNT
+       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : 3;
+}
+// ... and what the shop sells: the arcade prizes are won, never bought
+static uint8_t catCount(uint8_t c) {
+  return c == CAT_HATS ? HAT_SHOP_COUNT + ACC_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_SHOP_COUNT - DEC_TOY_COUNT
        : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : 3;   // CARE: the soap, the brush, garden seeds
 }
 static uint8_t catPages(uint8_t c) { return (catCount(c) + SHOP_PER_PAGE - 1) / SHOP_PER_PAGE; }
 // the catalogue id (HatId or DecorId) of item i in category c
-static uint8_t catItem(uint8_t c, uint8_t i) { return c == CAT_DECOR ? DEC_TOY_COUNT + i : i; }
+static uint8_t catItem(uint8_t c, uint8_t i) {
+  if (c == CAT_HATS && i >= HAT_SHOP_COUNT) return HAT_COUNT + (i - HAT_SHOP_COUNT);   // past the shop's hats: the accessories
+  return c == CAT_DECOR ? DEC_TOY_COUNT + i : i;
+}
+// the bag lists everything owned, prizes included
+static uint8_t bagItem(uint8_t c, uint8_t i) { return c == CAT_DECOR ? DEC_TOY_COUNT + i : i; }
 
 static StrId decorName(uint8_t d) {
   static const StrId T_[DEC_COUNT] = {
     S_DEC_BALL, S_DEC_PLUSH, S_DEC_DUCK, S_DEC_BLOCKS, S_DEC_DRUM, S_DEC_KITE,
-    S_DEC_PLANT, S_DEC_FLOWERS, S_DEC_LAMP, S_DEC_BED, S_DEC_GIFT, S_DEC_PUMPKIN
+    S_DEC_PLANT, S_DEC_FLOWERS, S_DEC_LAMP, S_DEC_BED, S_DEC_GIFT, S_DEC_PUMPKIN, S_DEC_CABINET
   };
   return T_[d % DEC_COUNT];
 }
@@ -10005,9 +10045,9 @@ static uint8_t bagEntries(int8_t *out, uint8_t max) {
     if (pet.hatOn >= 0 && n < max) out[n++] = -2;
     if (pet.hatOn >= 0 && n < max) out[n++] = -1;
   }
-  uint8_t all = c == CAT_FOOD ? FOOD_COUNT : catCount(c);   // the bag also holds what was cooked
+  uint8_t all = c == CAT_FOOD ? FOOD_COUNT : catCountAll(c);   // the bag also holds what was cooked, and the prizes
   for (uint8_t k = 0; k < all && n < max; k++) {
-    uint8_t id = catItem(c, k);
+    uint8_t id = bagItem(c, k);
     if (catOwned(c, id)) out[n++] = (int8_t)id;
   }
   return n;
@@ -12541,11 +12581,107 @@ void renderFunMenu() {
     gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_BG_DAY);
     gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_INK);
     uiTextFit(UIF_SMALL, PANEL_X + 30, uiMidY(UIF_SMALL, y, GL_ROW_H), T(fpEntryName(e)), UI_INK, 0, 190);
-    char rec[16];
-    snprintf(rec, sizeof(rec), T(S_REC_FMT), fpEntryRecord(e));
-    uiTextFit(UIF_TINY, PANEL_X + PANEL_W - 28, uiMidY(UIF_TINY, y, GL_ROW_H), rec, UI_TRACK_TEXT, 2, 90);
+    char rec[24];
+    if (e == FP_G_PRIZES) snprintf(rec, sizeof(rec), "%u %s", (unsigned)pet.tickets, T(S_TICKETS));
+    else if (e == FP_G_BOARD) rec[0] = 0;
+    else snprintf(rec, sizeof(rec), T(S_REC_FMT), fpEntryRecord(e));
+    uiTextFit(UIF_TINY, PANEL_X + PANEL_W - 28, uiMidY(UIF_TINY, y, GL_ROW_H), rec, UI_TRACK_TEXT, 2, 110);
   }
   gfx->flush();
+}
+
+// ---------- the arcade: the prize counter and the weekly records (phase 26) ----------
+
+static const char *const *prizeIcon(uint8_t p) {
+  return p == PRIZE_CAP ? SPR_HAT_ARCADE : p == PRIZE_VISOR ? SPR_HAT_VISOR : p == PRIZE_CABINET ? SPR_DEC_CABINET
+       : p == PRIZE_CAPSULE ? SPR_DEC_GIFT : SPR_FOODS[FOOD_CAKE];
+}
+static StrId prizeName(uint8_t p) {
+  return p == PRIZE_CAP ? S_HAT_ARCADE : p == PRIZE_VISOR ? S_HAT_VISOR : p == PRIZE_CABINET ? S_DEC_CABINET
+       : p == PRIZE_CAPSULE ? S_CAPSULE : S_FOOD_CAKE;
+}
+#define BOARD_ROWS 4      // a fifth row would sit on the page arrows
+
+static void renderPrizes() {
+  drawPanelBase();
+  uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(S_PRIZES), UI_INK, 1, PANEL_W - 80);
+  char t[24];
+  snprintf(t, sizeof(t), "%u %s", (unsigned)pet.tickets, T(S_TICKETS));
+  uiTextFit(UIF_SMALL, CX, PANEL_Y + 62, t, C565(0x4f, 0x93, 0xc4), 1, PANEL_W - 80);
+  for (uint8_t p = 0; p < PRIZE_COUNT; p++) {
+    int y = GL_ROW_Y(p) + 14;
+    bool owned = pet.prizeOwned(p), can = pet.tickets >= Pet::prizePrice(p);
+    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, owned ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : UI_BG_DAY);
+    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_INK);
+    drawMap(prizeIcon(p), 16, PANEL_X + 22, y + 6, 2, false);
+    uiTextFit(UIF_SMALL, PANEL_X + 62, uiMidY(UIF_SMALL, y, GL_ROW_H), T(prizeName(p)), UI_INK, 0, 170);
+    char pr[12];
+    if (owned) snprintf(pr, sizeof(pr), "%s", T(S_OWNED));
+    else snprintf(pr, sizeof(pr), "%u", (unsigned)Pet::prizePrice(p));
+    uiTextFit(UIF_SMALL, PANEL_X + PANEL_W - 28, uiMidY(UIF_SMALL, y, GL_ROW_H), pr, owned ? UI_BAR_OK : can ? UI_INK : UI_BAR_BAD, 2, 90);
+  }
+  drawFpToast();
+  gfx->flush();
+}
+
+static void renderBoard() {
+  drawPanelBase();
+  uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(S_RECORDS), UI_INK, 1, PANEL_W - 80);
+  const int colW = PANEL_X + PANEL_W - 104, colB = PANEL_X + PANEL_W - 48;
+  uiTextFit(UIF_TINY, colW, PANEL_Y + 62, T(S_WEEK), UI_TRACK_TEXT, 1, 60);
+  uiTextFit(UIF_TINY, colB, PANEL_Y + 62, T(S_BEST), UI_TRACK_TEXT, 1, 60);
+  static const uint16_t BC[4] = { 0, C565(0xc0, 0x80, 0x40), C565(0x90, 0x98, 0xa4), C565(0xe0, 0xa8, 0x00) };
+  for (int i = 0; i < BOARD_ROWS; i++) {
+    int g = boardPage * BOARD_ROWS + i;
+    if (g >= MINI_COUNT) break;
+    int y = GL_ROW_Y(i) + 18;
+    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_BG_DAY);
+    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_INK);
+    uint8_t tier = Pet::badgeTier((uint8_t)g, pet.miniHi[g]);
+    if (tier) { gfx->fillCircle(PANEL_X + 32, y + GL_ROW_H / 2, 8, BC[tier]); gfx->drawCircle(PANEL_X + 32, y + GL_ROW_H / 2, 8, UI_INK); }
+    else gfx->drawCircle(PANEL_X + 32, y + GL_ROW_H / 2, 8, UI_TRACK_TEXT);
+    uiTextFit(UIF_SMALL, PANEL_X + 48, uiMidY(UIF_SMALL, y, GL_ROW_H), T(fpTitle((uint8_t)g)), UI_INK, 0, colW - PANEL_X - 90);
+    char w[8], b[8];
+    snprintf(w, sizeof(w), "%u", (unsigned)pet.weekHi[g]);
+    snprintf(b, sizeof(b), "%u", (unsigned)pet.miniHi[g]);
+    bool star = pet.beatThisWeek((uint8_t)g);
+    uiText(UIF_SMALL, colW, uiMidY(UIF_SMALL, y, GL_ROW_H), w, star ? UI_BAR_WARN : UI_INK, 1);
+    uiText(UIF_SMALL, colB, uiMidY(UIF_SMALL, y, GL_ROW_H), b, UI_INK, 1);
+    if (star) {                                            // a new record this week
+      int sx = colW - 26, sy = y + GL_ROW_H / 2;
+      gfx->fillTriangle(sx, sy - 7, sx - 6, sy + 5, sx + 6, sy + 5, UI_BAR_WARN);
+      gfx->fillTriangle(sx, sy + 9, sx - 6, sy - 3, sx + 6, sy - 3, UI_BAR_WARN);
+    }
+  }
+  drawPageNav(boardPage, (MINI_COUNT + BOARD_ROWS - 1) / BOARD_ROWS);
+  gfx->flush();
+}
+
+void renderArcade() { if (arcadeView == 1) renderPrizes(); else renderBoard(); }
+
+void arcadeTap(int16_t x, int16_t y) {
+  if (!inPanel(x, y)) { arcadeView = 0; fpMenuCat = FP_CAT_ARCADE + 1; return; }   // outside: back to the Arcade list
+  if (arcadeView == 2) {
+    uint8_t pages = (MINI_COUNT + BOARD_ROWS - 1) / BOARD_ROWS;
+    int nav = pageNavHit(x, y, pages);
+    if (nav) { boardPage = (uint8_t)((boardPage + pages + nav) % pages); sfxPlay(SFX_TAP); }
+    return;
+  }
+  for (uint8_t p = 0; p < PRIZE_COUNT; p++) {
+    int ry = GL_ROW_Y(p) + 14;
+    if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14 || y < ry || y > ry + GL_ROW_H) continue;
+    uint8_t r = pet.winPrize(p);
+    if (r == PRZ_OK) {
+      sfxPlay(SFX_MEDAL);
+      fpShowToast(S_PRIZE_WON, UI_BAR_OK);
+      if (p == PRIZE_CAP) pet.wearHat(HAT_ARCADE);          // a new hat goes straight on
+      else if (p == PRIZE_VISOR) pet.wearHat(HAT_VISOR);
+    } else {
+      sfxPlay(SFX_DENY);
+      fpShowToast(r == PRZ_NO_TICKETS ? S_NO_TICKETS : S_OWNED, UI_BAR_BAD);
+    }
+    return;
+  }
 }
 
 // -1 = outside the panel, -2 = inside but on no game, else the entry

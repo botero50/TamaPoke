@@ -1324,13 +1324,82 @@ uint8_t Pet::applyMiniResult(uint8_t game, uint8_t score) {
   int burn = (int)weight - (int)score * r.weightPerScore;
   weight = burn > 0 ? burn : 0;
   if (score >= r.heartAt) heartUntil = millis() + HEART_MS;
+  bool record = score > miniHi[game];
+  uint8_t tierBefore = badgeTier(game, miniHi[game]);
   if (score > miniHi[game]) miniHi[game] = score;
+  uint8_t tierAfter = badgeTier(game, miniHi[game]);
+  lastBadge = tierAfter > tierBefore ? tierAfter : 0;
+  weekRoll();
+  if (score > weekHi[game]) weekHi[game] = score > 250 ? 250 : score;
+  lastTickets = earnTickets(score, record && score > 0);
   notePlayedGame((uint8_t)r.stat, score);
   addBond(r.bond);
   registerCare();
   notePlayed();
   save();
   return r.stat != MINI_NO_STAT ? statGain : (uint8_t)(joy - joyBefore);
+}
+
+// ---------- the arcade (phase 26) ----------
+
+uint8_t Pet::earnTickets(uint8_t score, bool record) {
+  if (ticketDay != today()) { ticketDay = today(); ticketsToday = 0; }
+  int t = 1 + score / 20;
+  if (t > TICKET_GAME_MAX) t = TICKET_GAME_MAX;
+  if (record) t += TICKET_RECORD_BONUS;
+  int room = TICKETS_PER_DAY - ticketsToday;
+  if (t > room) t = room > 0 ? room : 0;
+  ticketsToday += t;
+  tickets = tickets + t > 9999 ? 9999 : tickets + t;
+  return (uint8_t)t;
+}
+
+uint16_t Pet::prizePrice(uint8_t p) {
+  static const uint16_t PRICE[PRIZE_COUNT] = { 60, 90, 120, 15, 10 };
+  return p < PRIZE_COUNT ? PRICE[p] : 0;
+}
+
+bool Pet::prizeOwned(uint8_t p) const {
+  return p == PRIZE_CAP ? ownsHat(HAT_ARCADE) : p == PRIZE_VISOR ? ownsHat(HAT_VISOR)
+       : p == PRIZE_CABINET ? ownsDecor(DEC_CABINET) : false;
+}
+
+uint8_t Pet::winPrize(uint8_t p) {
+  if (p >= PRIZE_COUNT) return PRZ_FULL;
+  if (prizeOwned(p)) return PRZ_OWNED;
+  if (p == PRIZE_CAKE && foodCount[FOOD_CAKE] >= FOOD_STACK_MAX) return PRZ_FULL;
+  if (tickets < prizePrice(p)) return PRZ_NO_TICKETS;
+  tickets -= prizePrice(p);
+  switch (p) {
+    case PRIZE_CAP: hatsOwned |= 1UL << HAT_ARCADE; break;
+    case PRIZE_VISOR: hatsOwned |= 1UL << HAT_VISOR; break;
+    case PRIZE_CABINET: decorOwned |= (uint16_t)(1 << DEC_CABINET); break;
+    case PRIZE_CAPSULE: spinCapsule(false); break;
+    case PRIZE_CAKE: foodCount[FOOD_CAKE]++; break;
+  }
+  save();
+  return PRZ_OK;
+}
+
+// bronze, silver and gold at 1x, 2x and 3x the score the game already calls good
+uint8_t Pet::badgeTier(uint8_t game, uint16_t score) {
+  if (game >= MINI_COUNT || !score) return 0;
+  uint16_t good = MINI_REWARDS[game].heartAt ? MINI_REWARDS[game].heartAt : 5;
+  return score >= 3 * good ? 3 : score >= 2 * good ? 2 : score >= good ? 1 : 0;
+}
+
+uint8_t Pet::goldBadges() const {
+  uint8_t n = 0;
+  for (uint8_t g = 0; g < MINI_COUNT; g++) if (badgeTier(g, miniHi[g]) == 3) n++;
+  return n;
+}
+
+void Pet::weekRoll() {
+  if (!lastSeenEpoch) return;
+  uint32_t w = (today() + 3) / 7 + 1;          // 1 Jan 1970 was a Thursday: +3 starts weeks on Monday
+  if (w == weekId) return;
+  weekId = w;
+  memset(weekHi, 0, sizeof(weekHi));
 }
 
 // ---------- Fun Pack: statuses (sickness, light, grumpy, bored) ----------
@@ -1552,12 +1621,13 @@ void Pet::notePlayedGame(uint8_t cat, uint16_t score) {
 uint16_t Pet::hatPrice(uint8_t h) {
   // About a day of good play for the simple ones, most of a week for the crown.
   static const uint16_t PRICE[HAT_COUNT] = { 80, 80, 100, 120, 150, 150, 200, 200, 300, 500,
-                                             90, 150, 100, 110, 160, 140, 120, 130, 90, 220 };
+                                             90, 150, 100, 110, 160, 140, 120, 130, 90, 220,
+    0, 0 };                                     // the arcade prizes: tickets, not coins
   return h < HAT_COUNT ? PRICE[h] : 0;
 }
 
 bool Pet::buyHat(uint8_t h) {
-  if (h >= HAT_COUNT || ownsHat(h)) return false;
+  if (h >= HAT_SHOP_COUNT || ownsHat(h)) return false;
   if (!spendCoins(hatPrice(h))) return false;
   hatsOwned |= 1UL << h;
   save();
@@ -1585,12 +1655,13 @@ uint16_t Pet::decorPrice(uint8_t d) {
   static const uint16_t PRICE[DEC_COUNT] = {
     40, 90, 60, 70, 110, 120,      // ball, plush, duck, blocks, drum, kite
     50, 60, 90, 150, 80, 70,       // plant, flowers, lamp, bed, gift, pumpkin
+    0,                             // the arcade cabinet: a prize
   };
   return d < DEC_COUNT ? PRICE[d] : 0;
 }
 
 bool Pet::buyDecor(uint8_t d) {
-  if (d >= DEC_COUNT || ownsDecor(d)) return false;
+  if (d >= DEC_SHOP_COUNT || ownsDecor(d)) return false;
   if (!spendCoins(decorPrice(d))) return false;
   decorOwned |= (uint16_t)(1 << d);
   save();
@@ -1816,18 +1887,20 @@ int8_t Pet::harvest() {
 
 // ---------- the capsule machine ----------
 
-CapsuleResult Pet::spinCapsule() {
+CapsuleResult Pet::spinCapsule(bool paid) {
   if (capDay != today()) { capDay = today(); capSpins = 0; }
-  if (capSpins >= CAPSULES_PER_DAY) return CAP_LIMIT;
-  if (!spendCoins(CAPSULE_PRICE)) return CAP_NO_COINS;
-  capSpins++;
+  if (paid) {
+    if (capSpins >= CAPSULES_PER_DAY) return CAP_LIMIT;
+    if (!spendCoins(CAPSULE_PRICE)) return CAP_NO_COINS;
+    capSpins++;
+  }
   bumpTally(TALLY_CAPSULE);
   int r = random(100);
   CapsuleResult res;
   if (r < 10) {                                          // the rare one: a hat or decoration not owned yet
     uint8_t free[HAT_COUNT + DEC_COUNT], n = 0;
-    for (uint8_t h = 0; h < HAT_COUNT; h++) if (!ownsHat(h)) free[n++] = h;
-    for (uint8_t d = 0; d < DEC_COUNT; d++) if (!ownsDecor(d)) free[n++] = 100 + d;
+    for (uint8_t h = 0; h < HAT_SHOP_COUNT; h++) if (!ownsHat(h)) free[n++] = h;
+    for (uint8_t d = 0; d < DEC_SHOP_COUNT; d++) if (!ownsDecor(d)) free[n++] = 100 + d;
     if (n) {
       uint8_t pick = free[random(n)];
       diaryFlag(DF_RARE);
@@ -2269,7 +2342,7 @@ bool Pet::questNote(uint8_t kind) {
   joy = clamp100(joy + 3);
   if (questStep >= QUEST_STEPS) {               // the end of the story: a hat not owned yet, or coins
     uint8_t free[HAT_COUNT], n = 0;
-    for (uint8_t h = 0; h < HAT_COUNT; h++) if (!ownsHat(h)) free[n++] = h;
+    for (uint8_t h = 0; h < HAT_SHOP_COUNT; h++) if (!ownsHat(h)) free[n++] = h;
     if (n) hatsOwned |= 1UL << free[random(n)];
     else earnCoins(QUEST_COINS, false);
     earnCoins(10, false);
@@ -2820,6 +2893,11 @@ void Pet::save() {
   prefs.putString("nick", nick);
   // Fun Pack: new keys only, so an older save loads healthy and with no records
   prefs.putBytes("mnhi", miniHi, sizeof(miniHi));
+  prefs.putUShort("tkt", tickets);
+  prefs.putUInt("tkd", ticketDay);
+  prefs.putUChar("tkn", ticketsToday);
+  prefs.putBytes("wkhi", weekHi, sizeof(weekHi));
+  prefs.putUInt("wkid", weekId);
   prefs.putUChar("sick", sickness);
   prefs.putUChar("sdose", sickDoses);
   prefs.putUInt("sdmin", lastDoseMinute);
@@ -3039,6 +3117,12 @@ void Pet::load() {
     size_t n = prefs.getBytesLength("mnhi");   // shorter from before the phase 12 games: those start at 0
     if (n && n <= sizeof(miniHi) && n % sizeof(miniHi[0]) == 0) prefs.getBytes("mnhi", miniHi, n);
   }
+  tickets = prefs.getUShort("tkt", 0);
+  ticketDay = prefs.getUInt("tkd", 0);
+  ticketsToday = prefs.getUChar("tkn", 0);
+  memset(weekHi, 0, sizeof(weekHi));
+  if (prefs.getBytesLength("wkhi") == sizeof(weekHi)) prefs.getBytes("wkhi", weekHi, sizeof(weekHi));
+  weekId = prefs.getUInt("wkid", 0);
   sickness = prefs.getUChar("sick", SICK_NONE);
   if (sickness > SICK_COLD) sickness = SICK_NONE;
   sickDoses = prefs.getUChar("sdose", 0);

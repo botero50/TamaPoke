@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 2 November 2026, with v1.8._
+_Last updated: 2 November 2026, with Phase 26._
 
 ## Done
 | Phase | What | Release |
@@ -14,18 +14,18 @@ _Last updated: 2 November 2026, with v1.8._
 | 22 | Wi-Fi time sync and the real weather (Open-Meteo) | v1.7 |
 | 23 | Weather polish: fog, thunder, snow on the ground, puddles, snow from New York, 30-minute refresh, Wi-Fi diagnostics | v1.7 |
 | 24 | Restful nights (asleep 20:00-08:00 the bars hold; bedtime from 21:00; an unplugged night counts as sleep) and the try-on mirror in the shop | v1.8 |
+| 25 (prepared) | Show it to the world: posts in `Desktop\Tamapoke-backup\share`, social preview image, new tour GIF, repo description, a short README with "Build your own" and the screens | on GitHub |
+| 26 | Arcade night: tickets from the Fun Pack games (30 a day), a prize counter (arcade cap, star visor, arcade cabinet, capsule, cake), the weekly records board, bronze/silver/gold badges per game; plus a Wi-Fi name typed in any letter case still connects | v1.9 (pending) |
 
 ## Next
 | # | Item | Needs | Notes |
 |---|---|---|---|
-| 1 | **Checks on the real ball** | the family | Nursery sprites and the next-day egg; SD photo (DIARY -> ALBUM -> PHOTO); tilt direction in the maze, Catch and Balance; how hard the shake race is; New York snow on its first snowy day; a hat in the mirror sits as it does once bought. (Wi-Fi sync and weather: confirmed working on 2 Nov.) |
-| 1b | **Small fix: Wi-Fi name in any case** | nothing | Accept "alejandro" for "Alejandro" by matching the scan; the first setup failed on exactly that |
-| 2 | **Phase 25: show it to the world** | the owner's accounts | Upstream note first, then MakerWorld/Printables makes, r/esp32, r/tamagotchi, r/arduino, Hackster, Hackaday tips, repo topics and preview image. Every post approved one by one; no faces, names, city or Wi-Fi name |
-| 3 | **Phase 26: arcade extras** | nothing | Game tickets, a weekly high-score board, badges for beating records |
-| 4 | **Phase 27: friend visits and trading** | a second ball | Uses the existing ESP-NOW battle link; cannot be tested with one ball |
-| 5 | **Battery saver** | a battery fitted | The ball reports no battery now (`bat=-1`) |
-| 6 | **SD content packs** | only if space runs out | Firmware at ~74%; revisit near 90% |
-| 7 | **Translations review** | native speakers | FR, DE, IT, PT, ZH and KO were machine-written |
+| 1 | **Checks on the real ball** | the family | Nursery sprites and the next-day egg; SD photo (DIARY -> ALBUM -> PHOTO); tilt direction in the maze, Catch and Balance; how hard the shake race is; New York snow on its first snowy day; a hat in the mirror sits as it does once bought; the arcade prizes. (Wi-Fi sync and weather: confirmed working on 2 Nov.) |
+| 2 | **Phase 25: the posts** | the owner's accounts | MakerWorld thank-you and Make, r/esp32, r/tamagotchi, Hackster, r/arduino, Hackaday, in the order of `checklist.md`. No faces, names, city or Wi-Fi name |
+| 3 | **Phase 27: friend visits and trading** | a second ball | Uses the existing ESP-NOW battle link; cannot be tested with one ball |
+| 4 | **Battery saver** | a battery fitted | The ball reports no battery now (`bat=-1`) |
+| 5 | **SD content packs** | only if space runs out | Firmware at ~75%; revisit near 90% |
+| 6 | **Translations review** | native speakers | FR, DE, IT, PT, ZH and KO were machine-written |
 
 ## Decisions on record
 - **Weather:** Open-Meteo (free, no key). The location comes from the browser, rounded
@@ -40,3 +40,10 @@ _Last updated: 2 November 2026, with v1.8._
   to a floor of 60; daytime naps keep the slow drain. With the screen off it goes to bed
   by itself from 21:00. A ball switched off overnight counts the night as sleep.
 - **The mirror** is RAM only: trying on never changes what the pet wears or the save.
+- **The arcade:** tickets only from the 20 Fun Pack games (1 + score/20, at most 5, +3 for a
+  record, 30 a day). The prizes are never sold, nor handed out by capsules or quests. Badges
+  are worked out from the records (1x, 2x, 3x each game's "good score"), so they need no save.
+  The cabinet is a decoration beside the pet, not room furniture, and there is no trophy for
+  gold badges: the trophy list is full at 16.
+- **Posting:** crenberries428's repo has issues and discussions off, so the thank-you note
+  goes on their MakerWorld case page. Printables dropped: the case is only on MakerWorld.

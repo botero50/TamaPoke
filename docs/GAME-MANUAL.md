@@ -356,6 +356,15 @@ started at midnight, and the evening before that drained it empty). A ball switc
 overnight counts the night as sleep. Daytime naps keep the slower-than-awake drain, and
 the moon button still wakes it at any hour.
 
+### Arcade night: tickets, prizes, records, badges
+Every finished Fun Pack game pays **tickets**: 1 + score/20, at most 5, plus 3 for a new
+record, and at most 30 a day (coins keep their own cap). Games -> Arcade -> **PRIZES**
+trades them for things the shop never sells: the arcade cap (60), the star visor (90) and
+the arcade cabinet (120, a decoration beside the pet), or a capsule spin (15) or a cake (10).
+**RECORDS** lists every game's best this week and of all time, with a star where the record
+fell this week; the week starts on Monday. Each game has **bronze, silver and gold badges**
+at 1x, 2x and 3x the score it already calls good, shown on the board and on the result screen.
+
 ### The try-on mirror
 In the shop, an outfit she does not own offers BUY, TRY ON and NO. TRY ON shows the
 Pokemon in a mirror wearing it together with what it already wears, with BUY and BACK.

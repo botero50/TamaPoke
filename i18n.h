@@ -180,6 +180,8 @@ enum StrId : uint16_t {
   S_ST_RESTING,
   // the try-on mirror
   S_TRY_ON, S_MIRROR,
+  // the arcade
+  S_PRIZES, S_RECORDS, S_TICKETS, S_PRIZE_WON, S_NO_TICKETS, S_HAT_ARCADE, S_HAT_VISOR, S_DEC_CABINET, S_WEEK, S_BEST, S_BADGE_1, S_BADGE_2, S_BADGE_3,
   STR_COUNT
 };
 

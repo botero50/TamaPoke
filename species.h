@@ -1430,10 +1430,46 @@ static const char* const* const SPR_ACC[] = {
   SPR_ACC_CAPE, SPR_ACC_BACKPACK, SPR_ACC_WINGS, SPR_ACC_BATWINGS,
 };
 
+static const char* const SPR_HAT_ARCADE[16] = {  // 16x16
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "......kkkkk.....",
+  ".....kLLfLLk....",
+  "....kLLfffLLk...",
+  "...kLLLLfLLLLk..",
+  "...kLLLLLLLLLk..",
+  "...kMMMMMMMMMkkk",
+  "...kkkkkkkkkMMMk",
+  "............kkk.",
+  "................",
+  "................",
+};
+static const char* const SPR_HAT_VISOR[16] = {  // 16x16
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "...kkkkkkkkkk...",
+  "...kGGGGfGGGGk..",
+  "...kGGGfffGGGk..",
+  "...kkkkkkkkkkkkk",
+  "..........kTTTk.",
+  "...........kkk..",
+  "................",
+  "................",
+};
 static const char* const* const SPR_HATS[] = {
   SPR_HAT_CAP, SPR_HAT_BOW, SPR_HAT_FLOWER, SPR_HAT_BEANIE, SPR_HAT_PARTY, SPR_HAT_STRAW, SPR_HAT_WITCH, SPR_HAT_SANTA, SPR_HAT_TOPHAT, SPR_HAT_CROWN,
   SPR_HAT_CHEF, SPR_HAT_PIRATE, SPR_HAT_CATEARS, SPR_HAT_BUNNY, SPR_HAT_HEADPHONES, SPR_HAT_GRAD, SPR_HAT_WREATH,
-  SPR_HAT_HELMET, SPR_HAT_BERET, SPR_HAT_VIKING,
+  SPR_HAT_HELMET, SPR_HAT_BERET, SPR_HAT_VIKING, SPR_HAT_ARCADE, SPR_HAT_VISOR,
 };
 
 // The room (phase 13). Order matches FurnId in pet.h.
@@ -1442,6 +1478,24 @@ static const char* const* const SPR_FURN[] = {
   SPR_FURN_BOOKCASE, SPR_FURN_FIREPLACE, SPR_FURN_RUG, SPR_FURN_PAPER_BLUE, SPR_FURN_PAPER_PINK, SPR_FURN_PAPER_MINT,
 };
 
+static const char* const SPR_DEC_CABINET[16] = {  // 16x16
+  "................",
+  "....kkkkkkkk....",
+  "....kRRRRRRk....",
+  "....kkkkkkkk....",
+  "....kbbbbbbk....",
+  "....kbwbbbbk....",
+  "....kbbbbbbk....",
+  "....kkkkkkkk....",
+  "....kSSrSfSk....",
+  "....kSSSSSSk....",
+  "....kSSSSSSk....",
+  "....kSSkkSSk....",
+  "....kSSSSSSk....",
+  "....kSSSSSSk....",
+  "....kkkkkkkk....",
+  "................",
+};
 // Toys and decorations (shop). Order matches DecorId in pet.h; SPR_DECOR indexes them.
 static const char* const SPR_DEC_BALL[16] = {  // 16x16
   "................",
@@ -1672,7 +1726,7 @@ static const char* const SPR_DEC_PUMPKIN[16] = {  // 16x16
 };
 
 static const char* const* const SPR_DECOR[] = {
-  SPR_DEC_BALL, SPR_DEC_PLUSH, SPR_DEC_DUCK, SPR_DEC_BLOCKS, SPR_DEC_DRUM, SPR_DEC_KITE, SPR_DEC_PLANT, SPR_DEC_FLOWERS, SPR_DEC_LAMP, SPR_DEC_BED, SPR_DEC_GIFT, SPR_DEC_PUMPKIN,
+  SPR_DEC_BALL, SPR_DEC_PLUSH, SPR_DEC_DUCK, SPR_DEC_BLOCKS, SPR_DEC_DRUM, SPR_DEC_KITE, SPR_DEC_PLANT, SPR_DEC_FLOWERS, SPR_DEC_LAMP, SPR_DEC_BED, SPR_DEC_GIFT, SPR_DEC_PUMPKIN, SPR_DEC_CABINET,
 };
 
 // Foods (shop, food menu). Order matches FoodId in pet.h; SPR_FOODS indexes them.

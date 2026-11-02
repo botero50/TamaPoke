@@ -78,6 +78,11 @@ int main(){
     WeatherNow none; weatherSet(none, 0);
   }
 
+  // the network name in any letter case (phase 26)
+  ck(ssidSameIgnoringCase("Alejandro", "alejandro") && ssidSameIgnoringCase("MyNet_2.4G", "mynet_2.4g"), "the same name in other letter case matches");
+  ck(!ssidSameIgnoringCase("Alejandro", "Alejandro2") && !ssidSameIgnoringCase("abc", "abd"), "a different name does not");
+  ck(!ssidSameIgnoringCase(nullptr, "x") && ssidSameIgnoringCase("", ""), "and no name is no match");
+
   // what the screen sees
   ck(weatherShown(1000) == WX_NONE, "nothing fetched: the normal sky");
   WeatherNow r; r.kind = WX_RAIN; r.tempC = 9;

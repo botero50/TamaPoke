@@ -121,8 +121,10 @@ enum HatId : uint8_t {
   HAT_STRAW, HAT_WITCH, HAT_SANTA, HAT_TOPHAT, HAT_CROWN,
   HAT_CHEF, HAT_PIRATE, HAT_CATEARS, HAT_BUNNY, HAT_HEADPHONES,   // phase 13
   HAT_GRAD, HAT_WREATH, HAT_HELMET, HAT_BERET, HAT_VIKING,
+  HAT_ARCADE, HAT_VISOR,                                            // arcade prizes (phase 26)
   HAT_COUNT
 };
+#define HAT_SHOP_COUNT HAT_ARCADE   // the prizes are won with tickets, never sold
 static_assert(HAT_COUNT <= 32, "hatsOwned needs a bit per hat");
 #define HAT_NUDGE_MAX 60     // how far the player may move a hat, px each way
 
@@ -133,8 +135,10 @@ static_assert(HAT_COUNT <= 32, "hatsOwned needs a bit per hat");
 enum DecorId : uint8_t {
   DEC_BALL = 0, DEC_PLUSH, DEC_DUCK, DEC_BLOCKS, DEC_DRUM, DEC_KITE,
   DEC_PLANT, DEC_FLOWERS, DEC_LAMP, DEC_BED, DEC_GIFT, DEC_PUMPKIN,
+  DEC_CABINET,                    // an arcade prize (phase 26)
   DEC_COUNT
 };
+#define DEC_SHOP_COUNT DEC_CABINET
 #define DEC_TOY_COUNT 6
 
 // Foods bought in the shop and kept in the bag, a count each (the berries and
@@ -173,6 +177,11 @@ enum GiftKind : uint8_t { GIFT_NONE = 0, GIFT_HALLOWEEN, GIFT_CHRISTMAS, GIFT_NE
 // worth about the price on average (see coins_test), with a small chance of
 // a hat or decoration not owned yet. A few a day, so it cannot eat the purse.
 #define CAPSULE_PRICE 30
+#define TICKETS_PER_DAY 30          // the arcade pays tickets, at most this many a day
+#define TICKET_GAME_MAX 5
+#define TICKET_RECORD_BONUS 3
+enum PrizeId : uint8_t { PRIZE_CAP = 0, PRIZE_VISOR, PRIZE_CABINET, PRIZE_CAPSULE, PRIZE_CAKE, PRIZE_COUNT };
+enum PrizeResult : uint8_t { PRZ_OK = 0, PRZ_NO_TICKETS, PRZ_OWNED, PRZ_FULL };
 #define CAPSULES_PER_DAY 3
 enum CapsuleResult : uint8_t { CAP_NO_COINS = 0, CAP_LIMIT, CAP_HAT, CAP_DECOR, CAP_FOOD, CAP_SOAP, CAP_SEED, CAP_COINS };
 // Scenery: the main screen's backdrop. The creature's own biome is free; the
@@ -466,6 +475,22 @@ public:
   uint8_t applyMiniResult(uint8_t game, uint8_t score);  // stat points, or joy for joy-only games
   static int8_t miniGameStat(uint8_t game);
   uint16_t miniHi[MINI_COUNT] = { 0 };
+  // The arcade (phase 26): tickets from the Fun Pack games, spent at the prize
+  // counter; this week's best per game; badges worked out from the records.
+  uint16_t tickets = 0;
+  uint32_t ticketDay = 0;
+  uint8_t ticketsToday = 0;
+  uint8_t lastTickets = 0, lastBadge = 0;     // what the last game gave, for its result screen
+  uint8_t weekHi[MINI_COUNT] = { 0 };
+  uint32_t weekId = 0;                         // (today()+3)/7 + 1: weeks start on Monday
+  uint8_t earnTickets(uint8_t score, bool record);
+  uint8_t winPrize(uint8_t p);                 // a PrizeResult
+  bool prizeOwned(uint8_t p) const;
+  static uint16_t prizePrice(uint8_t p);
+  static uint8_t badgeTier(uint8_t game, uint16_t score);   // 0 none, 1 bronze, 2 silver, 3 gold
+  uint8_t goldBadges() const;
+  void weekRoll();
+  bool beatThisWeek(uint8_t game) const { return weekHi[game] && weekHi[game] >= miniHi[game]; }
   // Fun Pack: statuses. All persisted under new keys, so an older save loads
   // healthy and with no records.
   uint8_t sickness = SICK_NONE;
@@ -577,7 +602,7 @@ public:
   uint32_t capDay = 0;
   uint8_t capSpins = 0;         // capsules turned today
   uint16_t capWhat = 0;         // what the last capsule gave: the item id, or the coins
-  CapsuleResult spinCapsule();
+  CapsuleResult spinCapsule(bool paid = true);   // paid=false: a prize spin, no coins and no daily limit
   uint8_t capsulesLeft() const { return capDay == today() ? (capSpins < CAPSULES_PER_DAY ? CAPSULES_PER_DAY - capSpins : 0) : CAPSULES_PER_DAY; }
   uint8_t sceneryOwned = 0;     // bit per biome
   int8_t sceneryPick = -1;      // the backdrop chosen, -1 = the creature's own

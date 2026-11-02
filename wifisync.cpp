@@ -68,7 +68,19 @@ static void syncTask(void *) {
   bool ok = false;
   gDiagStep = DG_JOIN; gDiagReason = 0; gDiagRssi = 0; gDiagHttp = 0;
   WiFi.mode(WIFI_STA);
-  WiFi.begin(gSsid, gPass);
+  // A name typed in the wrong letter case still finds its network: look around
+  // first, and if the exact name is not there but the same one in other case is,
+  // join that. A hidden network is not in the scan, so the name is tried as typed.
+  char use[33];
+  strncpy(use, gSsid, sizeof(use) - 1);
+  use[sizeof(use) - 1] = 0;
+  int found = WiFi.scanNetworks();
+  bool exact = false;
+  for (int i = 0; i < found && !exact; i++) exact = WiFi.SSID(i) == gSsid;
+  for (int i = 0; i < found && !exact; i++)
+    if (ssidSameIgnoringCase(WiFi.SSID(i).c_str(), gSsid)) { strncpy(use, WiFi.SSID(i).c_str(), sizeof(use) - 1); break; }
+  WiFi.scanDelete();
+  WiFi.begin(use, gPass);
   uint32_t t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) delay(200);
   if (WiFi.status() == WL_CONNECTED) {
