@@ -60,7 +60,8 @@ This fork (**[botero50/TamaPoke](https://github.com/botero50/TamaPoke)**, branch
   jobs), part-time jobs, daily mail, weekly story quests, Halloween and winter.
 - **A photo album** on the SD card, and **music** in the places.
 - **The Nursery**: two favourites from the party or box leave an egg for the next raising.
-- **Wi-Fi time and weather**: the clock sets itself from the internet, and the sky shows the real weather.
+- **Wi-Fi time and weather**: the clock sets itself from the internet, and the sky shows the real weather
+  (fog, rain with puddles, storms with thunder, snow that settles) -- plus snow from New York.
 
 See the sections further down for the rules and the economy numbers.
 
@@ -548,7 +549,7 @@ is never replaced. GIVE BACK drops it again, and random eggs return.
 ### Wi-Fi: the real time and the weather
 The board's RTC has no backup cell, so when the power runs out it wakes on the
 1 January seed. Set up Wi-Fi once from the web installer (the 📶 section) and the
-board fixes its own clock: about 15 s after boot and then every hour (every 6 h
+board fixes its own clock: about 15 s after boot and then every 30 minutes (every 6 h
 without a place), it joins the network on a background task, asks NTP for the time,
 and turns the radio off again. A big jump is applied **without** catch-up, like the
 serial `TIME` command, so a month-long gap does not replay on the creature.
@@ -558,6 +559,17 @@ it also fetches the current weather from [Open-Meteo](https://open-meteo.com/):
 grey skies when cloudy, rain or a storm behind the creature, snow, and the
 temperature left of the clock. Weather older than 3 h is dropped. Without Wi-Fi the
 old made-up weather (about 1 day in 5) still plays.
+
+- **Fog** drifts across in pale bands; **rain** fills puddles that splash; a **storm**
+  flashes about every 20 s with a thunder rumble (silent at night and while it sleeps);
+  **snow** whitens the hill and leaves drifts that build over ~20 min and melt over ~1 h.
+- **Snow from New York:** the same request also asks about New York. On days that are
+  only clear or cloudy at home, New York's snow falls on the ball (the temperature stays
+  yours), with a toast once a day. Anything real at home wins. Switch: Settings -> About,
+  the installer, or serial `NYSNOW 0/1`.
+- **When it will not connect:** `WIFISCAN` lists the 2.4 GHz networks in reach, and
+  STATS prints a `wifidiag` line with the step that stopped and the access point's reason.
+  Network names are case-sensitive.
 
 - The SSID and password live in their own NVS namespace, `wifi`, so they are never
   in an EXPORT backup. Serial: `WIFI <ssid><TAB><password>`, `TZ <minutes east>`,

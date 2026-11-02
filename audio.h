@@ -21,6 +21,7 @@ enum Sfx : uint8_t {
   SFX_SUPER,    // super effective
   SFX_FAINT,    // something goes down
   SFX_VICTORY,  // the fight is won
+  SFX_THUNDER,  // a storm outside (the real weather)
   SFX_COUNT
 };
 

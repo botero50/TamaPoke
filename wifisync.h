@@ -22,8 +22,12 @@ void wifiForget();
 void wifiSetTz(int16_t minutesEast);            // used when there is no place for the weather
 void wifiSetPlace(float lat, float lon);
 void wifiSyncNow();
+void wifiSetNySnow(bool on);                   // the "Snow from New York" switch, saved
 
 enum WifiState : uint8_t { WIFI_ST_NONE = 0, WIFI_ST_IDLE, WIFI_ST_BUSY, WIFI_ST_OK, WIFI_ST_FAIL };
 uint8_t wifiState();
 uint32_t wifiLastSync();                        // local epoch of the last good sync, 0 = never
 const char *wifiNetwork();                      // the SSID, "" when not set up
+#include <stddef.h>
+void wifiDiag(char *out, size_t n);             // why the last sync stopped, for STATS
+void wifiScanPrint();                           // serial WIFISCAN: the 2.4 GHz networks in reach

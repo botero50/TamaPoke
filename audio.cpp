@@ -103,11 +103,14 @@ static const Note N_FAINT[]  = { {520, 90}, {400, 110}, {300, 140}, {200, 200} }
 static const Note N_VICTORY[] = { {784, 120}, {784, 120}, {784, 120}, {1047, 320},
                                   {880, 140}, {1047, 420} };
 
+// the frequencies are unused: the thunder is all noise, lower and quieter each step
+static const Note N_THUNDER[] = { {1, 220}, {1, 420}, {1, 700} };
+
 static const SfxDef SFX[SFX_COUNT] = {
   {N_TAP, 1}, {N_EAT, 3}, {N_PLAY, 2}, {N_HEART, 2}, {N_HATCH, 4},
   {N_EVOLVE, 5}, {N_MEDAL, 5}, {N_DENY, 2}, {N_BYE, 3}, {N_LEVEL, 2},
   {N_HIT, 2}, {N_BEAM, 3}, {N_STATUS, 3}, {N_SUPER, 3}, {N_FAINT, 4},
-  {N_VICTORY, 6},
+  {N_VICTORY, 6}, {N_THUNDER, 3},
 };
 
 // A loop, not a one-shot: the task walks it and starts over.
@@ -273,7 +276,9 @@ static void audioTask(void *) {
         for (uint8_t i = 0; i < d.len; i++) {
           uint16_t f = hzToGb(d.n[i].f);
           // percussion for the impact cues, a pulse for everything else
-          if (id == SFX_HIT || id == SFX_FAINT)
+          if (id == SFX_THUNDER)
+            gSyn.noise((uint8_t)(12 - i * 3), -1, 6, d.n[i].ms, (uint16_t)(70 + i * 45));
+          else if (id == SFX_HIT || id == SFX_FAINT)
             gSyn.noise(13, -1, 2, d.n[i].ms, (uint16_t)(4 + i * 4));
           else if (f)
             gSyn.note(0, f, 1, 14, -1, 4, d.n[i].ms);

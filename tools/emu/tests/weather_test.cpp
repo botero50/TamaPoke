@@ -40,6 +40,44 @@ int main(){
   ck(!parseOpenMeteo(nullptr, w), "nor does no reply");
   ck(!parseOpenMeteo("{\"current_units\":{\"temperature_2m\":\"C\"}}", w), "units alone are not weather");
 
+  // two places in one request: here first, New York second (a real reply, 1 Nov 2026)
+  const char *both =
+    "[{\"latitude\":4.7451673,\"longitude\":-74.10025,\"generationtime_ms\":0.069,\"utc_offset_seconds\":-18000,"
+    "\"timezone\":\"America/Bogota\",\"timezone_abbreviation\":\"GMT-5\",\"elevation\":2558.0,"
+    "\"current_units\":{\"time\":\"iso8601\",\"interval\":\"seconds\",\"temperature_2m\":\"°C\",\"weather_code\":\"wmo code\"},"
+    "\"current\":{\"time\":\"2026-11-01T23:45\",\"interval\":900,\"temperature_2m\":12.6,\"weather_code\":3}},"
+    "{\"latitude\":40.710335,\"longitude\":-73.99308,\"generationtime_ms\":0.094,\"utc_offset_seconds\":-18000,"
+    "\"timezone\":\"America/New_York\",\"timezone_abbreviation\":\"GMT-5\",\"elevation\":27.0,\"location_id\":1,"
+    "\"current_units\":{\"time\":\"iso8601\",\"interval\":\"seconds\",\"temperature_2m\":\"°C\",\"weather_code\":\"wmo code\"},"
+    "\"current\":{\"time\":\"2026-11-01T23:45\",\"interval\":900,\"temperature_2m\":8.4,\"weather_code\":0}}]";
+  ck(parseOpenMeteo(both, w), "the two-place reply parses");
+  ck(w.kind == WX_CLOUDY && w.tempC == 13 && w.utcOffset == -18000, "home comes first: cloudy, 13C, -5 h");
+  ck(w.nyKind == WX_CLEAR, "and New York second: clear");
+  ck(parseOpenMeteo(reply, w) && w.nyKind == WX_NONE, "one place: no New York");
+
+  // snow from New York: only on a plain day at home, and only while it is on
+  {
+    WeatherNow s; s.tempC = 22; s.nyKind = WX_SNOW;
+    s.kind = WX_CLEAR; weatherSet(s, 0);
+    ck(weatherShown(10) == WX_SNOW_NY && weatherLast().tempC == 22, "clear here, snowing in New York: its snow, our temperature");
+    s.kind = WX_CLOUDY; weatherSet(s, 0);
+    ck(weatherShown(10) == WX_SNOW_NY, "cloudy here too");
+    s.kind = WX_RAIN; weatherSet(s, 0);
+    ck(weatherShown(10) == WX_RAIN, "rain here beats New York's snow");
+    s.kind = WX_FOG; weatherSet(s, 0);
+    ck(weatherShown(10) == WX_FOG, "and so does fog");
+    s.kind = WX_SNOW; weatherSet(s, 0);
+    ck(weatherShown(10) == WX_SNOW, "real snow here is our own");
+    s.kind = WX_CLEAR; s.nyKind = WX_RAIN; weatherSet(s, 0);
+    ck(weatherShown(10) == WX_CLEAR, "rain in New York is not borrowed");
+    s.nyKind = WX_SNOW; weatherSet(s, 0);
+    weatherSetNySnow(false);
+    ck(weatherShown(10) == WX_CLEAR && !weatherNySnow(), "the switch off: our own sky");
+    weatherSetNySnow(true);
+    ck(wxIsSnow(WX_SNOW) && wxIsSnow(WX_SNOW_NY) && !wxIsSnow(WX_RAIN), "both snows draw as snow");
+    WeatherNow none; weatherSet(none, 0);
+  }
+
   // what the screen sees
   ck(weatherShown(1000) == WX_NONE, "nothing fetched: the normal sky");
   WeatherNow r; r.kind = WX_RAIN; r.tempC = 9;

@@ -86,6 +86,8 @@
     </div>
     <p><label><input id="wgeo" type="checkbox" checked> Show the weather (asks for this
        computer's location, rounded to about 1 km)</label></p>
+    <p><label><input id="wny" type="checkbox" checked> Snow from New York: when it never
+       snows where you live, the ball shows New York's snow on days it snows there</label></p>
     <div class="row">
       <button id="wsend">📶 Send to the board</button>
       <button id="wforget">Forget Wi-Fi</button>
@@ -371,6 +373,8 @@ document.getElementById('wsend').onclick = async () => {
     }
     await send('WIFI ' + ssid + '\t' + pass);
     if (!await answered(line)) { wlog('The board did not take the Wi-Fi details.'); return; }
+    await send('NYSNOW ' + (document.getElementById('wny').checked ? 1 : 0));
+    await answered(line);                // an older firmware just ignores it
     await send('WIFISYNC');
     await answered(line);
     wlog('Done! The board connects in a few seconds and sets its clock' + (geo ? ' and the weather.' : '.') +

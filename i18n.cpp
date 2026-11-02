@@ -85,7 +85,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the Nursery
     "GUARDERIA", "Un dia juntos: 40 monedas", "DEJAR DOS", "Elige dos amigos", "PAGAR 40", "Ese no puede ir", "Hasta manana!", "Vuelve la proxima semana", "Listo en", "TOMAR HUEVO", "Un huevo! Sera el siguiente", "Tu proximo huevo", "DEVOLVER", "Toca otra vez para devolverlo", "Su huevo ya esta en casa", "De la guarderia",
     // Wi-Fi
-    "Sin Wi-Fi: configuralo en la pagina de instalacion", "Wi-Fi: conectando...", "Hora del Wi-Fi", "Wi-Fi: no se pudo conectar", },
+    "Sin Wi-Fi: configuralo en la pagina de instalacion", "Wi-Fi: conectando...", "Hora del Wi-Fi", "Wi-Fi: no se pudo conectar",
+    // snow from New York
+    "Esta nevando en Nueva York!", "Mira, nieve de Nueva York!", "Nieve de Nueva York: SI", "Nieve de Nueva York: NO", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -165,7 +167,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the Nursery
     "NURSERY", "A day together: 40 coins", "LEAVE TWO", "Pick two friends", "PAY 40", "That one can't go", "See you tomorrow!", "Come back next week", "Ready in", "TAKE EGG", "An egg! It will be your next", "Your next egg", "GIVE BACK", "Tap again to give it back", "Their egg is at home now", "From the Nursery",
     // Wi-Fi
-    "No Wi-Fi yet: set it up on the install page", "Wi-Fi: connecting...", "Clock set by Wi-Fi", "Wi-Fi: could not connect", },
+    "No Wi-Fi yet: set it up on the install page", "Wi-Fi: connecting...", "Clock set by Wi-Fi", "Wi-Fi: could not connect",
+    // snow from New York
+    "It's snowing in New York!", "Look, snow from New York!", "Snow from New York: ON", "Snow from New York: OFF", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -244,7 +248,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the Nursery
     "PENSION", "Un jour ensemble : 40 pieces", "EN LAISSER 2", "Choisis deux amis", "PAYER 40", "Celui-la ne peut pas", "A demain !", "Reviens la semaine prochaine", "Pret dans", "PRENDRE", "Un oeuf ! Ce sera le prochain", "Ton prochain oeuf", "RENDRE", "Touche encore pour le rendre", "Leur oeuf est a la maison", "De la pension",
     // Wi-Fi
-    "Pas de Wi-Fi : regle-le sur la page d'installation", "Wi-Fi : connexion...", "Heure par Wi-Fi", "Wi-Fi : connexion impossible", },
+    "Pas de Wi-Fi : regle-le sur la page d'installation", "Wi-Fi : connexion...", "Heure par Wi-Fi", "Wi-Fi : connexion impossible",
+    // snow from New York
+    "Il neige a New York !", "Regarde, la neige de New York !", "Neige de New York : OUI", "Neige de New York : NON", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -323,7 +329,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the Nursery
     "PENSION", "Ein Tag zusammen: 40 Muenzen", "ZWEI DA LASSEN", "Waehle zwei Freunde", "40 ZAHLEN", "Der kann nicht mit", "Bis morgen!", "Komm naechste Woche wieder", "Fertig in", "EI NEHMEN", "Ein Ei! Es kommt als Naechstes", "Dein naechstes Ei", "ZURUECK", "Nochmal tippen zum Zurueckgeben", "Ihr Ei ist jetzt zu Hause", "Aus der Pension",
     // Wi-Fi
-    "Kein WLAN: auf der Installationsseite einrichten", "WLAN: verbinde...", "Uhrzeit per WLAN", "WLAN: keine Verbindung", },
+    "Kein WLAN: auf der Installationsseite einrichten", "WLAN: verbinde...", "Uhrzeit per WLAN", "WLAN: keine Verbindung",
+    // snow from New York
+    "In New York schneit es!", "Schau, Schnee aus New York!", "Schnee aus New York: AN", "Schnee aus New York: AUS", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -402,7 +410,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the Nursery
     "PENSIONE", "Un giorno insieme: 40 monete", "LASCIANE 2", "Scegli due amici", "PAGA 40", "Quello non puo andare", "A domani!", "Torna la prossima settimana", "Pronto tra", "PRENDI UOVO", "Un uovo! Sara il prossimo", "Il tuo prossimo uovo", "RESTITUISCI", "Tocca ancora per restituirlo", "Il loro uovo e a casa", "Dalla pensione",
     // Wi-Fi
-    "Niente Wi-Fi: impostalo dalla pagina di installazione", "Wi-Fi: connessione...", "Ora dal Wi-Fi", "Wi-Fi: connessione non riuscita", },
+    "Niente Wi-Fi: impostalo dalla pagina di installazione", "Wi-Fi: connessione...", "Ora dal Wi-Fi", "Wi-Fi: connessione non riuscita",
+    // snow from New York
+    "Nevica a New York!", "Guarda, neve da New York!", "Neve da New York: SI", "Neve da New York: NO", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -481,7 +491,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the Nursery
     "CRECHE", "Um dia juntos: 40 moedas", "DEIXAR DOIS", "Escolha dois amigos", "PAGAR 40", "Esse nao pode ir", "Ate amanha!", "Volte na proxima semana", "Pronto em", "PEGAR OVO", "Um ovo! Sera o proximo", "Seu proximo ovo", "DEVOLVER", "Toque de novo para devolver", "O ovo deles esta em casa", "Da creche",
     // Wi-Fi
-    "Sem Wi-Fi: configure na pagina de instalacao", "Wi-Fi: conectando...", "Hora pelo Wi-Fi", "Wi-Fi: nao conectou", },
+    "Sem Wi-Fi: configure na pagina de instalacao", "Wi-Fi: conectando...", "Hora pelo Wi-Fi", "Wi-Fi: nao conectou",
+    // snow from New York
+    "Esta nevando em Nova York!", "Olha, neve de Nova York!", "Neve de Nova York: SIM", "Neve de Nova York: NAO", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -562,7 +574,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the Nursery
     "托儿所", "一起待一天:40金币", "留下两只", "选两个朋友", "付40", "它不能去", "明天见!", "下周再来", "还要", "拿蛋", "一颗蛋!下一个就是它", "你的下一颗蛋", "退回", "再按一次退回", "它们的蛋已经在家了", "来自托儿所",
     // Wi-Fi
-    "未设Wi-Fi:请在安装页面设置", "Wi-Fi:连接中...", "Wi-Fi已校时", "Wi-Fi:无法连接", },
+    "未设Wi-Fi:请在安装页面设置", "Wi-Fi:连接中...", "Wi-Fi已校时", "Wi-Fi:无法连接",
+    // snow from New York
+    "纽约下雪啦!", "看,纽约的雪!", "纽约的雪:开", "纽约的雪:关", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -642,7 +656,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // the Nursery
     "보육원", "하루 함께: 40코인", "두 마리 맡기기", "친구 두 명 고르기", "40 내기", "그 친구는 안 돼요", "내일 봐요!", "다음 주에 다시 와요", "남은 시간", "알 받기", "알이다! 다음 알이 될 거예요", "다음 알", "돌려주기", "한 번 더 누르면 돌려줘요", "알은 이미 집에 있어요", "보육원에서 온 알",
     // Wi-Fi
-    "Wi-Fi 없음: 설치 페이지에서 설정하세요", "Wi-Fi: 연결 중...", "Wi-Fi로 시간 맞춤", "Wi-Fi: 연결 실패", },
+    "Wi-Fi 없음: 설치 페이지에서 설정하세요", "Wi-Fi: 연결 중...", "Wi-Fi로 시간 맞춤", "Wi-Fi: 연결 실패",
+    // snow from New York
+    "뉴욕에 눈이 와요!", "봐, 뉴욕에서 온 눈이야!", "뉴욕의 눈: 켜짐", "뉴욕의 눈: 꺼짐", },
 };
 
 // Medal names in their three lengths [language][medal].

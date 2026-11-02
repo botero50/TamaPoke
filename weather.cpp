@@ -5,6 +5,7 @@
 static WeatherNow gWx;
 static uint32_t gWxAt = 0;
 static bool gWxHave = false;
+static bool gNySnow = true;
 
 // WMO 4677 codes as Open-Meteo reports them
 uint8_t wmoKind(int code) {
@@ -44,6 +45,10 @@ bool parseOpenMeteo(const char *body, WeatherNow &out) {
   if (t > 60) t = 60;
   if (t < -60) t = -60;
   w.tempC = (int8_t)(t < 0 ? t - 0.5 : t + 0.5);
+  // an array of two places: New York's "current" is the second one
+  const char *cur2 = strstr(cur + 10, "\"current\":");
+  double c2;
+  if (cur2 && numAfter(cur2, "\"weather_code\"", c2)) w.nyKind = wmoKind((int)c2);
   double off;
   if (numAfter(body, "\"utc_offset_seconds\"", off) && off > -14 * 3600 - 1 && off < 14 * 3600 + 1) {
     w.hasOffset = true;
@@ -57,5 +62,9 @@ void weatherSet(const WeatherNow &w, uint32_t atMs) { gWx = w; gWxAt = atMs; gWx
 const WeatherNow &weatherLast() { return gWx; }
 uint8_t weatherShown(uint32_t nowMs) {
   if (!gWxHave || nowMs - gWxAt > WEATHER_FRESH_MS) return WX_NONE;
+  // anything really happening here wins; only a plain day borrows New York's snow
+  if (gNySnow && gWx.nyKind == WX_SNOW && (gWx.kind == WX_CLEAR || gWx.kind == WX_CLOUDY)) return WX_SNOW_NY;
   return gWx.kind;
 }
+void weatherSetNySnow(bool on) { gNySnow = on; }
+bool weatherNySnow() { return gNySnow; }

@@ -43,7 +43,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.22"
+#define FW_VERSION "3.14-funpack.23"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -891,6 +891,9 @@ void loop() {
       // without catch-up, like TIME: after a blank RTC the gap is months of nothing
       if (!cur || (cur > le ? cur - le : le - cur) > 60) { rtcSetEpoch(le); pet.setClock(le); }
     }
+    static uint32_t nyToastDay = 0;
+    uint32_t day = pet.lastSeenEpoch / 86400;
+    if (weatherShown(now) == WX_SNOW_NY && day != nyToastDay) { nyToastDay = day; fpShowToast(S_NY_SNOW, UI_BAR_OK); }
   }
 
   // plays a sound when the creature becomes ready to evolve
@@ -1177,6 +1180,13 @@ void handleSerial() {
   } else if (line == "WIFIOFF") {
     wifiForget();
     Serial.println("DONE");
+  } else if (line.startsWith("NYSNOW ")) {   // NYSNOW 1 / 0
+    wifiSetNySnow(line.substring(7).toInt() != 0);
+    Serial.println("DONE");
+  } else if (line == "WIFISCAN") {
+    if (lan.live() || linkNowUp()) Serial.println("scan: the battle link has the radio");
+    else wifiScanPrint();
+    Serial.println("DONE");
   } else if (line == "WIFISYNC") {
     wifiSyncNow();
     Serial.println("DONE");
@@ -1373,8 +1383,9 @@ void handleSerial() {
     Serial.printf("shiny=%d streak=%u/%u bond=%u medals=0x%X(%u) nick=%s\n",
                   pet.shiny, pet.streak, pet.bestStreak, pet.bond, pet.medals,
                   pet.totalMedals, pet.nick);
-    Serial.printf("wifi=%s state=%u synced=%lu weather=%u/%d\n", wifiNetwork(), wifiState(), (unsigned long)wifiLastSync(),
-                  weatherShown(millis()), weatherLast().tempC);
+    Serial.printf("wifi=%s state=%u synced=%lu weather=%u/%d ny=%u nysnow=%d\n", wifiNetwork(), wifiState(), (unsigned long)wifiLastSync(),
+                  weatherShown(millis()), weatherLast().tempC, weatherLast().nyKind, weatherNySnow());
+    { char dg[96]; wifiDiag(dg, sizeof(dg)); Serial.printf("wifidiag %s\n", dg); }
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
                   (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
     Serial.println("DONE");
@@ -3776,9 +3787,54 @@ static void drawGraveyard(uint32_t now, bool night, int h, uint16_t top, uint16_
 
 // Rain, snow or a storm over the scene (the temperature goes by the clock). Drawn
 // after the background and before the creature, so it rains BEHIND it.
+float snowDepth = 0;              // 0..1, the snow lying on the ground
+
+// a horizontal run that wraps around the screen edge
+static void wrapHLine(int x, int y, int w, uint16_t col) {
+  x = ((x % 466) + 466) % 466;
+  if (x + w <= 466) { gfx->drawFastHLine(x, y, w, col); return; }
+  gfx->drawFastHLine(x, y, 466 - x, col);
+  gfx->drawFastHLine(0, y, w - (466 - x), col);
+}
+
 void drawSkyWeather(uint32_t now) {
   uint8_t wx = weatherShown(now);
+  // the snow on the ground builds over ~20 min of snowing and melts over ~1 h
+  static uint32_t lastMs = 0;
+  uint32_t dt = lastMs ? now - lastMs : 0;
+  lastMs = now;
+  if (dt > 5000) dt = 5000;
+  snowDepth += wxIsSnow(wx) ? dt / (20.0f * 60000.0f) : -(dt / (60.0f * 60000.0f));
+  if (snowDepth < 0) snowDepth = 0;
+  if (snowDepth > 1) snowDepth = 1;
+  if (snowDepth > 0.01f) {
+    int sh = 4 + (int)(snowDepth * 24);
+    gfx->fillRoundRect(-60, HORIZON - 14, 586, 14 + sh, 22, UI_WHITE);   // the hill turns white
+    for (int k = 0; k < 9; k++)                                          // and drifts on the ground
+      gfx->fillCircle(20 + k * 54, HORIZON + 38 + (k % 3) * 14, 4 + (int)(snowDepth * 10), UI_WHITE);
+  }
   if (wx == WX_NONE) return;
+  if (wx == WX_FOG) {                // pale mist drifting slowly across
+    uint16_t mist = gNight ? C565(0x4c, 0x52, 0x60) : C565(0xec, 0xf0, 0xf4);
+    for (int b = 0; b < 4; b++) {
+      int y0 = 118 + b * 46 + (int)(sinf(now / 3000.0f + b) * 6);
+      int off = (int)(now / (60 + b * 15)) + b * 120;
+      for (int y = y0; y < y0 + 22; y += 2) wrapHLine(off + (y % 6) * 9, y, 280, mist);
+    }
+  }
+  if (wx == WX_RAIN || wx == WX_STORM) {
+    uint16_t pc = C565(0x6c, 0x84, 0xa0);           // puddles, and the drops landing in them
+    static const int16_t PX[3] = { 40, 330, 400 };
+    for (int k = 0; k < 3; k++) {
+      gfx->fillRoundRect(PX[k], 292 + k * 4, 54, 8, 4, pc);
+      uint32_t ph = (now / 70 + k * 7) % 12;
+      if (ph < 3) {
+        int sx = PX[k] + 12 + (int)((now / 840 + k * 13) % 30), sy = 294 + k * 4;
+        gfx->drawLine(sx, sy, sx - 4 - (int)ph * 2, sy - 6 - (int)ph * 2, C565(0xd8, 0xe4, 0xf4));
+        gfx->drawLine(sx, sy, sx + 4 + (int)ph * 2, sy - 6 - (int)ph * 2, C565(0xd8, 0xe4, 0xf4));
+      }
+    }
+  }
   if (wx == WX_RAIN || wx == WX_STORM) {
     uint16_t rc = C565(0xc8, 0xd8, 0xf0);
     int n = wx == WX_STORM ? 70 : 44;
@@ -3787,8 +3843,13 @@ void drawSkyWeather(uint32_t now) {
       int y = (int)((k * 151 + now / 2) % 466);
       gfx->drawLine(x, y, x - 4, y + 14, rc);
     }
-    if (wx == WX_STORM && (now / 90) % 61 == 0) gfx->fillRect(0, 0, 466, 140, C565(0xf0, 0xf4, 0xff));   // lightning
-  } else if (wx == WX_SNOW) {
+    // lightning about every 20 s, and its thunder -- never at night or while it sleeps
+    static bool wasFlash = false;
+    bool flash = wx == WX_STORM && now % 20000 < 120;
+    if (flash) gfx->fillRect(0, 0, 466, 140, C565(0xf0, 0xf4, 0xff));
+    if (flash && !wasFlash && !gNight && !pet.sleeping) sfxPlay(SFX_THUNDER);
+    wasFlash = flash;
+  } else if (wxIsSnow(wx)) {
     for (int k = 0; k < 40; k++) {
       int x = (int)((k * 113 + (int)(sinf(now / 900.0f + k) * 12)) % 466);
       int y = (int)((k * 131 + now / 14) % 466);
@@ -4812,16 +4873,16 @@ void renderClock() {
     renderParentPage();
   } else {
     settingsTitle(T(S_ABOUT));
-    drawLogo(217);
+    drawLogo(196);
     if (pet.ownerName[0]) {
       char own[24];
       snprintf(own, sizeof(own), "%s's", pet.ownerName);
       // just above the logo
-      uiTextFit(UIF_BIG, CX, 217 - LOGO_H / 2 - 24 - 10 + 21, own, UI_INK, 1, 300);
+      uiTextFit(UIF_BIG, CX, 196 - LOGO_H / 2 - 24 - 10 + 21, own, UI_INK, 1, 300);
     }
     char ver[24];   // 16 cut "funpack.21" to "funpack.2"
     snprintf(ver, sizeof(ver), "v%s", FW_VERSION);
-    uiText(UIF_BIG, CX, 290, ver, UI_INK, 1);
+    uiText(UIF_BIG, CX, 262, ver, UI_INK, 1);
     char wl[64];
     uint8_t ws = wifiState();
     if (ws == WIFI_ST_NONE) snprintf(wl, sizeof(wl), "%s", T(S_WIFI_NONE));
@@ -4829,7 +4890,11 @@ void renderClock() {
     else if (ws == WIFI_ST_FAIL) snprintf(wl, sizeof(wl), "%s", T(S_WIFI_FAIL));
     else if (wifiLastSync()) snprintf(wl, sizeof(wl), "%s %02u:%02u", T(S_WIFI_OK), (unsigned)(wifiLastSync() / 3600 % 24), (unsigned)(wifiLastSync() / 60 % 60));
     else snprintf(wl, sizeof(wl), "Wi-Fi: %s", wifiNetwork());
-    uiTextFit(UIF_TINY, CX, 316, wl, UI_TRACK_TEXT, 1, 320);
+    uiTextFit(UIF_TINY, CX, 284, wl, UI_TRACK_TEXT, 1, 320);
+    bool ny = weatherNySnow();                     // the snow-from-New-York switch
+    gfx->fillRoundRect(CX - 130, 294, 260, 28, 14, ny ? lerp565(UI_BAR_OK, UI_WHITE, 4, 8) : UI_WHITE);
+    gfx->drawRoundRect(CX - 130, 294, 260, 28, 14, UI_INK);
+    uiTextFit(UIF_TINY, CX, uiMidY(UIF_TINY, 294, 28), T(ny ? S_NY_SNOW_ON : S_NY_SNOW_OFF), UI_INK, 1, 240);
   }
 
   // page dots, like the player card's
@@ -4930,6 +4995,8 @@ void clockTap(int16_t x, int16_t y) {
     alarmPageTap(x, y);
   } else if (settingsPage == SET_PARENT) {
     parentPageTap(x, y);
+  } else if (settingsPage == SET_ABOUT) {
+    if (y >= 290 && y <= 326 && x >= CX - 130 && x <= CX + 130) { wifiSetNySnow(!weatherNySnow()); sfxPlay(SFX_TAP); }
   }
 }
 
@@ -10706,7 +10773,7 @@ void checkHolidayGift() {
 static uint8_t weatherToday() {   // 0 fair, 1 rain, 2 snow
   // the real weather when the Wi-Fi has fetched it; otherwise a made-up one, ~1 day in 5
   uint8_t real = weatherShown(millis());
-  if (real != WX_NONE) return real == WX_SNOW ? 2 : (real == WX_RAIN || real == WX_STORM) ? 1 : 0;
+  if (real != WX_NONE) return wxIsSnow(real) ? 2 : (real == WX_RAIN || real == WX_STORM) ? 1 : 0;
   uint32_t d = pet.lastSeenEpoch / 86400;
   if (!d) return 0;
   uint32_t h = d * 2654435761UL;
@@ -11253,6 +11320,7 @@ static StrId pickTalk() {
   if (pet.hygiene < 30 || pet.poops >= 2) return S_TALK_DIRTY;
   if (pet.energy < 25) return S_TALK_SLEEPY;
   if (pet.gardenReady()) return S_TALK_GARDEN;
+  if (weatherShown(millis()) == WX_SNOW_NY && random(3) == 0) return S_TALK_NY_SNOW;
   uint8_t w = weatherToday();
   if (w == 1 && random(3) == 0) return S_TALK_RAIN;
   if (w == 2 && random(3) == 0) return S_TALK_SNOW;

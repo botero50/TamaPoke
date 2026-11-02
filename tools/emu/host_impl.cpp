@@ -157,9 +157,13 @@ void wifiForget() {}
 void wifiSetTz(int16_t) {}
 void wifiSetPlace(float, float) {}
 void wifiSyncNow() {}
+#include "weather.h"
+void wifiSetNySnow(bool on) { weatherSetNySnow(on); }
 uint8_t wifiState() { return WIFI_ST_NONE; }
 uint32_t wifiLastSync() { return 0; }
 const char *wifiNetwork() { return ""; }
+void wifiDiag(char *out, size_t n) { if (n) out[0] = 0; }
+void wifiScanPrint() {}
 void linkNowEnd() {}
 bool linkNowUp() { return false; }
 void linkNowPoll() {}
