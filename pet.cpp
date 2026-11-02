@@ -135,9 +135,19 @@ void Pet::syncClock(uint32_t nowEpoch) {
       continue;
     }
     if (sleeping && napEnd && ageMinutes >= napEnd) { napEnd = 0; wakeUp(); sleepAuto = SLEEP_NONE; }
-    if (sleeping) {  // rest: falls slowly and with a floor, same as live
+    // switched off for the night: it went to bed by itself, as it would have with
+    // the screen off (the screen of a switched-off ball is off)
+    uint32_t at = seen + (i + 1) * 60;
+    int hr = (int)((at / 3600) % 24);
+    bool nightNow = NIGHT_START < NIGHT_END ? (hr >= NIGHT_START && hr < NIGHT_END) : (hr >= NIGHT_START || hr < NIGHT_END);
+    if (!sleeping && nightNow) { sleeping = true; sleepAuto = SLEEP_AUTO; }
+    if (sleeping) {  // rest: same rules as live
       energy = clamp100(energy + (lightOn ? 3 : 6));
       if (lightOn && lightOnTicks < 255) lightOnTicks++;
+      if (isRestAt(at)) {
+        if (ageMinutes % REST_FOOD_EVERY == 0) fullness = dropTo(fullness, 1, REST_FOOD_FLOOR);
+        continue;
+      }
       if (ageMinutes % 2 == 0) {
         fullness = dropTo(fullness, 1, 30);
         joy = dropTo(joy, 1, 35);
@@ -224,11 +234,15 @@ void Pet::tick() {
     }
     if (lightOn && lightOnTicks < 255) lightOnTicks++;
     if (weight > 0 && ageMinutes % 3 == 0) weight--;
-    if (ageMinutes % 2 == 0) {                 // ~4x slower than awake
-      fullness = dropTo(fullness, 1, 30);
-      joy = dropTo(joy, 1, 35);
+    if (isRestHour()) {                        // a night's rest: the bars hold
+      if (ageMinutes % REST_FOOD_EVERY == 0) fullness = dropTo(fullness, 1, REST_FOOD_FLOOR);
+    } else {
+      if (ageMinutes % 2 == 0) {               // a daytime nap: ~4x slower than awake
+        fullness = dropTo(fullness, 1, 30);
+        joy = dropTo(joy, 1, 35);
+      }
+      if (ageMinutes % 3 == 0) hygiene = dropTo(hygiene, 1, 45);
     }
-    if (ageMinutes % 3 == 0) hygiene = dropTo(hygiene, 1, 45);
     defTick(true);  // resting is also wellbeing: it counts toward DEF
     checkMedals();  // can still cross a level by age while asleep
     if (++ticksSinceSave >= 5) pendingSave = true;
@@ -2616,6 +2630,11 @@ void Pet::play() {
 
 // The hour off the RTC, the same source the scene uses. With no clock at all
 // there is no night, so a board that has never been set never auto-sleeps.
+bool Pet::isRestAt(uint32_t epoch) {
+  int h = (int)((epoch / 3600) % 24);
+  return h >= REST_START || h < REST_END;
+}
+
 bool Pet::isNightHour() const {
   if (!lastSeenEpoch) return false;
   int h = (int)((lastSeenEpoch / 3600) % 24);

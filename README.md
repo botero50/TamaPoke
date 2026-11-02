@@ -62,6 +62,7 @@ This fork (**[botero50/TamaPoke](https://github.com/botero50/TamaPoke)**, branch
 - **The Nursery**: two favourites from the party or box leave an egg for the next raising.
 - **Wi-Fi time and weather**: the clock sets itself from the internet, and the sky shows the real weather
   (fog, rain with puddles, storms with thunder, snow that settles) -- plus snow from New York.
+- **Restful nights** (asleep, the bars hold) and a **try-on mirror** in the shop.
 
 See the sections further down for the rules and the economy numbers.
 
@@ -545,6 +546,19 @@ is never replaced. GIVE BACK drops it again, and random eggs return.
 - Legendaries cannot go, nor branch forms no egg can hold (Bellossom, Slowking...).
 - The parents are copied at drop-off: releasing or moving one afterwards changes
   nothing. A bred egg ignores the region chooser.
+
+### Restful nights
+Asleep between 20:00 and 08:00, joy and hygiene do not fall and food only creeps down
+to 60, so nobody wakes up to a hungry, sad, dirty Pokemon after a night it could not
+be cared for. With the screen off it goes to bed by itself from 21:00 (the old window
+started at midnight, and the evening before that drained it empty). A ball switched off
+overnight counts the night as sleep. Daytime naps keep the slower-than-awake drain, and
+the moon button still wakes it at any hour.
+
+### The try-on mirror
+In the shop, an outfit she does not own offers BUY, TRY ON and NO. TRY ON shows the
+Pokemon in a mirror wearing it together with what it already wears, with BUY and BACK.
+Trying changes nothing: not the outfit, not the coins, not the save.
 
 ### Wi-Fi: the real time and the weather
 The board's RTC has no backup cell, so when the power runs out it wakes on the

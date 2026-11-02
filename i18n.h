@@ -176,6 +176,10 @@ enum StrId : uint16_t {
   S_WIFI_NONE, S_WIFI_BUSY, S_WIFI_OK, S_WIFI_FAIL,
   // snow from New York
   S_NY_SNOW, S_TALK_NY_SNOW, S_NY_SNOW_ON, S_NY_SNOW_OFF,
+  // restful nights
+  S_ST_RESTING,
+  // the try-on mirror
+  S_TRY_ON, S_MIRROR,
   STR_COUNT
 };
 

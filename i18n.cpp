@@ -87,7 +87,11 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Wi-Fi
     "Sin Wi-Fi: configuralo en la pagina de instalacion", "Wi-Fi: conectando...", "Hora del Wi-Fi", "Wi-Fi: no se pudo conectar",
     // snow from New York
-    "Esta nevando en Nueva York!", "Mira, nieve de Nueva York!", "Nieve de Nueva York: SI", "Nieve de Nueva York: NO", },
+    "Esta nevando en Nueva York!", "Mira, nieve de Nueva York!", "Nieve de Nueva York: SI", "Nieve de Nueva York: NO",
+    // restful nights
+    "Durmiendo: sus necesidades descansan",
+    // the try-on mirror
+    "PROBAR", "Como me veo?", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -169,7 +173,11 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Wi-Fi
     "No Wi-Fi yet: set it up on the install page", "Wi-Fi: connecting...", "Clock set by Wi-Fi", "Wi-Fi: could not connect",
     // snow from New York
-    "It's snowing in New York!", "Look, snow from New York!", "Snow from New York: ON", "Snow from New York: OFF", },
+    "It's snowing in New York!", "Look, snow from New York!", "Snow from New York: ON", "Snow from New York: OFF",
+    // restful nights
+    "Sleeping: its needs are resting",
+    // the try-on mirror
+    "TRY ON", "How do I look?", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -250,7 +258,11 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Wi-Fi
     "Pas de Wi-Fi : regle-le sur la page d'installation", "Wi-Fi : connexion...", "Heure par Wi-Fi", "Wi-Fi : connexion impossible",
     // snow from New York
-    "Il neige a New York !", "Regarde, la neige de New York !", "Neige de New York : OUI", "Neige de New York : NON", },
+    "Il neige a New York !", "Regarde, la neige de New York !", "Neige de New York : OUI", "Neige de New York : NON",
+    // restful nights
+    "Il dort : ses besoins se reposent",
+    // the try-on mirror
+    "ESSAYER", "Je suis comment ?", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -331,7 +343,11 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Wi-Fi
     "Kein WLAN: auf der Installationsseite einrichten", "WLAN: verbinde...", "Uhrzeit per WLAN", "WLAN: keine Verbindung",
     // snow from New York
-    "In New York schneit es!", "Schau, Schnee aus New York!", "Schnee aus New York: AN", "Schnee aus New York: AUS", },
+    "In New York schneit es!", "Schau, Schnee aus New York!", "Schnee aus New York: AN", "Schnee aus New York: AUS",
+    // restful nights
+    "Schlaeft: seine Beduerfnisse ruhen",
+    // the try-on mirror
+    "ANPROBE", "Wie sehe ich aus?", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -412,7 +428,11 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Wi-Fi
     "Niente Wi-Fi: impostalo dalla pagina di installazione", "Wi-Fi: connessione...", "Ora dal Wi-Fi", "Wi-Fi: connessione non riuscita",
     // snow from New York
-    "Nevica a New York!", "Guarda, neve da New York!", "Neve da New York: SI", "Neve da New York: NO", },
+    "Nevica a New York!", "Guarda, neve da New York!", "Neve da New York: SI", "Neve da New York: NO",
+    // restful nights
+    "Dorme: i suoi bisogni riposano",
+    // the try-on mirror
+    "PROVA", "Come sto?", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -493,7 +513,11 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Wi-Fi
     "Sem Wi-Fi: configure na pagina de instalacao", "Wi-Fi: conectando...", "Hora pelo Wi-Fi", "Wi-Fi: nao conectou",
     // snow from New York
-    "Esta nevando em Nova York!", "Olha, neve de Nova York!", "Neve de Nova York: SIM", "Neve de Nova York: NAO", },
+    "Esta nevando em Nova York!", "Olha, neve de Nova York!", "Neve de Nova York: SIM", "Neve de Nova York: NAO",
+    // restful nights
+    "Dormindo: as necessidades descansam",
+    // the try-on mirror
+    "PROVAR", "Como estou?", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -576,7 +600,11 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Wi-Fi
     "未设Wi-Fi:请在安装页面设置", "Wi-Fi:连接中...", "Wi-Fi已校时", "Wi-Fi:无法连接",
     // snow from New York
-    "纽约下雪啦!", "看,纽约的雪!", "纽约的雪:开", "纽约的雪:关", },
+    "纽约下雪啦!", "看,纽约的雪!", "纽约的雪:开", "纽约的雪:关",
+    // restful nights
+    "睡觉中:需求也在休息",
+    // the try-on mirror
+    "试穿", "我看起来怎么样?", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -658,7 +686,11 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // Wi-Fi
     "Wi-Fi 없음: 설치 페이지에서 설정하세요", "Wi-Fi: 연결 중...", "Wi-Fi로 시간 맞춤", "Wi-Fi: 연결 실패",
     // snow from New York
-    "뉴욕에 눈이 와요!", "봐, 뉴욕에서 온 눈이야!", "뉴욕의 눈: 켜짐", "뉴욕의 눈: 꺼짐", },
+    "뉴욕에 눈이 와요!", "봐, 뉴욕에서 온 눈이야!", "뉴욕의 눈: 켜짐", "뉴욕의 눈: 꺼짐",
+    // restful nights
+    "자는 중: 필요도 쉬고 있어요",
+    // the try-on mirror
+    "입어보기", "나 어때?", },
 };
 
 // Medal names in their three lengths [language][medal].

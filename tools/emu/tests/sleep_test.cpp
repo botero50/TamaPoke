@@ -66,33 +66,42 @@ int main(){
     ck(p.sleeping, "screen off at 01:00 puts it to sleep");
   }
 
-  // --- put down BEFORE midnight: it nods off when the hour comes
-  {
-    Pet p; fresh(p, 23);
-    p.setScreenOff(true);
-    ck(!p.sleeping, "put down at 23:00, still awake -- the evening is yours");
-    liveMinutes(p, 23, 70);              // through midnight
-    ck(p.sleeping, "and it goes to bed by itself once midnight arrives");
-  }
-
-  // --- the whole evening still drains, which is the point of a narrow window
+  // --- put down BEFORE bedtime: it nods off when the hour comes (21:00, phase 24)
   {
     Pet p; fresh(p, 20);
     p.setScreenOff(true);
-    liveMinutes(p, 20, 120);             // 20:00 -> 22:00, screen off
-    ck(!p.sleeping, "screen off at 20:00 does not sleep it");
-    ck(p.fullness == 0, "and the evening drains like any other hour");
+    ck(!p.sleeping, "put down at 20:00, still awake -- the evening is yours");
+    liveMinutes(p, 20, 70);              // through 21:00
+    ck(p.sleeping, "and it goes to bed by itself once 21:00 arrives");
   }
 
-  // --- THE ONE THAT MATTERS: the whole night costs nothing
+  // --- the afternoon and early evening still drain, which is the point of a window
+  {
+    Pet p; fresh(p, 18);
+    p.setScreenOff(true);
+    liveMinutes(p, 18, 120);             // 18:00 -> 20:00, screen off
+    ck(!p.sleeping, "screen off at 18:00 does not sleep it");
+    ck(p.fullness == 0, "and the early evening drains like any other hour");
+  }
+
+  // --- screen off late in the evening: straight to bed
+  {
+    Pet p; fresh(p, 21);
+    p.lastSeenEpoch = atHour(21) + 30 * 60;
+    p.setScreenOff(true);
+    ck(p.sleeping, "screen off at 21:30 puts it to sleep");
+  }
+
+  // --- THE ONE THAT MATTERS: the whole night costs nothing (phase 24: the bars hold)
   {
     Pet p; fresh(p, 0);
+    p.fullness = 80; p.joy = 70; p.hygiene = 65;
     p.setScreenOff(true);
     liveMinutes(p, 0, 6 * 60 - 5);       // 00:00 -> 05:55
     printf("      at 05:55: food=%u joy=%u ene=%u hyg=%u ready=%d\n",
            p.fullness, p.joy, p.energy, p.hygiene, (int)p.canRunawayNow());
-    ck(p.fullness >= 30 && p.joy >= 35 && p.hygiene >= 45,
-       "a night asleep never drops below the floors");
+    ck(p.joy == 70 && p.hygiene == 65, "a night asleep: joy and hygiene hold exactly");
+    ck(p.fullness >= REST_FOOD_FLOOR && p.fullness < 80, "food only creeps down, never below the rest floor");
     ck(p.energy > 50, "and it wakes rested");
     ck(!p.canRunawayNow(), "NOWHERE NEAR running away");
     ck(p.speciesId == 147, "the creature is still there");
@@ -109,6 +118,34 @@ int main(){
     // it wakes when YOU do
     p.setScreenOff(false);
     ck(!p.sleeping, "turning the screen back on is what wakes it");
+  }
+
+  // --- a daytime nap still drains (slowly): only a night is a rest
+  {
+    Pet p; fresh(p, 13);
+    p.toggleLight();
+    liveMinutes(p, 13, 60);
+    ck(p.sleeping && p.joy < 100 && p.fullness < 100, "a nap at 13:00 still drains a little");
+    ck(p.joy >= 35 && p.fullness >= 30, "but never below the nap floors");
+  }
+
+  // --- switched off for the night while awake: it went to bed by itself
+  {
+    Pet p; fresh(p, 20);
+    p.fullness = 80; p.joy = 70; p.hygiene = 65;
+    p.dbgSetSeen(atHour(21) + 10 * 60);              // unplugged at 21:10, awake
+    p.syncClock(86400 + atHour(7) + 30 * 60);        // plugged in at 07:30 next morning
+    printf("      unplugged overnight: food=%u joy=%u hyg=%u asleep=%d\n", p.fullness, p.joy, p.hygiene, (int)p.sleeping);
+    ck(p.sleeping, "it slept through the night while switched off");
+    ck(p.joy == 70 && p.hygiene == 65 && p.fullness >= REST_FOOD_FLOOR, "and wakes in the same shape");
+  }
+
+  // --- switched off for an afternoon: the day still counts
+  {
+    Pet p; fresh(p, 12);
+    p.dbgSetSeen(atHour(12));
+    p.syncClock(atHour(16));
+    ck(!p.sleeping && p.fullness == 15, "an afternoon off still drains to the offline floor");
   }
 
   // --- the light button still beats both
@@ -160,19 +197,19 @@ int main(){
   //     runaway button is drawn over the creature, where the tap that says good
   //     morning lands. It cost a real player a DRAGONAIR.
   {
-    Pet p; fresh(p, 22);
+    Pet p; fresh(p, 19);
     p.fullness = p.joy = p.energy = p.hygiene = 0;   // a neglected evening
-    liveMinutes(p, 22, 60);
+    liveMinutes(p, 19, 60);
     ck(p.canRunawayNow(), "armed by an hour of total neglect before bed");
 
-    p.setScreenOff(true);                            // 23:00, not the window yet
-    ck(!p.sleeping, "screen off before midnight does not sleep it yet");
+    p.setScreenOff(true);                            // 20:00, not the window yet
+    ck(!p.sleeping, "screen off before 21:00 does not sleep it yet");
 
-    for (int i = 0; i < 540; i++) {                  // through to 08:00
-      p.lastSeenEpoch = atHour(23) + (uint32_t)i * 60;
+    for (int i = 0; i < 720; i++) {                  // through to 08:00
+      p.lastSeenEpoch = atHour(20) + (uint32_t)i * 60;
       p.dbgTick();
     }
-    ck(p.sleeping, "it slept from midnight through the night");
+    ck(p.sleeping, "it slept from 21:00 through the night");
     ck(p.energy == 100, "and energy recovered while it slept");
     ck(!p.canRunawayNow(), "asleep it cannot leave -- the night itself was safe");
 

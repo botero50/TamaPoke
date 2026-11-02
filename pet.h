@@ -22,16 +22,25 @@
 // as 24, so it stays "a day" if the level rate is ever retuned.
 #define EVO_PENALTY_LEVELS ((uint8_t)((24UL * 60) / MINUTES_PER_LEVEL))
 #define RUNAWAY_TICKS 60                   // runs away after 1 h with EVERYTHING at zero
-// Night, by the RTC: midnight to 06:00. Auto-sleep needs BOTH: the screen off
-// AND this window.
+// Night, by the RTC: 21:00 to 06:00 (was midnight: an evening with the screen
+// off drained it empty before it ever slept). Auto-sleep needs BOTH: the screen
+// off AND this window.
 // The screen alone would pause the game every time you put the device in a
 // pocket -- the creature is supposed to get hungry during the day. The hour
 // alone would send it to bed while you were playing. Set the clock in SETTINGS
 // or over the console with RTCSET; an unset board reads months out and simply
 // never auto-sleeps, which fails in the safe direction (it still drains, and
 // the light button still works by hand).
-#define NIGHT_START 0
+#define NIGHT_START 21
 #define NIGHT_END 6
+// A night's rest (phase 24): asleep between these hours, joy and hygiene hold and
+// food only creeps down to a floor -- a child cannot care for it while it sleeps,
+// so waking up to low bars every morning was a punishment for going to bed.
+// Daytime naps keep the slower-than-awake drain.
+#define REST_START 20
+#define REST_END 8
+#define REST_FOOD_FLOOR 60
+#define REST_FOOD_EVERY 10      // minutes per point of food while resting
 enum : uint8_t { SLEEP_NONE = 0, SLEEP_AUTO, SLEEP_PLAYER };
 #define DEF_TRAIN_TICKS 60                 // minutes of wellbeing per +1 DEF
 
@@ -873,6 +882,8 @@ public:
   void play();
   void toggleLight();
   bool isNightHour() const;
+  static bool isRestAt(uint32_t epoch);   // 20:00-08:00, a night's rest
+  bool isRestHour() const { return lastSeenEpoch && isRestAt(lastSeenEpoch); }
   void setScreenOff(bool off);  // the sketch reports the PWR button
   bool screenIsOff = false;
   void dbgTick() { tick(); }   // tests drive minutes directly; tick() is private

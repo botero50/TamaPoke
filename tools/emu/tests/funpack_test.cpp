@@ -133,7 +133,7 @@ int main(){
     fresh(p, 22);
     p.setScreenOff(true);
     p.dozeOff();
-    ck(!p.sleeping, "screen off counts as light off: no doze");
+    ck(!p.lightOn, "screen off counts as light off: it goes to bed properly, never dozing with the light on");
     p.setScreenOff(false);
     p.dozeOff();
     ck(p.sleeping && p.lightOn, "22:00, screen on, left alone: asleep with the light on");

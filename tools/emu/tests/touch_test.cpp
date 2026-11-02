@@ -248,6 +248,47 @@ int main(int argc, char **argv) {
     printf("FAIL: BUY did not buy and wear the cap\n"); return 1;
   }
   printf("PASS: shop -> hats -> confirm -> the cap is bought and worn\n");
+  {                                      // phase 24: the try-on mirror
+    extern int8_t mirrorItem, tryHat, tryAcc;
+    click(233, 146 + 54 + 24);           // hats row 1, not owned
+    int8_t want = shopConfirm;
+    if (want < 0 || pet.ownsHat(want)) { printf("FAIL: row 1 did not ask to buy an unowned hat\n"); return 1; }
+    uint32_t coins0 = pet.coins;
+    click(233, 307);                     // TRY ON
+    if (mirrorItem != want || tryHat != want || pet.hatOn != HAT_CAP || pet.coins != coins0) {
+      printf("FAIL: TRY ON did not open the mirror without changing anything\n"); return 1;
+    }
+    pump(3);                             // it draws
+    click(240 + 58, 380 + 22);           // BACK
+    if (mirrorItem != -1 || shopConfirm != want || pet.ownsHat(want) || pet.hatOn != HAT_CAP) {
+      printf("FAIL: BACK did not return to the dialog with nothing bought\n"); return 1;
+    }
+    click(233, 307);                     // TRY ON again...
+    click(110 + 58, 380 + 22);           // ...and BUY from the mirror
+    if (mirrorItem != -1 || !pet.ownsHat(want) || pet.hatOn != want || pet.coins != coins0 - Pet::hatPrice(want)) {
+      printf("FAIL: BUY in the mirror did not buy and wear it\n"); return 1;
+    }
+    shopConfirm = (int8_t)(HAT_COUNT + ACC_SCARF);   // an accessory's dialog
+    int8_t neck0 = pet.accOn[ACC_NECK];
+    click(233, 307);
+    if (mirrorItem != HAT_COUNT + ACC_SCARF || tryAcc != ACC_SCARF || tryHat != -1 || pet.hatOn != want) {
+      printf("FAIL: trying a scarf did not keep the hat on\n"); return 1;
+    }
+    pump(3);
+    click(240 + 58, 380 + 22);
+    if (pet.accOn[ACC_NECK] != neck0 || pet.ownsAcc(ACC_SCARF)) { printf("FAIL: backing out wore or bought the scarf\n"); return 1; }
+    shopConfirm = -1;
+    click(233, 146 + 2 * 54 + 24);       // hats row 2, not owned
+    int8_t poor = shopConfirm;
+    pet.coins = 0;
+    click(233, 307);
+    click(110 + 58, 380 + 22);           // BUY with no coins
+    if (mirrorItem != poor || pet.ownsHat(poor) || pet.hatOn != want) { printf("FAIL: BUY with no coins changed something\n"); return 1; }
+    click(240 + 58, 380 + 22);
+    click(20, 233);                      // close the dialog
+    pet.coins = 1000;
+    printf("PASS: shop -> TRY ON -> the mirror: back changes nothing, buy buys, no coins refuses\n");
+  }
   click(20, 233);                        // outside: back to the categories
   if (!shopOpen || shopCat != -1) { printf("FAIL: tapping outside did not go back to the categories\n"); return 1; }
   pet.decorOwned = 0; pet.slotL = pet.slotR = -1;

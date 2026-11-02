@@ -43,7 +43,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.23"
+#define FW_VERSION "3.14-funpack.24"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -252,6 +252,9 @@ bool bagOpen = false;
 bool hatAdjust = false;      // the hat-moving pad is up on the main screen
 uint8_t shopPage = 0, bagPage = 0;
 int8_t shopConfirm = -1;     // the item whose purchase dialog is open
+// The try-on mirror (phase 24): what is being tried, in RAM only -- trying never
+// touches pet.hatOn / accOn, so backing out has nothing to undo or save.
+int8_t mirrorItem = -1, tryHat = -1, tryAcc = -1;
 int8_t shopCat = -1, bagCat = -1;   // -1 = the category list
 // the food menu: -1 its first page, else MEALS / SWEETS / DRINKS
 bool foodOpen = false;
@@ -2197,6 +2200,7 @@ void onTap(int16_t x, int16_t y) {
   if (bathOpen) { bathMenuTap(x, y); return; }
   if (sleepOpen) { sleepMenuTap(x, y); return; }
   if (hubOpen) { hubTap(x, y); return; }
+  if (shopOpen && mirrorItem >= 0) { mirrorTap(x, y); return; }
   if (shopOpen) { shopTap(x, y); return; }
   if (bagOpen) { bagTap(x, y); return; }
   if (trophyOpen) { trophyTap(x, y); return; }
@@ -4128,6 +4132,10 @@ void render() {
   }
   if (hubOpen) {
     renderHub();
+    return;
+  }
+  if (shopOpen && mirrorItem >= 0) {
+    renderMirror();
     return;
   }
   if (shopOpen) {
@@ -8439,7 +8447,7 @@ const char *statusMsg() {
   if (pet.atWork()) return T(S_AT_WORK);
   if (pet.evolving()) return T(S_EVOLVING);
   if (bathUntil) return "Splish splash!";  // universal onomatopoeia
-  if (pet.sleeping) return pet.lightOn ? T(S_ST_LIGHT) : "";   // the Zs say the rest
+  if (pet.sleeping) return pet.lightOn ? T(S_ST_LIGHT) : pet.isRestHour() ? T(S_ST_RESTING) : "";   // the Zs say the rest
   if (pet.eating()) return T(S_EATING);
   if (pet.showHeart()) return T(S_LIKES);
   if (pet.sickness == SICK_STOMACH) return T(S_ST_STOMACH);
@@ -9674,8 +9682,9 @@ static int mapBottomRow(const char *const *m) {
 // it recorded in gSprTop. Walking right mirrors the player's sideways nudge,
 // since the sprite itself is mirrored.
 void drawHat(uint8_t act) {
-  if (pet.hatOn < 0 || pet.hatOn >= HAT_COUNT || !gSprTop.ok || pet.isEgg()) return;
-  const char *const *m = SPR_HATS[pet.hatOn];
+  int8_t hat = (shopOpen && mirrorItem >= 0 && tryHat >= 0) ? tryHat : pet.hatOn;   // trying one on
+  if (hat < 0 || hat >= HAT_COUNT || !gSprTop.ok || pet.isEgg()) return;
+  const char *const *m = SPR_HATS[hat];
   int hs = gSprTop.sc >= 300 ? 4 : 3;       // follows the sprite zoom: 48-64 px
   int dx = pet.hatOffX();
   if (act == PMD_WALKR) dx = -dx;
@@ -9744,7 +9753,7 @@ void hubTap(int16_t x, int16_t y) {
   if (i < 0) return;
   sfxPlay(SFX_TAP);
   switch (i) {
-    case 0: shopOpen = true; shopCat = -1; shopPage = 0; shopConfirm = -1; break;
+    case 0: shopOpen = true; shopCat = -1; shopPage = 0; shopConfirm = -1; mirrorItem = -1; break;
     case 1: bagOpen = true; bagCat = -1; bagPage = 0; break;
     case 2: choresOpen = true; break;
     case 3: piggyOpen = true; break;
@@ -9923,10 +9932,19 @@ void renderShop() {
     drawMap(SPR_ICON_COIN, 16, CX - 44, 234, 2, false);
     uiText(UIF_MID, CX - 6, 260, pr, UI_INK, 0);
     bool can = pet.coins >= catPrice(c, id);
-    gfx->fillRoundRect(103, 280, 120, 54, 12, can ? UI_BAR_OK : UI_TRACK_TEXT);
-    uiTextFit(UIF_SMALL, 163, uiMidY(UIF_SMALL, 280, 54), T(S_BUY), UI_WHITE, 1, 110);
-    gfx->fillRoundRect(243, 280, 120, 54, 12, UI_BAR_BAD);
-    uiTextFit(UIF_SMALL, 303, uiMidY(UIF_SMALL, 280, 54), T(S_CANCEL), UI_WHITE, 1, 110);
+    if (c == CAT_HATS && canTryOn()) {   // BUY / TRY ON / CANCEL
+      gfx->fillRoundRect(97, 280, 88, 54, 12, can ? UI_BAR_OK : UI_TRACK_TEXT);
+      uiTextFit(UIF_SMALL, 141, uiMidY(UIF_SMALL, 280, 54), T(S_BUY), UI_WHITE, 1, 80);
+      gfx->fillRoundRect(189, 280, 88, 54, 12, C565(0x4f, 0x93, 0xc4));
+      uiTextFit(UIF_SMALL, 233, uiMidY(UIF_SMALL, 280, 54), T(S_TRY_ON), UI_WHITE, 1, 80);
+      gfx->fillRoundRect(281, 280, 88, 54, 12, UI_BAR_BAD);
+      uiTextFit(UIF_SMALL, 325, uiMidY(UIF_SMALL, 280, 54), T(S_CANCEL), UI_WHITE, 1, 80);
+    } else {
+      gfx->fillRoundRect(103, 280, 120, 54, 12, can ? UI_BAR_OK : UI_TRACK_TEXT);
+      uiTextFit(UIF_SMALL, 163, uiMidY(UIF_SMALL, 280, 54), T(S_BUY), UI_WHITE, 1, 110);
+      gfx->fillRoundRect(243, 280, 120, 54, 12, UI_BAR_BAD);
+      uiTextFit(UIF_SMALL, 303, uiMidY(UIF_SMALL, 280, 54), T(S_CANCEL), UI_WHITE, 1, 110);
+    }
   }
   drawFpToast();
   gfx->flush();
@@ -9945,7 +9963,15 @@ void shopTap(int16_t x, int16_t y) {
   if (shopConfirm >= 0) {
     uint8_t id = (uint8_t)shopConfirm;
     shopConfirm = -1;
-    if (y >= 280 && y <= 334 && x >= 103 && x <= 223) {
+    bool three = c == CAT_HATS && canTryOn();
+    if (three && y >= 280 && y <= 334 && x >= 189 && x <= 277) {   // TRY ON: to the mirror
+      mirrorItem = (int8_t)id;
+      if (id < HAT_COUNT) { tryHat = (int8_t)id; tryAcc = -1; }
+      else { tryAcc = (int8_t)(id - HAT_COUNT); tryHat = -1; }
+      sfxPlay(SFX_HEART);
+      return;
+    }
+    if (y >= 280 && y <= 334 && (three ? (x >= 97 && x <= 185) : (x >= 103 && x <= 223))) {
       if (catBuy(c, id)) {
         if (!catConsumable(c, id)) catUse(c, id);   // a new hat goes on, a new toy goes out
         sfxPlay(SFX_MEDAL);
@@ -10734,7 +10760,7 @@ void placeTap(int16_t x, int16_t y) {
       break;
     case PLACE_STORE:
       sfxPlay(SFX_TAP);
-      shopOpen = true; shopCat = -1; shopPage = 0; shopConfirm = -1;   // the shop opens over the store
+      shopOpen = true; shopCat = -1; shopPage = 0; shopConfirm = -1; mirrorItem = -1;   // the shop opens over the store
       break;
     case PLACE_CENTER: {
       CenterResult r = pet.centerHeal();
@@ -13048,8 +13074,82 @@ static void accDraw(int8_t a, float down) {
   drawMap(m, 16, gSprTop.x - 8 * hs, cy - 8 * hs, hs, false);
 }
 
-void drawAccBack() { accDraw(pet.accOn[ACC_BACK], 0.45f); }
-void drawAccFront() { accDraw(pet.accOn[ACC_NECK], 0.58f); accDraw(pet.accOn[ACC_FACE], 0.30f); }
+// per slot: the accessory on trial if it goes there, else what it wears
+static int8_t accShown(uint8_t slot) {
+  if (shopOpen && mirrorItem >= 0 && tryAcc >= 0 && Pet::accSlot((uint8_t)tryAcc) == slot) return tryAcc;
+  return pet.accOn[slot];
+}
+void drawAccBack() { accDraw(accShown(ACC_BACK), 0.45f); }
+void drawAccFront() { accDraw(accShown(ACC_NECK), 0.58f); accDraw(accShown(ACC_FACE), 0.30f); }
+
+// ---------- the try-on mirror (phase 24) ----------
+
+bool canTryOn() { return !pet.isEgg() && pet.speciesId >= 1; }
+
+void renderMirror() {
+  uint8_t id = (uint8_t)mirrorItem;
+  uint32_t now = millis();
+  drawIndoor(C565(0xf4, 0xe6, 0xda), C565(0xc8, 0x9a, 0x60));
+  fpEllipse(CX, 222, 132, 136, C565(0xb0, 0x7a, 0x45));          // the wooden frame
+  fpEllipse(CX, 222, 120, 124, C565(0xe4, 0xf2, 0xf8));          // and the glass
+  gfx->drawLine(CX - 70, 140, CX - 40, 110, UI_WHITE);           // a glint
+  gfx->drawLine(CX - 74, 160, CX - 34, 120, UI_WHITE);
+  if (pmd.loaded) {                    // its own animated sprite: the outfit sits as on the main screen
+    drawAccBack();
+    drawPmdAct(PMD_IDLE, CX, PET_GROUND, now, true, false, 3);
+    drawHat(PMD_IDLE);
+    drawAccFront();
+  } else {                             // no sprite pack: the built-in one, head estimated
+    int fi = flashIdxForDex(pet.speciesId);
+    if (fi >= 0) {
+      const Species &sp = SPECIES[fi];
+      int s = sp.scale, y = PET_GROUND - 32 * s;
+      gSprTop.ok = true; gSprTop.x = CX; gSprTop.y = y + 7 * s; gSprTop.w = 18 * s; gSprTop.sc = (uint32_t)s * 100;
+      drawAccBack();
+      drawMap(sp.sprite, SPRITE_H, CX - 16 * s, y, s, false);
+      drawHat(PMD_IDLE);
+      drawAccFront();
+    }
+  }
+  for (int k = 0; k < 4; k++) {        // sparkles, twinkling in turn
+    if ((now / 250 + k) % 4 == 0) continue;
+    int sx = CX + (k % 2 ? 96 : -96) - (k / 2) * 14, sy = 130 + k * 46;
+    gfx->drawLine(sx - 6, sy, sx + 6, sy, C565(0xff, 0xd9, 0x5c));
+    gfx->drawLine(sx, sy - 6, sx, sy + 6, C565(0xff, 0xd9, 0x5c));
+  }
+  uiTextFit(UIF_MID, CX, 50, T(S_MIRROR), UI_INK, 1, 300);
+  char lb[48];
+  snprintf(lb, sizeof(lb), "%s  %u", T(catName(CAT_HATS, id)), (unsigned)catPrice(CAT_HATS, id));
+  uiTextFit(UIF_SMALL, CX, 80, lb, UI_INK, 1, 300);
+  drawPlaceButtons(S_BUY, pet.coins >= catPrice(CAT_HATS, id));
+  drawFpToast();
+  gfx->flush();
+}
+
+static void mirrorClose() { mirrorItem = -1; tryHat = -1; tryAcc = -1; }
+
+void mirrorTap(int16_t x, int16_t y) {
+  uint8_t id = (uint8_t)mirrorItem;
+  bool inRow = y >= PLACE_BTN_Y && y <= PLACE_BTN_Y + PLACE_BTN_H;
+  if (inRow && x >= PLACE_ACT_X && x <= PLACE_ACT_X + PLACE_BTN_W) {            // BUY
+    if (catBuy(CAT_HATS, id)) {
+      catUse(CAT_HATS, id);
+      sfxPlay(SFX_MEDAL);
+      fpShowToast(S_BOUGHT, UI_BAR_OK);
+      mirrorClose();
+      shopConfirm = -1;
+    } else {
+      sfxPlay(SFX_DENY);
+      fpShowToast(S_NOT_ENOUGH, UI_BAR_BAD);
+    }
+    return;
+  }
+  if (y < 72 || (inRow && x >= PLACE_BACK_X && x <= PLACE_BACK_X + PLACE_BTN_W)) {   // BACK: the dialog again
+    sfxPlay(SFX_TAP);
+    mirrorClose();
+    shopConfirm = (int8_t)id;
+  }
+}
 
 // ===========================================================================
 // Phase 17: town life -- the beach, the library, the music hall, the weekly
