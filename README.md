@@ -59,6 +59,7 @@ This fork (**[botero50/TamaPoke](https://github.com/botero50/TamaPoke)**, branch
 - **Town life**: a second map page (beach, library, music hall, contest, arcade,
   jobs), part-time jobs, daily mail, weekly story quests, Halloween and winter.
 - **A photo album** on the SD card, and **music** in the places.
+- **The Nursery**: two favourites from the party or box leave an egg for the next raising.
 
 See the sections further down for the rules and the economy numbers.
 
@@ -528,6 +529,20 @@ them full screen; PHOTO there takes one of the main screen right away. Each plac
 hums its own public-domain tune while you are there: the park *Twinkle, Twinkle*,
 the school *Frere Jacques*, the garden and the lake *Ode to Joy*, the beach *La
 Cucaracha*.
+
+### The Nursery
+Map page two, NURSERY. LEAVE TWO picks two creatures from the party or the box
+(40 coins, once a week). They spend a day together; then TAKE EGG. The egg waits
+and becomes the **next** egg, when the current creature finishes -- the live pet
+is never replaced. GIVE BACK drops it again, and random eggs return.
+
+- **Species:** the first form of one parent's line, 50/50 (Venusaur gives a
+  Bulbasaur, every Eeveelution an Eevee).
+- **IVs:** three of the four come from the better parent, the fourth is rolled.
+- **Shiny:** 1 in 12 with a shiny parent, otherwise the usual 1 in 48.
+- Legendaries cannot go, nor branch forms no egg can hold (Bellossom, Slowking...).
+- The parents are copied at drop-off: releasing or moving one afterwards changes
+  nothing. A bred egg ignores the region chooser.
 
 ### The economy, checked
 `economy_test` plays thirty days through the real rules (missions, caps, steps):

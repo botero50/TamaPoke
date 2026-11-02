@@ -77,6 +77,8 @@ const SaveField SAVE_FIELDS[] = {
   { "mld", SK_U32 },    { "mlk", SK_U8 },     { "mlr", SK_BOOL },
   // story quests
   { "qwk", SK_U32 },    { "qst", SK_U8 },     { "qsd", SK_U32 },
+  // the Nursery
+  { "nurs", SK_BYTES }, { "eggB", SK_BOOL },
   // the banked creatures
   { "party", SK_BYTES }, { "box", SK_BYTES },
   // settings, so a restored device plays the way it did

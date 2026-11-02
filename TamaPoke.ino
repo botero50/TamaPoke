@@ -41,7 +41,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.20"
+#define FW_VERSION "3.14-funpack.21"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -392,6 +392,7 @@ uint8_t rpickModeNow();                       // which chooser is up, or 0xFF
 static bool rpickSwipe(int dir);              // true if it handled the gesture
 static int regionPickTap(int16_t x, int16_t y, uint8_t mode);
 static void drawEggRegion();          // defined with the egg screen helpers
+static bool fpThumb(int16_t dex, int cx, int cy, int s, bool sil);   // defined with the Fun Pack scenes
 static int eggRegionTap(int16_t x, int16_t y);
 static void drawBtlBack();
 static void btlLinkPoll();   // defined with the battle code, called from render()
@@ -1339,6 +1340,8 @@ void handleSerial() {
     Serial.printf("shiny=%d streak=%u/%u bond=%u medals=0x%X(%u) nick=%s\n",
                   pet.shiny, pet.streak, pet.bestStreak, pet.bond, pet.medals,
                   pet.totalMedals, pet.nick);
+    Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
+                  (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
     Serial.println("DONE");
   }
 }
@@ -4109,7 +4112,11 @@ void render() {
     // settings screen because this is the only moment it does anything: the
     // species is decided when the egg appears, so choosing the region is
     // something you do to the egg in front of you.
-    drawEggRegion();
+    if (pet.eggBred) {
+      nurFace(pet.nursery.eggA, CX - 150, PET_CY + 20, 1, false);
+      nurFace(pet.nursery.eggB, CX + 150, PET_CY + 20, 1, false);
+      uiTextFit(UIF_SMALL, CX, 404, T(S_EGG_BRED), inkColor(), 1, 260);
+    } else drawEggRegion();
   } else {
     const DexEntry &d = DEX_TBL[pet.speciesId];
     char name[28];
@@ -6771,6 +6778,7 @@ void uiEggPillRect(int *x, int *y, int *w, int *h, bool hitArea) {
 // ours at all.
 static int eggRegionTap(int16_t x, int16_t y) {
   if (!pet.isEgg()) return 0;
+  if (pet.eggBred) return 0;   // no chooser: the parents decided
   int inset = EGGREG_PAD, guard = EGGREG_PAD + EGGREG_GUARD;
   bool hit = x >= EGGREG_X - inset && x <= EGGREG_X + EGGREG_W + inset &&
              y >= EGGREG_Y - inset && y <= EGGREG_Y + EGGREG_H + inset;
@@ -10332,7 +10340,7 @@ void drawBathDuck() {
 #define DEX_CHANSEY 113           // the nurse
 enum : uint8_t { PLACE_NONE = 0, PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_TEETH,
                  PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN,
-                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS };
+                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY };
 
 uint32_t placeAnimUntil = 0;      // the park walk animation
 uint32_t placeMsgUntil = 0;
@@ -11226,24 +11234,24 @@ static int tileHit(int16_t x, int16_t y, int n, bool hub) {
 
 static const uint8_t MAP_PLACE[2][MAP_TILES] = {
   { PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN },
-  { PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NONE, PLACE_NONE },
+  { PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_NONE },
 };
 
 void renderMapGrid() {
   drawMenuTitle(S_MAP_TITLE);
   static const char *const *const ICON[2][MAP_TILES] = {
     { SPR_PLACE_TREE, SPR_ICON_COIN, SPR_PLACE_CROSS, SPR_PLACE_SPROUT, SPR_ICON_MISSION, SPR_PLACE_FISH, SPR_PLACE_FLAG, SPR_PLACE_POT },
-    { SPR_DEC_DUCK, SPR_ICON_DIARY, SPR_CARE_NOTE, SPR_ACC_MEDAL, SPR_CAT_ARCADE, SPR_FURN_CLOCK, nullptr, nullptr },
+    { SPR_DEC_DUCK, SPR_ICON_DIARY, SPR_CARE_NOTE, SPR_ACC_MEDAL, SPR_CAT_ARCADE, SPR_FURN_CLOCK, SPR_PLACE_NURSERY, nullptr },
   };
   static const StrId NAME[2][MAP_TILES] = {
     { S_PLACE_PARK, S_SHOP, S_CENTER_SHORT, S_PLACE_GARDEN, S_PLACE_SCHOOL, S_PLACE_LAKE, S_PLACE_ADVENTURE, S_PLACE_KITCHEN },
-    { S_PLACE_BEACH, S_PLACE_LIBRARY, S_PLACE_MUSIC, S_PLACE_CONTEST, S_PLACE_ARCADE, S_PLACE_JOBS, S_PLACE_JOBS, S_PLACE_JOBS },
+    { S_PLACE_BEACH, S_PLACE_LIBRARY, S_PLACE_MUSIC, S_PLACE_CONTEST, S_PLACE_ARCADE, S_PLACE_JOBS, S_PLACE_NURSERY, S_PLACE_JOBS },
   };
   uint16_t lit = lerp565(UI_BAR_OK, UI_WHITE, 4, 8);
   uint8_t pg = mapPage % 2;
   for (int i = 0; i < MAP_TILES; i++) {
     if (MAP_PLACE[pg][i] == PLACE_NONE) continue;
-    bool hot = pg == 0 && ((i == 3 && pet.gardenReady()) || (i == 6 && pet.advReady()));
+    bool hot = (pg == 0 && ((i == 3 && pet.gardenReady()) || (i == 6 && pet.advReady()))) || (pg == 1 && i == 6 && pet.nurseryReady());
     drawTile(TILE_X(i % 2), MAP_TILE_Y(i / 2), ICON[pg][i], NAME[pg][i], hot ? lit : UI_BG_DAY);
   }
   drawPageNav(pg, 2);
@@ -12991,6 +12999,137 @@ static void contestScene(uint32_t now) {
   uiTextFit(UIF_TINY, CX, 228 + (townShowResult ? 50 : 0), T(S_CONTEST_HINT), UI_INK, 1, 300);
 }
 
+// ---------- the Nursery ----------
+bool nurPick = false;             // choosing the two parents
+int8_t nurSelA = -1, nurSelB = -1;   // 0..5 party, 6..23 box
+uint32_t nurAskUntil = 0;         // GIVE BACK asked once, waiting for the second tap
+#define NUR_COLS 6
+#define NUR_CELL_X(c) (CX - 150 + (c) * 60)
+#define NUR_CELL_Y(r) (150 + (r) * 56)
+
+static const PartyMon &nurMon(int i) { return i < PARTY_SLOTS ? party.slots[i] : party.box[i - PARTY_SLOTS]; }
+static bool nurCanGo(const PartyMon &m) { return !m.empty() && m.dex <= DEX_COUNT && DEX_TBL[m.dex].rarity != R_LEGENDARIO && pet.lineBase(m.dex); }
+
+// whether the scene shows an action button right now (else only LEAVE)
+static bool nurHasAct() {
+  if (nurPick) return true;
+  if (pet.eggBred) return false;
+  if (pet.nurseryBusy()) return pet.nurseryReady();
+  return true;                    // LEAVE TWO, or GIVE BACK
+}
+
+// a parent's face: its thumbnail, or a circle in its colour when the SD has none
+void nurFace(int16_t dex, int cx, int cy, int s, bool sil) {
+  if (dex < 1 || dex > DEX_COUNT) return;
+  if (fpThumb(dex, cx, cy, s, sil)) return;
+  gfx->fillCircle(cx, cy, 14 * s, sil ? UI_TRACK_TEXT : DEX_TBL[dex].accent);
+  gfx->drawCircle(cx, cy, 14 * s, UI_INK);
+}
+
+static void nurHeart(int x, int y, int r, uint16_t col) {
+  gfx->fillCircle(x - r / 2, y, r / 2 + 1, col);
+  gfx->fillCircle(x + r / 2, y, r / 2 + 1, col);
+  gfx->fillTriangle(x - r - 1, y + 1, x + r + 1, y + 1, x, y + r + 2, col);
+}
+
+static void nurEgg(int cx, int cy, int s, float tilt) {
+  int x = cx - 16 * s + (int)(tilt * 4), y = cy - 16 * s;
+  drawMap(SPR_EGG, SPRITE_H, x, y, s, false);
+}
+
+static void nurseryScene(uint32_t now) {
+  for (int y = 0; y < 230; y += 8) gfx->fillRect(0, y, 466, 8, lerp565(C565(0xb8, 0xe0, 0xf8), UI_WHITE, y, 460));
+  gfx->fillRect(0, 230, 466, 236, C565(0x8c, 0xd0, 0x7c));
+  for (int x = 40; x < 430; x += 36) {                       // the fence
+    gfx->fillRect(x, 196, 12, 50, UI_WHITE);
+    gfx->fillTriangle(x, 196, x + 12, 196, x + 6, 186, UI_WHITE);
+  }
+  gfx->fillRect(30, 208, 406, 8, UI_WHITE);
+  gfx->fillRect(30, 230, 406, 8, UI_WHITE);
+  const uint16_t pink = spriteColor('p');
+  if (nurPick) {
+    gfx->fillRoundRect(48, 84, 370, 270, 18, UI_WHITE);
+    gfx->drawRoundRect(48, 84, 370, 270, 18, UI_INK);
+    uiTextFit(UIF_SMALL, CX, 112, T(S_NUR_PICK_TITLE), UI_INK, 1, 300);
+    gfx->drawFastHLine(70, NUR_CELL_Y(0) + 28, 326, UI_TRACK_TEXT);   // the party above, the box below
+    for (int i = 0; i < PARTY_SLOTS + BOX_SLOTS; i++) {
+      int cx = NUR_CELL_X(i % NUR_COLS), cy = NUR_CELL_Y(i / NUR_COLS);
+      const PartyMon &m = nurMon(i);
+      if (m.empty()) { gfx->fillCircle(cx, cy, 4, UI_TRACK_TEXT); continue; }
+      if (i == nurSelA || i == nurSelB) { gfx->fillCircle(cx, cy, 27, lerp565(UI_BAR_OK, UI_WHITE, 4, 8)); gfx->drawCircle(cx, cy, 27, UI_BAR_OK); }
+      nurFace(m.dex, cx, cy, 1, !nurCanGo(m));
+    }
+    return;
+  }
+  if (pet.nurseryBusy()) {                                    // the two of them, together
+    int bob = (int)(sinf(now * 0.004f) * 10);
+    nurFace(pet.nursery.aDex, CX - 80 + bob, 290, 2, false);
+    nurFace(pet.nursery.bDex, CX + 80 - bob, 290, 2, false);
+    for (int k = 0; k < 3; k++) {
+      int hy = 250 - (int)((now / 12 + k * 60) % 180);
+      nurHeart(CX - 20 + k * 20, hy, 7, pink);
+    }
+    if (pet.nurseryReady()) nurEgg(CX, 330, 2, sinf(now * 0.01f));
+    else {
+      uint32_t left = pet.nurseryLeft();
+      char b[40];
+      snprintf(b, sizeof(b), "%s %luh %02lum", T(S_NUR_READY_IN), (unsigned long)(left / 3600), (unsigned long)(left % 3600 / 60));
+      uiTextFit(UIF_SMALL, CX, 356, b, UI_INK, 1, 300);
+    }
+    return;
+  }
+  if (pet.nurseryHasEgg()) {                                  // the egg they left
+    nurEgg(CX, 290, 3, sinf(now * 0.003f));
+    nurFace(pet.nursery.eggA, CX - 120, 300, 1, false);
+    nurFace(pet.nursery.eggB, CX + 120, 300, 1, false);
+    uiTextFit(UIF_SMALL, CX, 158, T(pet.eggBred ? S_NUR_HOME : S_NUR_NEXT), UI_INK, 1, 300);
+    return;
+  }
+  nurHeart(CX, 140, 16, pink);                                // nobody here yet
+  uiTextFit(UIF_SMALL, CX, 300, T(pet.nurseryWeekUsed() ? S_NUR_WEEK : S_NUR_INFO), UI_INK, 1, 320);
+}
+
+static bool nurseryTap(int16_t x, int16_t y, bool act) {
+  if (nurPick) {
+    if (act) {
+      if (nurSelA < 0 || nurSelB < 0) { sfxPlay(SFX_DENY); placeSay(T(S_NUR_PICK_TITLE)); return true; }
+      uint8_t r = pet.nurseryDrop(nurMon(nurSelA), nurMon(nurSelB));
+      if (r == NUR_OK) { sfxPlay(SFX_MEDAL); nurPick = false; placeSay(T(S_NUR_DROPPED)); }
+      else { sfxPlay(SFX_DENY); placeSay(T(r == NUR_NO_COINS ? S_NOT_ENOUGH : r == NUR_TOO_SOON ? S_NUR_WEEK : S_NUR_CANT)); }
+      return true;
+    }
+    for (int i = 0; i < PARTY_SLOTS + BOX_SLOTS; i++) {
+      int cx = NUR_CELL_X(i % NUR_COLS), cy = NUR_CELL_Y(i / NUR_COLS);
+      if (abs(x - cx) > 28 || abs(y - cy) > 26) continue;
+      const PartyMon &m = nurMon(i);
+      if (m.empty()) return true;
+      if (!nurCanGo(m)) { sfxPlay(SFX_DENY); placeSay(T(S_NUR_CANT)); return true; }
+      sfxPlay(SFX_TAP);
+      if (i == nurSelA) nurSelA = -1;
+      else if (i == nurSelB) nurSelB = -1;
+      else if (nurSelA < 0) nurSelA = (int8_t)i;
+      else nurSelB = (int8_t)i;
+      return true;
+    }
+    return true;
+  }
+  if (!act) return true;
+  if (pet.nurseryBusy()) {
+    if (pet.nurseryCollect()) { sfxPlay(SFX_VICTORY); placeSay(T(S_NUR_GOT)); }
+    return true;
+  }
+  if (pet.nurseryHasEgg()) {
+    if (nurAskUntil && millis() < nurAskUntil) { nurAskUntil = 0; pet.nurseryGiveBack(); sfxPlay(SFX_TAP); }
+    else { nurAskUntil = millis() + 3000; sfxPlay(SFX_TAP); placeSay(T(S_NUR_SURE)); }
+    return true;
+  }
+  if (pet.nurseryWeekUsed()) { sfxPlay(SFX_DENY); placeSay(T(S_NUR_WEEK)); return true; }
+  sfxPlay(SFX_TAP);
+  nurPick = true; nurSelA = nurSelB = -1;
+  placeMsgUntil = 0;
+  return true;
+}
+
 static void jobsScene(uint32_t) {
   drawIndoor(C565(0xd8, 0xe8, 0xc8), C565(0xb0, 0x7a, 0x45));
   gfx->fillRoundRect(73, 104, 320, 230, 14, C565(0xc8, 0x9a, 0x60));   // the board
@@ -13023,6 +13162,11 @@ bool renderPlaceTown() {
     case PLACE_MUSIC: musicScene(now); title = S_PLACE_MUSIC; buttons = false; break;
     case PLACE_CONTEST: contestScene(now); act = S_ENTER_CONTEST; on = !pet.contestDoneThisWeek(); title = S_PLACE_CONTEST; break;
     case PLACE_JOBS: jobsScene(now); title = S_PLACE_JOBS; buttons = false; break;
+    case PLACE_NURSERY:
+      nurseryScene(now); title = S_PLACE_NURSERY; buttons = nurHasAct();
+      act = nurPick ? S_NUR_PAY : pet.nurseryBusy() ? S_NUR_TAKE : pet.nurseryHasEgg() ? S_NUR_GIVE : S_NUR_PICK;
+      on = nurPick ? (nurSelA >= 0 && nurSelB >= 0) : (pet.nurseryBusy() || pet.nurseryHasEgg() || !pet.nurseryWeekUsed());
+      break;
     default: return false;
   }
   uiTextFit(UIF_MID, CX, 52, T(title), placeScene == PLACE_MUSIC ? UI_WHITE : UI_INK, 1, 300);
@@ -13040,12 +13184,15 @@ bool renderPlaceTown() {
 }
 
 bool placeTapTown(int16_t x, int16_t y) {
-  if (placeScene < PLACE_BEACH || placeScene > PLACE_JOBS || placeScene == PLACE_ARCADE) return false;
+  if (placeScene < PLACE_BEACH || placeScene > PLACE_NURSERY || placeScene == PLACE_ARCADE) return false;
   bool inBtnRow = y >= PLACE_BTN_Y && y <= PLACE_BTN_Y + PLACE_BTN_H;
-  bool backOnly = placeScene == PLACE_MUSIC || placeScene == PLACE_JOBS;
+  bool backOnly = placeScene == PLACE_MUSIC || placeScene == PLACE_JOBS || (placeScene == PLACE_NURSERY && !nurHasAct());
+  if (placeScene == PLACE_NURSERY && nurPick && (y < 72 || (inBtnRow && x >= PLACE_BACK_X && x <= PLACE_BACK_X + PLACE_BTN_W))) {
+    sfxPlay(SFX_TAP); nurPick = false; return true;          // out of the picker, still in the Nursery
+  }
   int bx = backOnly ? PLACE_BACK_X - 64 : PLACE_BACK_X;
   if (y < 72 || (inBtnRow && x >= bx && x <= bx + PLACE_BTN_W)) {
-    sfxPlay(SFX_TAP); placeScene = PLACE_NONE; townUntil = 0; shellsDealt = false; return true;
+    sfxPlay(SFX_TAP); placeScene = PLACE_NONE; townUntil = 0; shellsDealt = false; nurPick = false; nurAskUntil = 0; return true;
   }
   bool act = !backOnly && inBtnRow && x >= PLACE_ACT_X && x <= PLACE_ACT_X + PLACE_BTN_W;
   switch (placeScene) {
@@ -13097,6 +13244,8 @@ bool placeTapTown(int16_t x, int16_t y) {
         townUntil = millis() + 6000;
       }
       return true;
+    case PLACE_NURSERY:
+      return nurseryTap(x, y, act);
     case PLACE_JOBS:
       for (int i = 0; i < 3; i++) {
         int jy = 118 + i * 68;

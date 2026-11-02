@@ -204,6 +204,24 @@ struct OutfitSet { uint8_t hat, a, b; };   // 255 = that part is not needed
 #define JOB_SECS (3UL * 3600)            // a shift
 #define JOB_COINS 15
 #define LETTER_KINDS 6
+// The Nursery (phase 21): two banked creatures spend a day together and leave
+// an egg. It waits for the NEXT raising -- the live pet is never replaced.
+#define NURSERY_PRICE 40
+#define NURSERY_SECS (24UL * 3600)       // a full day together
+// Copied from the party/box at drop-off, so releasing or moving a parent later
+// changes nothing: the visit already happened. Appended-only, saved as one blob.
+struct NurseryState {
+  int16_t aDex, bDex;                   // the parents, 0 = nobody there
+  uint8_t aIv[4], bIv[4];               // atk, def, spe, hp
+  uint8_t aShiny, bShiny;
+  uint32_t since;                       // epoch they were dropped off
+  uint32_t week;                        // today()/7 of the last drop-off
+  int16_t eggDex;                       // the egg they left, 0 = none
+  uint8_t eggIv[4];
+  uint8_t eggShiny;
+  int16_t eggA, eggB;                   // whose egg it is (for the faces on it)
+};
+enum NurseryResult : uint8_t { NUR_OK = 0, NUR_BAD_PAIR, NUR_BUSY, NUR_TOO_SOON, NUR_NO_COINS };
 enum JobId : uint8_t { JOB_NONE = 0, JOB_CAFE, JOB_FLOWERS, JOB_POST, JOB_KINDS };
 enum Ribbon : uint8_t { RIB_NONE = 0, RIB_BRONZE, RIB_SILVER, RIB_GOLD };
 
@@ -602,6 +620,20 @@ public:
   bool mailRead = true;
   bool hasMail() const { return mailKind && !mailRead; }
   uint8_t openMail();                          // reads it and takes the gift; the letter id
+
+  // The Nursery (phase 21).
+  NurseryState nursery = {};
+  bool eggBred = false;                        // the waiting egg is the Nursery's
+  static bool nurseryCanPair(const PartyMon &a, const PartyMon &b);
+  int16_t lineBase(int16_t dex) const;         // the first form of its line an egg can hold, 0 = none
+  uint8_t nurseryDrop(const PartyMon &a, const PartyMon &b);   // a NurseryResult
+  bool nurseryBusy() const { return nursery.aDex > 0; }
+  bool nurseryReady() const { return nurseryBusy() && lastSeenEpoch >= nursery.since + NURSERY_SECS; }
+  uint32_t nurseryLeft() const { return nurseryReady() || !nurseryBusy() ? 0 : nursery.since + NURSERY_SECS - lastSeenEpoch; }
+  bool nurseryCollect();                       // the egg, once ready and none already kept
+  bool nurseryHasEgg() const { return nursery.eggDex > 0; }
+  void nurseryGiveBack();                      // drop the kept egg: random eggs again
+  bool nurseryWeekUsed() const { return nursery.week && nursery.week == today() / 7 + 1; }
 
   // A livelier pet (phase 14).
   uint8_t wishKind = WISH_NONE, wishArg = 0;   // the wish, and its food for WISH_FOOD

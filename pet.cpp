@@ -75,6 +75,14 @@ void Pet::newEgg() {
   int shinyBase = (lastEnd == CER_FAREWELL ? 24 : 48) - careBonus();
   if (shinyBase < 8) shinyBase = 8;
   eggShiny = (random(shinyBase) == 0);
+  // the Nursery's egg, if one is kept: its species and shine, strengths at hatch
+  eggBred = false;
+  if (nurseryHasEgg() && !starterPick) {
+    eggTarget = nursery.eggDex;
+    eggByRegion[region % REGION_COUNT] = eggTarget;
+    eggShiny = nursery.eggShiny != 0;
+    eggBred = true;
+  }
   // The debt lands on the creature about to hatch, and is spent doing so --
   // it is a one-day penalty, not a running total that compounds each retire.
   evoPen = retirePending ? EVO_PENALTY_LEVELS : 0;
@@ -530,7 +538,7 @@ void Pet::setRegion(uint8_t r) {
   if (r == region) return;
   uint8_t old = region;
   region = r;
-  if (isEgg() && eggTarget >= 1) {
+  if (isEgg() && eggTarget >= 1 && !eggBred) {   // a bred egg is its parents', whatever the region
     if (old < REGION_COUNT) eggByRegion[old] = eggTarget;
     int16_t known = eggByRegion[r];
     eggTarget = known >= 1 ? known : rollInRegion(r, eggRarity());
@@ -1014,6 +1022,12 @@ void Pet::hatch() {
   // the individual's IVs (each raising is unique). They are rolled BEFORE resetting the
   // bond on purpose: the careBonus that pushes them is the previous creature's.
   rollIVs();
+  if (eggBred && nurseryHasEgg()) {     // the parents' strengths, not a roll
+    ivAtk = nursery.eggIv[0]; ivDef = nursery.eggIv[1]; ivSpe = nursery.eggIv[2]; ivHp = nursery.eggIv[3];
+    if (shiny) { if (ivAtk < 20) ivAtk = 20; if (ivDef < 20) ivDef = 20; if (ivSpe < 20) ivSpe = 20; if (ivHp < 20) ivHp = 20; }
+    nursery.eggDex = 0;
+  }
+  eggBred = false;
   trAtk = trDef = trSpe = 0;
   goodTicks = 0;
   berryKnown = false;
@@ -2033,6 +2047,79 @@ uint8_t Pet::openMail() {
   return mailKind;
 }
 
+// ---------- the Nursery ----------
+
+bool Pet::nurseryCanPair(const PartyMon &a, const PartyMon &b) {
+  if (a.empty() || b.empty() || &a == &b) return false;
+  if (a.dex > DEX_COUNT || b.dex > DEX_COUNT) return false;
+  // legendaries do not breed, as in the games: otherwise they could be copied
+  return DEX_TBL[a.dex].rarity != R_LEGENDARIO && DEX_TBL[b.dex].rarity != R_LEGENDARIO;
+}
+
+// Back along evolvesTo to the start of the line, then forward to the first form
+// an egg can hold here (has art, its pack is on the card). Eevee's eight
+// branches all lead back to Eevee, which the table only links to Vaporeon.
+int16_t Pet::lineBase(int16_t dex) const {
+  if (dex < 1 || dex > DEX_COUNT) return 0;
+  int16_t cur = dex;
+  for (int guard = 0; guard < 4; guard++) {
+    int16_t prev = 0;
+    for (uint8_t i = 0; i < EEVEE_EVO_COUNT; i++) if (EEVEE_EVOS[i] == cur) prev = DEX_EEVEE;
+    for (int16_t d = 1; !prev && d <= DEX_COUNT; d++) if (DEX_TBL[d].evolvesTo == cur) prev = d;
+    if (!prev) break;
+    cur = prev;
+  }
+  for (int guard = 0; cur >= 1 && cur <= DEX_COUNT && guard < 4; guard++) {
+    const DexEntry &e = DEX_TBL[cur];
+    if (e.rarity != R_EVO && e.rarity != R_LEGENDARIO && speciesHasArt(cur) && regionAvailable(regionOfDex(cur)))
+      return cur;
+    if (cur == dex) break;          // never past the parent itself
+    cur = (cur == DEX_EEVEE) ? 0 : (int16_t)e.evolvesTo;
+  }
+  return 0;
+}
+
+uint8_t Pet::nurseryDrop(const PartyMon &a, const PartyMon &b) {
+  if (!nurseryCanPair(a, b) || !lineBase(a.dex) || !lineBase(b.dex) || !lastSeenEpoch) return NUR_BAD_PAIR;
+  if (nurseryBusy() || nurseryHasEgg() || eggBred) return NUR_BUSY;
+  if (nurseryWeekUsed()) return NUR_TOO_SOON;
+  if (!spendCoins(NURSERY_PRICE)) return NUR_NO_COINS;
+  nursery.aDex = a.dex; nursery.bDex = b.dex;
+  const uint8_t ia[4] = { a.ivAtk, a.ivDef, a.ivSpe, a.ivHp }, ib[4] = { b.ivAtk, b.ivDef, b.ivSpe, b.ivHp };
+  memcpy(nursery.aIv, ia, 4); memcpy(nursery.bIv, ib, 4);
+  nursery.aShiny = a.shiny ? 1 : 0; nursery.bShiny = b.shiny ? 1 : 0;
+  nursery.since = lastSeenEpoch;
+  nursery.week = today() / 7 + 1;
+  save();
+  return NUR_OK;
+}
+
+bool Pet::nurseryCollect() {
+  if (!nurseryReady() || nurseryHasEgg()) return false;
+  int16_t ba = lineBase(nursery.aDex), bb = lineBase(nursery.bDex);
+  int16_t pick = random(2) ? ba : bb;
+  if (!pick) pick = ba ? ba : bb;
+  if (!pick) { nursery.aDex = nursery.bDex = 0; save(); return false; }   // a pack went missing
+  // the better parent's value for each strength, except one rolled fresh
+  uint8_t fresh = random(4);
+  for (uint8_t k = 0; k < 4; k++) {
+    uint8_t v = nursery.aIv[k] > nursery.bIv[k] ? nursery.aIv[k] : nursery.bIv[k];
+    nursery.eggIv[k] = (k == fresh) ? rollIV(careBonus()) : (v > 31 ? 31 : v);
+  }
+  nursery.eggShiny = random((nursery.aShiny || nursery.bShiny) ? 12 : 48) == 0;
+  nursery.eggDex = pick;
+  nursery.eggA = nursery.aDex; nursery.eggB = nursery.bDex;
+  nursery.aDex = nursery.bDex = 0;      // the parents go home
+  save();
+  return true;
+}
+
+void Pet::nurseryGiveBack() {
+  if (!nurseryHasEgg() || eggBred) return;
+  nursery.eggDex = 0;
+  save();
+}
+
 // ---------- wishes, moods, birthdays, events ----------
 
 void Pet::wishTick() {
@@ -2822,6 +2909,8 @@ void Pet::save() {
   prefs.putUInt("mld", mailDay);
   prefs.putUChar("mlk", mailKind);
   prefs.putBool("mlr", mailRead);
+  prefs.putBytes("nurs", &nursery, sizeof(nursery));
+  prefs.putBool("eggB", eggBred);
   prefs.putChar("acF", accOn[0]);
   prefs.putChar("acN", accOn[1]);
   prefs.putChar("acB", accOn[2]);
@@ -3058,6 +3147,11 @@ void Pet::load() {
   mailKind = prefs.getUChar("mlk", 0);
   if (mailKind > LETTER_KINDS) mailKind = 0;
   mailRead = prefs.getBool("mlr", true);
+  if (prefs.getBytesLength("nurs") == sizeof(nursery)) prefs.getBytes("nurs", &nursery, sizeof(nursery));
+  else memset(&nursery, 0, sizeof(nursery));
+  if (nursery.aDex < 0 || nursery.aDex > DEX_COUNT || nursery.bDex < 0 || nursery.bDex > DEX_COUNT) nursery.aDex = nursery.bDex = 0;
+  if (nursery.eggDex < 0 || nursery.eggDex > DEX_COUNT) nursery.eggDex = 0;
+  eggBred = prefs.getBool("eggB", false) && nursery.eggDex > 0 && isEgg();
   {
     const char *k[3] = { "acF", "acN", "acB" };
     for (int s = 0; s < 3; s++) { int8_t v = prefs.getChar(k[s], -1); accOn[s] = (v >= 0 && v < ACC_COUNT && accSlot(v) == s && ownsAcc(v)) ? v : -1; }

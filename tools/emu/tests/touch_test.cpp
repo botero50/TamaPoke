@@ -661,6 +661,34 @@ int main(int argc, char **argv) {
       click(233, 118 + 28);                  // the cafe
       if (!pet.atWork() || placeScene) { printf("FAIL: picking the cafe did not send it to work\n"); return 1; }
       pet.jobKind = 0; pet.jobUntil = 0;     // back home for the rest of the test
+      {                                      // phase 21: tile 6, the Nursery
+        extern bool nurPick;
+        PartyMon keepA = party.slots[0], keepB = party.box[0];
+        party.slots[0] = PartyMon(); party.slots[0].dex = 3; party.slots[0].ivAtk = 30;
+        party.box[0] = PartyMon(); party.box[0].dex = 26;
+        pet.nursery = NurseryState(); pet.eggBred = false; pet.coins = 100;
+        click(394, 154);
+        click(155, 154 + 3 * 58);
+        if (placeScene != 16) { printf("FAIL: tile 6 did not open the Nursery (%u)\n", placeScene); return 1; }
+        click(110 + 58, 380 + 22);           // LEAVE TWO
+        if (!nurPick) { printf("FAIL: LEAVE TWO did not open the picker\n"); return 1; }
+        click(233 - 150, 150);               // party place 1
+        click(233 - 150, 150 + 56);          // box place 1
+        click(110 + 58, 380 + 22);           // PAY 40
+        if (nurPick || !pet.nurseryBusy() || pet.coins != 60) { printf("FAIL: PAY did not leave the two\n"); return 1; }
+        pet.lastSeenEpoch += NURSERY_SECS;
+        click(110 + 58, 380 + 22);           // TAKE EGG
+        if (!pet.nurseryHasEgg() || pet.nurseryBusy()) { printf("FAIL: TAKE EGG did not give the egg\n"); return 1; }
+        click(110 + 58, 380 + 22);           // GIVE BACK asks...
+        if (!pet.nurseryHasEgg()) { printf("FAIL: GIVE BACK did not ask first\n"); return 1; }
+        click(110 + 58, 380 + 22);           // ...and the second tap gives it back
+        if (pet.nurseryHasEgg()) { printf("FAIL: GIVE BACK did not give the egg back\n"); return 1; }
+        click(240 + 58, 380 + 22);           // BACK
+        if (placeScene) { printf("FAIL: BACK did not leave the Nursery\n"); return 1; }
+        party.slots[0] = keepA; party.box[0] = keepB;
+        pet.lastSeenEpoch -= NURSERY_SECS; pet.nursery = NurseryState();
+        printf("PASS: map page 2 -> Nursery: pick two, pay, egg, give back\n");
+      }
       mapPage = 0;
       printf("PASS: map page 2 -> beach castle, contest, a job\n");
       pet.mailDay = today; pet.mailKind = 2; pet.mailRead = false;

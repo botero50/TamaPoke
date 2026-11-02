@@ -47,6 +47,10 @@ int main(){
   for (int i=0;i<BOX_SLOTS;i++){ PartyMon m; m.dex=1+i*3; m.level=10+i;
     m.ivAtk=m.ivDef=m.ivSpe=m.ivHp=11; party.box[i]=m; }
   party.boxSave();
+  // the Nursery: two parents visiting, and an egg they left last week
+  pet.nursery.aDex = 3; pet.nursery.bDex = 134; pet.nursery.aIv[0] = 29; pet.nursery.bShiny = 1;
+  pet.nursery.since = 1793570433; pet.nursery.week = 2963;
+  pet.nursery.eggDex = 1; pet.nursery.eggIv[3] = 27; pet.nursery.eggA = 3; pet.nursery.eggB = 9;
   // renameTrainer() persists, and save() writes every field -- so this is also
   // what commits everything set above. save() itself is private on purpose.
   pet.renameTrainer("DYLAN");
@@ -125,6 +129,10 @@ int main(){
   bool moves = true;
   for (int i=0;i<MOVE_SLOTS;i++) if (p2.moves[i]!=pet.moves[i]) moves=false;
   ck(moves, "and the moveset");
+  ck(p2.nursery.aDex==3 && p2.nursery.bDex==134 && p2.nursery.aIv[0]==29 && p2.nursery.bShiny==1 &&
+     p2.nursery.since==1793570433 && p2.nursery.week==2963, "the two at the Nursery");
+  ck(p2.nursery.eggDex==1 && p2.nursery.eggIv[3]==27 && p2.nursery.eggA==3 && p2.nursery.eggB==9,
+     "and the egg they left");
 
   ck(q2.count()==PARTY_SLOTS, "the whole party is back");
   bool party_ok = true;

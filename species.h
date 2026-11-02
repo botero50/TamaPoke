@@ -880,6 +880,24 @@ static const char* const SPR_FURN_CLOCK[16] = {  // 16x16
   "................",
   "................",
 };
+static const char* const SPR_PLACE_NURSERY[16] = {  // 16x16
+  "................",
+  ".......kk.......",
+  "......krrk......",
+  ".....krrrrk.....",
+  "....krrrrrrk....",
+  "...krrrrrrrrk...",
+  "..kkkkkkkkkkkk..",
+  "...kyyyyyyyyk...",
+  "...kyppyyppyk...",
+  "...kyppppppyk...",
+  "...kyyppppyyk...",
+  "...kyyyppyyyk...",
+  "...kyyyyyyyyk...",
+  "...kkkkkkkkkk...",
+  "................",
+  "................",
+};
 static const char* const SPR_FURN_PAINTING[16] = {  // 16x16
   "................",
   "................",

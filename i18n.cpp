@@ -81,7 +81,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 19
     "AVENTURA", "Pikachu perdio su gorro", "El almuerzo de Meowth", "El huevo perdido de Chansey", "Una cancion para Jigglypuff", "Busca en el parque", "Busca en la playa", "Pregunta en la biblioteca", "Pesca algo en el lago", "Cocina un plato", "Comed juntos algo casero", "Abre una parada de aventura", "Visita el Centro Pokemon", "Date un bano", "Pon una cancion", "Juega un juego", "Estudia en la escuela", "El siguiente paso, manana", "Aventura completada! Un gorro nuevo", "Truco o trato! Una galleta", "Chocolate caliente gratis!", "Un ano juntos! +50",
     // the photo album
-    "ALBUM", "Aun no hay fotos", "Foto guardada en el album!", "FOTO", },
+    "ALBUM", "Aun no hay fotos", "Foto guardada en el album!", "FOTO",
+    // the Nursery
+    "GUARDERIA", "Un dia juntos: 40 monedas", "DEJAR DOS", "Elige dos amigos", "PAGAR 40", "Ese no puede ir", "Hasta manana!", "Vuelve la proxima semana", "Listo en", "TOMAR HUEVO", "Un huevo! Sera el siguiente", "Tu proximo huevo", "DEVOLVER", "Toca otra vez para devolverlo", "Su huevo ya esta en casa", "De la guarderia", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -157,7 +159,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 19
     "QUEST", "Pikachu lost its hat", "Meowth's lunch", "Chansey's lost egg", "A song for Jigglypuff", "Search the park", "Search the beach", "Ask at the library", "Catch something at the lake", "Cook a dish", "Eat something home-made", "Open an adventure stop", "Visit the Pokemon Center", "Have a bath", "Play a song", "Play a game", "Study at school", "The next step tomorrow", "Quest complete! A new hat", "Trick or treat! A cookie", "A free hot cocoa!", "One year together! +50",
     // the photo album
-    "ALBUM", "No photos yet", "Photo saved to the album!", "PHOTO", },
+    "ALBUM", "No photos yet", "Photo saved to the album!", "PHOTO",
+    // the Nursery
+    "NURSERY", "A day together: 40 coins", "LEAVE TWO", "Pick two friends", "PAY 40", "That one can't go", "See you tomorrow!", "Come back next week", "Ready in", "TAKE EGG", "An egg! It will be your next", "Your next egg", "GIVE BACK", "Tap again to give it back", "Their egg is at home now", "From the Nursery", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -232,7 +236,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 19
     "QUETE", "Pikachu a perdu son chapeau", "Le dejeuner de Miaouss", "L'oeuf perdu de Leveinard", "Une chanson pour Rondoudou", "Cherche au parc", "Cherche a la plage", "Demande a la bibliotheque", "Peche au lac", "Cuisine un plat", "Mangez un plat maison", "Ouvre une etape d'aventure", "Va au Centre Pokemon", "Prends un bain", "Joue une chanson", "Joue a un jeu", "Etudie a l'ecole", "Prochaine etape demain", "Quete reussie ! Un chapeau", "Un bonbon ou un sort ! Un biscuit", "Un chocolat chaud offert !", "Un an ensemble ! +50",
     // the photo album
-    "ALBUM", "Pas encore de photos", "Photo dans l'album !", "PHOTO", },
+    "ALBUM", "Pas encore de photos", "Photo dans l'album !", "PHOTO",
+    // the Nursery
+    "PENSION", "Un jour ensemble : 40 pieces", "EN LAISSER 2", "Choisis deux amis", "PAYER 40", "Celui-la ne peut pas", "A demain !", "Reviens la semaine prochaine", "Pret dans", "PRENDRE", "Un oeuf ! Ce sera le prochain", "Ton prochain oeuf", "RENDRE", "Touche encore pour le rendre", "Leur oeuf est a la maison", "De la pension", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -307,7 +313,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 19
     "QUEST", "Pikachu hat seinen Hut verloren", "Mauzis Mittagessen", "Chaneiras verlorenes Ei", "Ein Lied fuer Pummeluff", "Such im Park", "Such am Strand", "Frag in der Bibliothek", "Angle am See", "Koche ein Gericht", "Esst etwas Selbstgemachtes", "Oeffne einen Abenteuerhalt", "Besuch das Pokemon-Center", "Nimm ein Bad", "Spiel ein Lied", "Spiel ein Spiel", "Lern in der Schule", "Naechster Schritt morgen", "Quest geschafft! Ein Hut", "Suesses oder Saures! Ein Keks", "Ein Gratis-Kakao!", "Ein Jahr zusammen! +50",
     // the photo album
-    "ALBUM", "Noch keine Fotos", "Foto im Album!", "FOTO", },
+    "ALBUM", "Noch keine Fotos", "Foto im Album!", "FOTO",
+    // the Nursery
+    "PENSION", "Ein Tag zusammen: 40 Muenzen", "ZWEI DA LASSEN", "Waehle zwei Freunde", "40 ZAHLEN", "Der kann nicht mit", "Bis morgen!", "Komm naechste Woche wieder", "Fertig in", "EI NEHMEN", "Ein Ei! Es kommt als Naechstes", "Dein naechstes Ei", "ZURUECK", "Nochmal tippen zum Zurueckgeben", "Ihr Ei ist jetzt zu Hause", "Aus der Pension", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -382,7 +390,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 19
     "MISSIONE", "Pikachu ha perso il cappello", "Il pranzo di Meowth", "L'uovo perso di Chansey", "Una canzone per Jigglypuff", "Cerca al parco", "Cerca in spiaggia", "Chiedi in biblioteca", "Pesca al lago", "Cucina un piatto", "Mangiate qualcosa fatto in casa", "Apri una tappa d'avventura", "Visita il Centro Pokemon", "Fai un bagno", "Metti una canzone", "Fai un gioco", "Studia a scuola", "Prossimo passo domani", "Missione compiuta! Un cappello", "Dolcetto o scherzetto! Un biscotto", "Una cioccolata calda gratis!", "Un anno insieme! +50",
     // the photo album
-    "ALBUM", "Ancora nessuna foto", "Foto salvata nell'album!", "FOTO", },
+    "ALBUM", "Ancora nessuna foto", "Foto salvata nell'album!", "FOTO",
+    // the Nursery
+    "PENSIONE", "Un giorno insieme: 40 monete", "LASCIANE 2", "Scegli due amici", "PAGA 40", "Quello non puo andare", "A domani!", "Torna la prossima settimana", "Pronto tra", "PRENDI UOVO", "Un uovo! Sara il prossimo", "Il tuo prossimo uovo", "RESTITUISCI", "Tocca ancora per restituirlo", "Il loro uovo e a casa", "Dalla pensione", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -457,7 +467,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 19
     "MISSAO", "Pikachu perdeu o chapeu", "O almoco de Meowth", "O ovo perdido de Chansey", "Uma cancao para Jigglypuff", "Procure no parque", "Procure na praia", "Pergunte na biblioteca", "Pesque no lago", "Cozinhe um prato", "Comam algo caseiro", "Abra uma parada de aventura", "Visite o Centro Pokemon", "Tome um banho", "Toque uma musica", "Jogue um jogo", "Estude na escola", "Proximo passo amanha", "Missao completa! Um chapeu", "Gostosuras! Um biscoito", "Chocolate quente gratis!", "Um ano juntos! +50",
     // the photo album
-    "ALBUM", "Ainda sem fotos", "Foto salva no album!", "FOTO", },
+    "ALBUM", "Ainda sem fotos", "Foto salva no album!", "FOTO",
+    // the Nursery
+    "CRECHE", "Um dia juntos: 40 moedas", "DEIXAR DOIS", "Escolha dois amigos", "PAGAR 40", "Esse nao pode ir", "Ate amanha!", "Volte na proxima semana", "Pronto em", "PEGAR OVO", "Um ovo! Sera o proximo", "Seu proximo ovo", "DEVOLVER", "Toque de novo para devolver", "O ovo deles esta em casa", "Da creche", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -534,7 +546,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 19
     "任务", "皮卡丘的帽子丢了", "喵喵的午饭", "吉利蛋丢失的蛋", "给胖丁的歌", "去公园找找", "去海滩找找", "去图书馆问问", "在湖边钓鱼", "做一道菜", "一起吃自制的菜", "打开一个冒险站点", "去宝可梦中心", "洗个澡", "放一首歌", "玩个游戏", "在学校学习", "下一步明天继续", "任务完成! 新帽子", "不给糖就捣蛋! 饼干", "免费热可可!", "在一起一年了! +50",
     // the photo album
-    "相册", "还没有照片", "照片已存入相册!", "拍照", },
+    "相册", "还没有照片", "照片已存入相册!", "拍照",
+    // the Nursery
+    "托儿所", "一起待一天:40金币", "留下两只", "选两个朋友", "付40", "它不能去", "明天见!", "下周再来", "还要", "拿蛋", "一颗蛋!下一个就是它", "你的下一颗蛋", "退回", "再按一次退回", "它们的蛋已经在家了", "来自托儿所", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -610,7 +624,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 19
     "퀘스트", "피카츄가 모자를 잃어버렸어요", "나옹의 점심", "럭키의 잃어버린 알", "푸린을 위한 노래", "공원을 찾아봐요", "해변을 찾아봐요", "도서관에 물어봐요", "호수에서 낚시해요", "요리를 해요", "직접 만든 음식을 먹어요", "모험 정류장을 열어요", "포켓몬센터에 가요", "목욕해요", "노래를 틀어요", "게임을 해요", "학교에서 공부해요", "다음 단계는 내일", "퀘스트 완료! 새 모자", "트릭 오어 트릿! 쿠키", "핫초코 공짜!", "함께한 지 1년! +50",
     // the photo album
-    "앨범", "아직 사진이 없어요", "앨범에 사진 저장!", "사진", },
+    "앨범", "아직 사진이 없어요", "앨범에 사진 저장!", "사진",
+    // the Nursery
+    "보육원", "하루 함께: 40코인", "두 마리 맡기기", "친구 두 명 고르기", "40 내기", "그 친구는 안 돼요", "내일 봐요!", "다음 주에 다시 와요", "남은 시간", "알 받기", "알이다! 다음 알이 될 거예요", "다음 알", "돌려주기", "한 번 더 누르면 돌려줘요", "알은 이미 집에 있어요", "보육원에서 온 알", },
 };
 
 // Medal names in their three lengths [language][medal].

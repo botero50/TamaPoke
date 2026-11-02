@@ -384,6 +384,73 @@ int main(){
     ck(p.birthdayMonths() == 12 && p.claimBirthday() && p.coins == c + 50, "a year old: a bigger party");
   }
 
+  // --- phase 21: the Nursery
+  {
+    Pet p; fresh(p, 20100);
+    p.nursery = NurseryState(); p.eggBred = false;
+    ck(p.lineBase(3) == 1, "Venusaur's egg holds a Bulbasaur");
+    ck(p.lineBase(26) == 172 || p.lineBase(26) == 25, "Raichu's line starts at Pichu (or Pikachu)");
+    ck(p.lineBase(134) == DEX_EEVEE && p.lineBase(196) == DEX_EEVEE, "every Eeveelution leads back to Eevee");
+    ck(p.lineBase(150) == 0, "a legendary has no egg");
+    PartyMon a, b, leg, none;
+    a.dex = 3; a.ivAtk = 30; a.ivDef = 10; a.ivSpe = 12; a.ivHp = 9;
+    b.dex = 26; b.ivAtk = 11; b.ivDef = 28; b.ivSpe = 25; b.ivHp = 27;
+    leg.dex = 150;
+    ck(Pet::nurseryCanPair(a, b), "two favourites can pair");
+    ck(!Pet::nurseryCanPair(a, leg) && !Pet::nurseryCanPair(a, none) && !Pet::nurseryCanPair(a, a), "no legendary, no empty place, not itself");
+    p.coins = 39;
+    ck(p.nurseryDrop(a, b) == NUR_NO_COINS && !p.nurseryBusy() && p.coins == 39, "40 coins needed");
+    p.coins = 100;
+    ck(p.nurseryDrop(a, leg) == NUR_BAD_PAIR && p.coins == 100, "a bad pair costs nothing");
+    ck(p.nurseryDrop(a, b) == NUR_OK && p.nurseryBusy() && p.coins == 60, "dropped off for 40");
+    ck(!p.nurseryReady() && !p.nurseryCollect() && p.nurseryLeft() == NURSERY_SECS, "not ready at once");
+    p.lastSeenEpoch += NURSERY_SECS - 60;
+    ck(!p.nurseryReady() && p.nurseryLeft() == 60, "a minute to go");
+    p.lastSeenEpoch += 60;
+    ck(p.nurseryReady() && p.nurseryCollect() && p.nurseryHasEgg() && !p.nurseryBusy(), "a day later: the egg");
+    ck(p.nursery.eggDex == 1 || p.nursery.eggDex == p.lineBase(26), "the egg is one parent's line");
+    int fromBest = 0;
+    const uint8_t best[4] = { 30, 28, 25, 27 };
+    for (int k = 0; k < 4; k++) if (p.nursery.eggIv[k] == best[k]) fromBest++;
+    ck(fromBest >= 3, "at least 3 strengths are the better parent's");
+    ck(p.nurseryDrop(a, b) == NUR_BUSY, "one egg at a time");
+    // the next raising takes it, once
+    int16_t want = p.nursery.eggDex; uint8_t wantIv[4]; for (int k = 0; k < 4; k++) wantIv[k] = p.nursery.eggIv[k];
+    bool wantShiny = p.nursery.eggShiny;
+    p.newEgg();
+    ck(p.isEgg() && p.eggBred && p.eggPeek() == want, "the next egg is the Nursery's");
+    p.setRegion((uint8_t)((p.region + 1) % REGION_COUNT));
+    ck(p.eggPeek() == want, "a region change keeps the bred egg");
+    p.eggTap(); p.eggTap(); p.eggTap();
+    ck(!p.isEgg() && p.speciesId == want && !p.eggBred && !p.nurseryHasEgg(), "it hatches into the parents' line");
+    if (!wantShiny) ck(p.ivAtk == wantIv[0] && p.ivDef == wantIv[1] && p.ivSpe == wantIv[2] && p.ivHp == wantIv[3], "with the inherited strengths");
+    p.newEgg();
+    ck(!p.eggBred, "the egg after that is random again");
+    // weekly limit and giving an egg back
+    fresh(p, 20100); p.nursery = NurseryState(); p.eggBred = false; p.coins = 200;
+    ck(p.nurseryDrop(a, b) == NUR_OK, "drop-off");
+    p.lastSeenEpoch += NURSERY_SECS; p.nurseryCollect();
+    p.nurseryGiveBack();
+    ck(!p.nurseryHasEgg(), "given back: no egg kept");
+    p.lastSeenEpoch = atDay(20100, 13);
+    ck(p.nurseryDrop(a, b) == NUR_TOO_SOON, "once a week");
+    p.lastSeenEpoch = atDay(20100 + 7, 12);
+    ck(p.nurseryDrop(a, b) == NUR_OK, "the next week again");
+    // the shiny chance with a shiny parent
+    int shinies = 0;
+    for (int i = 0; i < 600; i++) {
+      p.nursery = NurseryState(); p.nursery.aDex = 3; p.nursery.bDex = 26; p.nursery.aShiny = 1;
+      p.nursery.since = p.lastSeenEpoch - NURSERY_SECS;
+      p.nurseryCollect(); if (p.nursery.eggShiny) shinies++;
+    }
+    ck(shinies > 20 && shinies < 100, "a shiny parent: about 1 egg in 12 shines");
+    // it persists
+    p.nursery = NurseryState(); p.coins = 100;
+    p.nurseryDrop(a, b);
+    Pet q; q.begin();
+    ck(q.nursery.aDex == 3 && q.nursery.bDex == 26 && q.nursery.aIv[0] == 30 && q.nursery.since == p.nursery.since, "the Nursery persists");
+  }
+
   if (bad) printf("FAILURES\n");
   return bad?1:0;
 }
