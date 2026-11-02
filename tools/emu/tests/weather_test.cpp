@@ -78,6 +78,37 @@ int main(){
     WeatherNow none; weatherSet(none, 0);
   }
 
+  // honest weather (phase 29): falling weather needs something falling, grey needs clouds
+  {
+    const char *drizzle =
+      "[{\"utc_offset_seconds\":-18000,\"current_units\":{\"temperature_2m\":\"°C\",\"weather_code\":\"wmo code\",\"precipitation\":\"mm\",\"cloud_cover\":\"%\"},"
+      "\"current\":{\"time\":\"2026-11-02T12:30\",\"interval\":900,\"temperature_2m\":22.4,\"weather_code\":61,\"precipitation\":0.00,\"cloud_cover\":35}},"
+      "{\"utc_offset_seconds\":-18000,\"current_units\":{\"temperature_2m\":\"°C\",\"weather_code\":\"wmo code\",\"precipitation\":\"mm\",\"cloud_cover\":\"%\"},"
+      "\"current\":{\"time\":\"2026-11-02T12:30\",\"interval\":900,\"temperature_2m\":3.1,\"weather_code\":71,\"precipitation\":0.00,\"cloud_cover\":100}}]";
+    WeatherNow d;
+    ck(parseOpenMeteo(drizzle, d), "a reply with precipitation and cloud cover parses");
+    ck(d.rawCode == 61 && d.precip10 == 0 && d.cloud == 35, "the raw code, the precipitation and the cloud are kept for STATS");
+    ck(d.kind == WX_CLEAR, "rain code, nothing falling, 35% cloud: a sunny sky, not rain");
+    ck(d.nyKind == WX_CLOUDY, "New York's snow code with nothing falling is not snow either");
+    ck(wxHonest(WX_RAIN, true, 4, true, 90) == WX_RAIN, "0.4 mm really falling: rain");
+    ck(wxHonest(WX_RAIN, true, 2, true, 90) == WX_CLOUDY && wxHonest(WX_RAIN, true, 3, true, 90) == WX_RAIN,
+       "rain needs 0.3 mm: 0.2 is a grey sky");
+    // the real reading on a sunny day (2 Nov): drizzle, 0.1 mm, 96% cloud -- never rain now
+    WeatherNow dz;
+    ck(parseOpenMeteo("{\"current\":{\"temperature_2m\":22,\"weather_code\":51,\"precipitation\":0.1,\"cloud_cover\":96}}", dz) &&
+       dz.kind == WX_CLOUDY && dz.rawCode == 51, "drizzle at 0.1 mm: at most a grey sky");
+    ck(parseOpenMeteo("{\"current\":{\"temperature_2m\":22,\"weather_code\":53,\"precipitation\":0.9,\"cloud_cover\":96}}", dz) &&
+       dz.kind == WX_CLOUDY, "even heavy drizzle is not drawn as rain");
+    ck(parseOpenMeteo("{\"current\":{\"temperature_2m\":22,\"weather_code\":61,\"precipitation\":0.5,\"cloud_cover\":96}}", dz) &&
+       dz.kind == WX_RAIN, "real rain, 0.5 mm: rain");
+    ck(wxHonest(WX_RAIN, true, 0, true, 90) == WX_CLOUDY, "nothing falling under thick cloud: cloudy");
+    ck(wxHonest(WX_CLOUDY, true, 0, true, 40) == WX_CLEAR && wxHonest(WX_CLOUDY, true, 0, true, 75) == WX_CLOUDY, "cloudy only from 60% cloud");
+    ck(wxHonest(WX_STORM, true, 0, false, 255) == WX_CLOUDY, "a storm with no rain is just cloud");
+    ck(wxHonest(WX_FOG, true, 0, true, 10) == WX_FOG, "fog stays fog");
+    ck(wxHonest(WX_RAIN, false, 0, false, 255) == WX_RAIN, "an older reply without the fields keeps its code");
+    ck(WEATHER_FRESH_MS == 75UL * 60 * 1000, "a missed refresh clears the sky after 75 minutes, not 3 hours");
+  }
+
   // the network name in any letter case (phase 26)
   ck(ssidSameIgnoringCase("Alejandro", "alejandro") && ssidSameIgnoringCase("MyNet_2.4G", "mynet_2.4g"), "the same name in other letter case matches");
   ck(!ssidSameIgnoringCase("Alejandro", "Alejandro2") && !ssidSameIgnoringCase("abc", "abd"), "a different name does not");

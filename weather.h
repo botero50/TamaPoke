@@ -19,11 +19,23 @@ struct WeatherNow {
   bool hasOffset = false;
   int32_t utcOffset = 0;      // seconds east of UTC at the place, DST included
   uint8_t nyKind = WX_NONE;   // New York's weather, when the reply carried it
+  // what the model said before the rules below (phase 29), for STATS
+  int16_t rawCode = -1;
+  uint16_t precip10 = 0;      // precipitation in the last 15 min, tenths of a mm
+  uint8_t cloud = 255;        // cloud cover %, 255 = not in the reply
 };
+// Phase 29: models flag drizzle and showers with nothing actually falling,
+// especially over mountain and tropical cities, which kept the sky raining
+// while the sun was out. Rain, snow and storms need real precipitation;
+// "cloudy" needs real cloud cover.
+#define WX_MIN_PRECIP10 3       // 0.3 mm in 15 min: real rain, not a model's drizzle (0.1 mm showed rain on a sunny day)
+static inline bool wmoDrizzle(int code) { return code >= 51 && code <= 57; }   // never drawn as rain
+#define WX_MIN_CLOUD 60
 
-#define WEATHER_FRESH_MS (3UL * 3600 * 1000)   // older than this and the sky goes back to normal
+#define WEATHER_FRESH_MS (75UL * 60 * 1000)   // older than this and the sky goes back to normal (2.5 refreshes)
 
 uint8_t wmoKind(int code);                     // a WMO weather code -> WeatherKind
+uint8_t wxHonest(uint8_t kind, bool hasPrecip, uint16_t precip10, bool hasCloud, uint8_t cloud);
 bool parseOpenMeteo(const char *body, WeatherNow &out);   // false if the reply has no current weather
                                                           // (one place, or an array: here first, New York second)
 

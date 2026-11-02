@@ -34,6 +34,7 @@
 #include "rtcbat.h"
 #include "wifisync.h"
 #include "weather.h"
+#include "talk.h"
 #include "imu.h"
 #include "steps.h"
 #include "i18n.h"
@@ -43,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.27"
+#define FW_VERSION "3.14-funpack.28"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -1394,6 +1395,7 @@ void handleSerial() {
                   pet.totalMedals, pet.nick);
     Serial.printf("wifi=%s state=%u synced=%lu weather=%u/%d ny=%u nysnow=%d\n", wifiNetwork(), wifiState(), (unsigned long)wifiLastSync(),
                   weatherShown(millis()), weatherLast().tempC, weatherLast().nyKind, weatherNySnow());
+    Serial.printf("wxraw code=%d precip=%u.%u mm cloud=%u%%\n", weatherLast().rawCode, weatherLast().precip10 / 10, weatherLast().precip10 % 10, weatherLast().cloud);
     { char dg[96]; wifiDiag(dg, sizeof(dg)); Serial.printf("wifidiag %s\n", dg); }
     Serial.printf("tickets=%u today=%u golds=%u\n", pet.tickets, pet.ticketsToday, pet.goldBadges());
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
@@ -11019,15 +11021,21 @@ static uint8_t weatherToday() {   // 0 fair, 1 rain, 2 snow
   // the real weather when the Wi-Fi has fetched it; otherwise a made-up one, ~1 day in 5
   uint8_t real = weatherShown(millis());
   if (real != WX_NONE) return wxIsSnow(real) ? 2 : (real == WX_RAIN || real == WX_STORM) ? 1 : 0;
+  // With Wi-Fi set up, no fresh data means a normal sky, never an invented rain
+  // (it used to rain all day after every restart, or whenever a sync failed).
+  if (wifiNetwork()[0]) return 0;
   uint32_t d = pet.lastSeenEpoch / 86400;
   if (!d) return 0;
   uint32_t h = d * 2654435761UL;
   uint8_t r = (uint8_t)((h >> 24) % 100);
+  if (r >= 22) return 0;
+  // a rainy day is a 1-2 hour spell somewhere between 08:00 and 18:00, not all day
+  int hr = (int)((pet.lastSeenEpoch / 3600) % 24), start = 8 + (int)((h >> 8) % 10), len = 1 + (int)((h >> 16) % 2);
+  if (hr < start || hr >= start + len) return 0;
   int y, m, dd;
   Pet::civilDate(d, y, m, dd);
   bool winter = (m == 12 || m <= 2);
-  if (r < 22) return winter ? 2 : 1;
-  return 0;
+  return winter ? 2 : 1;
 }
 
 void drawWeather() {
@@ -11570,21 +11578,35 @@ static StrId wishTalk() {
   return W[pet.wishKind % WISH_KINDS];
 }
 
+static uint32_t talkRnd(uint32_t n) { return n ? (uint32_t)random(n) : 0; }
+
+// What it says: the pet and the clock into a TalkCtx, the choice in talk.cpp.
 static StrId pickTalk() {
-  if (pet.isSick()) return S_TALK_SICK;
-  if (pet.hasWish()) return wishTalk();
-  if (pet.isLonely()) return S_TALK_LONELY;
-  if (pet.fullness < 30) return S_TALK_HUNGRY;
-  if (pet.hygiene < 30 || pet.poops >= 2) return S_TALK_DIRTY;
-  if (pet.energy < 25) return S_TALK_SLEEPY;
-  if (pet.gardenReady()) return S_TALK_GARDEN;
-  if (weatherShown(millis()) == WX_SNOW_NY && random(3) == 0) return S_TALK_NY_SNOW;
-  uint8_t w = weatherToday();
-  if (w == 1 && random(3) == 0) return S_TALK_RAIN;
-  if (w == 2 && random(3) == 0) return S_TALK_SNOW;
-  if (pet.joy < 50) return S_TALK_PLAY;
-  static const StrId HAPPY[4] = { S_TALK_LOVE, S_TALK_HAPPY, S_TALK_PLAY, S_TALK_STUDY };
-  return HAPPY[random(4)];
+  if (!pet.isSick() && pet.hasWish()) return wishTalk();   // a wish is said first
+  TalkCtx c;
+  c.sick = pet.isSick();
+  c.lonely = pet.isLonely();
+  c.hungry = pet.fullness < 30;
+  c.dirty = pet.hygiene < 30 || pet.poops >= 2;
+  c.sleepy = pet.energy < 25;
+  c.bored = pet.isBored();
+  uint8_t real = weatherShown(millis());
+  if (real != WX_NONE) { c.wx = real; c.hasTemp = true; c.tempC = weatherLast().tempC; }
+  else { uint8_t w = weatherToday(); c.wx = w == 1 ? WX_RAIN : w == 2 ? WX_SNOW : 0; }
+  c.hour = (uint8_t)((pet.lastSeenEpoch / 3600) % 24);
+  c.garden = pet.gardenReady();
+  c.mail = pet.hasMail();
+  c.quest = pet.questStepReady();
+  c.nursery = pet.nurseryReady();
+  c.arcade = true;
+  c.study = c.hour >= 15 && c.hour < 20;
+  c.job = pet.jobDoneToday() && !pet.atWork();
+  c.birthday = pet.birthdayMonths() > 0;
+  c.event = pet.eventToday();
+  c.bondHigh = pet.bond >= 80;
+  c.evolve = pet.wantEvolveButton();
+  c.joy = pet.joy;
+  return talkPick(c, talkRnd);
 }
 
 void drawTalk() {

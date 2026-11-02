@@ -94,11 +94,11 @@ static void syncTask(void *) {
     bool haveOff = gTzSet;
     if (gHasPlace) {
       // coarse on purpose: two decimals is a neighbourhood, not a house
-      char url[200];
+      char url[256];
       // New York rides along in the same request, for its snow
       snprintf(url, sizeof(url),
                "https://api.open-meteo.com/v1/forecast?latitude=%.2f," NY_LAT "&longitude=%.2f," NY_LON
-               "&current=temperature_2m,weather_code&timezone=auto", gLat, gLon);
+               "&current=temperature_2m,weather_code,precipitation,cloud_cover&timezone=auto", gLat, gLon);
       WiFiClientSecure tls;
       tls.setInsecure();        // weather is public data; there is no secret to protect here
       HTTPClient http;

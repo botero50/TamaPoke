@@ -7,6 +7,15 @@ static uint32_t gWxAt = 0;
 static bool gWxHave = false;
 static bool gNySnow = true;
 
+// What to draw from what the model says: falling weather needs something falling,
+// and grey skies need clouds. Without those fields (an older reply) the code stands.
+uint8_t wxHonest(uint8_t kind, bool hasPrecip, uint16_t precip10, bool hasCloud, uint8_t cloud) {
+  if (hasPrecip && precip10 < WX_MIN_PRECIP10 && (kind == WX_RAIN || kind == WX_SNOW || kind == WX_STORM))
+    kind = WX_CLOUDY;
+  if (hasCloud && kind == WX_CLOUDY && cloud < WX_MIN_CLOUD) kind = WX_CLEAR;
+  return kind;
+}
+
 // WMO 4677 codes as Open-Meteo reports them
 uint8_t wmoKind(int code) {
   if (code < 0) return WX_NONE;
@@ -41,14 +50,28 @@ bool parseOpenMeteo(const char *body, WeatherNow &out) {
   double t, c;
   if (!numAfter(cur, "\"temperature_2m\"", t) || !numAfter(cur, "\"weather_code\"", c)) return false;
   WeatherNow w;
-  w.kind = wmoKind((int)c);
+  w.rawCode = (int16_t)c;
+  w.kind = wmoDrizzle((int)c) ? WX_CLOUDY : wmoKind((int)c);   // drizzle is a grey sky at most
+  double pr, cc;
+  bool hasPr = numAfter(cur, "\"precipitation\"", pr), hasCc = numAfter(cur, "\"cloud_cover\"", cc);
+  // only inside this place's own "current" block: stop at the next place
+  const char *next = strstr(cur + 10, "\"current\":");
+  if (hasPr && next && strstr(cur, "\"precipitation\"") > next) hasPr = false;
+  if (hasCc && next && strstr(cur, "\"cloud_cover\"") > next) hasCc = false;
+  if (hasPr) w.precip10 = pr < 0 ? 0 : (uint16_t)(pr * 10 + 0.5);
+  if (hasCc) w.cloud = cc < 0 ? 0 : cc > 100 ? 100 : (uint8_t)cc;
+  w.kind = wxHonest(w.kind, hasPr, w.precip10, hasCc, w.cloud);
   if (t > 60) t = 60;
   if (t < -60) t = -60;
   w.tempC = (int8_t)(t < 0 ? t - 0.5 : t + 0.5);
   // an array of two places: New York's "current" is the second one
   const char *cur2 = strstr(cur + 10, "\"current\":");
   double c2;
-  if (cur2 && numAfter(cur2, "\"weather_code\"", c2)) w.nyKind = wmoKind((int)c2);
+  if (cur2 && numAfter(cur2, "\"weather_code\"", c2)) {
+    double p2;
+    bool hp2 = numAfter(cur2, "\"precipitation\"", p2);
+    w.nyKind = wxHonest(wmoDrizzle((int)c2) ? WX_CLOUDY : wmoKind((int)c2), hp2, hp2 ? (uint16_t)(p2 * 10 + 0.5) : 0, false, 0);
+  }
   double off;
   if (numAfter(body, "\"utc_offset_seconds\"", off) && off > -14 * 3600 - 1 && off < 14 * 3600 + 1) {
     w.hasOffset = true;

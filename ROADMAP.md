@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 2 November 2026, with Phase 28._
+_Last updated: 2 November 2026, with Phase 29._
 
 ## Done
 | Phase | What | Release |
@@ -18,6 +18,7 @@ _Last updated: 2 November 2026, with Phase 28._
 | 26 | Arcade night: tickets from the Fun Pack games (30 a day), a prize counter (arcade cap, star visor, arcade cabinet, capsule, cake), the weekly records board, bronze/silver/gold badges per game; plus a Wi-Fi name typed in any letter case still connects | v1.9 |
 | 27 | Trophies past 16 (now 18): "10 gold badges" and "All 3 arcade prizes" | v1.10 |
 | 28 | The places come alive (the Center's healing machine and an original jingle, plus an animation in the garden, beach, library, contest, jobs, adventure; idle life in the park, store, school, music hall), the map as a fifth bottom button, a slimmer steps gauge | v1.11 |
+| 29 | A talkative Pokemon (147 phrases in 35 groups, 8 languages, never one of the last six) and honest weather (rain needs 0.3 mm really falling, drizzle is never rain, grey skies need 60% cloud, no pretend rain with Wi-Fi, a stale sky clears after 75 min) | v1.12 |
 
 ## Next
 | # | Item | Needs | Notes |
@@ -36,7 +37,10 @@ _Last updated: 2 November 2026, with Phase 28._
 ## Decisions on record
 - **Weather:** Open-Meteo (free, no key). The location comes from the browser, rounded
   to two decimals (~1 km). Refresh every 30 minutes with a place, every 6 hours without.
-  Weather older than 3 hours is dropped.
+  Weather older than 75 minutes is dropped (phase 29; was 3 hours). Rain, snow and storms
+  need at least 0.3 mm falling, drizzle is never drawn as rain, grey skies need 60% cloud:
+  forecast models flagged drizzle over a sunny house. With Wi-Fi set up, the old made-up
+  weather never shows; without Wi-Fi it rains in 1-2 hour spells, not all day.
 - **Clock jumps** from a Wi-Fi sync apply without replaying the missing time on the pet.
 - **The Wi-Fi password** lives in its own NVS namespace and never goes into a backup.
 - **Snow from New York:** only on days that are clear or cloudy at home; anything real
