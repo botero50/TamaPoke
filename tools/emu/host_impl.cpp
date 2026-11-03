@@ -133,6 +133,8 @@ bool pwrShortPressed() { return false; }
 
 // --- IMU: no sensor in the emulator; steps arrive through the STEPS console command ---
 bool imuBegin() { return true; }
+void i2cLock() {}
+void i2cUnlock() {}
 bool imuReadAccel(float &, float &, float &) { return false; }
 uint8_t imuReadBatch(float *, uint32_t *, uint8_t) { return 0; }
 bool imuFifoOn() { return false; }

@@ -132,6 +132,27 @@ int main(){
     ck(q.stepsDaysAgo(0) == 10 && q.stepTotal == 1560 && q.gymSteps == 1560, "the history and the total survive a reboot");
   }
 
+  // --- a clock glitch (a bad RTC read for a moment) never resets today or wipes the week
+  {
+    Pet p; fresh(p);
+    p.stepCount = 0; p.stepDay = 0; p.stepHistDay = 0; p.stepTotal = 0;
+    for (int k = 0; k < 7; k++) p.stepHist[k] = 0;
+    p.lastSeenEpoch = 20009 * DAY + 9 * 3600;
+    p.addSteps(800);
+    p.lastSeenEpoch = 20010 * DAY + 9 * 3600;
+    p.addSteps(400);
+    ck(p.stepsToday() == 400 && p.stepsDaysAgo(1) == 800, "two days: 800 yesterday, 400 today");
+    p.lastSeenEpoch = 20003 * DAY + 9 * 3600;      // a glitch: a week back for a moment
+    p.addSteps(5);
+    p.lastSeenEpoch = 20010 * DAY + 9 * 3610;      // and back to the real time
+    p.addSteps(5);
+    ck(p.stepsToday() == 410 && p.stepsDaysAgo(1) == 800 && p.stepTotal == 1210, "after the glitch: today 410, yesterday still 800, nothing lost");
+    p.setClock(20008 * DAY + 9 * 3600);           // a deliberate change to an earlier date (TIME, a sync)
+    ck(p.stepsToday() == 0, "a deliberate earlier date starts today again");
+    p.addSteps(20);
+    ck(p.stepsToday() == 20 && p.stepsDaysAgo(0) == 20, "and counts from there");
+  }
+
   if (bad) printf("FAILURES\n");
   return bad?1:0;
 }

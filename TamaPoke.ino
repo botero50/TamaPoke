@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.37"
+#define FW_VERSION "3.14-funpack.38"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -740,6 +740,7 @@ void IRAM_ATTR touchIsr() { gTouchIrq = true; }
 uint32_t lastRender = 0;
 // AMOLED protection: dimmed on inactivity
 uint32_t lastInteract = 0;
+uint32_t gClockJumps = 0;    // RTC reads thrown out as glitches (STATS)
 uint8_t dimStage = 0;        // 0 despierto, 1 atenuado (90s), 2 casi apagado (5min)
 bool swallowGesture = false; // el toque que despierta no acciona nada
 bool sliderDrag = false;     // this touch began on the volume slider
@@ -1025,12 +1026,26 @@ void loop() {
     pet.flushSave();
   }
 
-  // records the real time every 30 s (persisted on every game save)
+  // records the real time every 30 s (persisted on every game save). A read that
+  // does not match where the clock should be by now (one bad I2C read made
+  // "today" jump and restart the step count) is read again; a jump is believed
+  // only when two reads in a row agree. Real changes -- a Wi-Fi sync, TIME --
+  // set lastSeenEpoch themselves.
   static uint32_t lastClock = 0;
   if (now - lastClock > 30000) {
+    uint32_t elapsed = (now - lastClock) / 1000;
     lastClock = now;
     uint32_t e = rtcEpoch();
-    if (e) pet.lastSeenEpoch = e;
+    if (e) {
+      uint32_t want = pet.lastSeenEpoch ? pet.lastSeenEpoch + elapsed : e;
+      uint32_t off = e > want ? e - want : want - e;
+      if (off > 120) {
+        uint32_t e2 = rtcEpoch();
+        uint32_t agree = e2 > e ? e2 - e : e - e2;
+        if (!e2 || agree > 5) { gClockJumps++; e = 0; }   // two reads that disagree: neither is believed
+      }
+      if (e) pet.lastSeenEpoch = e;
+    }
   }
 
   // health heartbeat every 5 min (for the soak test; discarded when no monitor)
@@ -1446,7 +1461,7 @@ void handleSerial() {
     Serial.printf("wxraw code=%d precip=%u.%u mm cloud=%u%%\n", weatherLast().rawCode, weatherLast().precip10 / 10, weatherLast().precip10 % 10, weatherLast().cloud);
     { char dg[96]; wifiDiag(dg, sizeof(dg)); Serial.printf("wifidiag %s\n", dg); }
     Serial.printf("tickets=%u today=%u golds=%u\n", pet.tickets, pet.ticketsToday, pet.goldBadges());
-    Serial.printf("imu fifo=%d\n", imuFifoOn());
+    Serial.printf("imu fifo=%d dropped=%lu clockjumps=%lu\n", imuFifoOn(), (unsigned long)imuDroppedCount(), (unsigned long)gClockJumps);
     Serial.printf("steps=%lu hist=%u,%u,%u,%u,%u,%u,%u total=%lu adv=%u/%u\n", (unsigned long)pet.stepsToday(), pet.stepsDaysAgo(0), pet.stepsDaysAgo(1), pet.stepsDaysAgo(2), pet.stepsDaysAgo(3), pet.stepsDaysAgo(4), pet.stepsDaysAgo(5), pet.stepsDaysAgo(6), (unsigned long)pet.stepTotal, (unsigned)pet.advSteps, (unsigned)Pet::advNeed(pet.advStop));
     { int8_t gi = pet.gymChallengeIdx(); Serial.printf("gym=%u/%u next=%d region=%u ready=%d\n", pet.gymSteps, gi >= 0 ? Pet::gymStepsNeed((uint8_t)gi) : 0, gi, pet.gymChallengeRegion(), pet.gymChallengeReady()); }
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
@@ -1472,7 +1487,9 @@ void handleTouch() {
   if (!gTouchIrq && !wasPressed) return;
   gTouchIrq = false;
   int16_t x, y;
+  i2cLock();                                   // shared with the IMU task
   bool pressed = touch.getPoint(&x, &y, 1) > 0;
+  i2cUnlock();
 
   // punching bag: every touch counts instantly (rapid mashing)
   if (sackOpen) {

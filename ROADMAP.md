@@ -28,6 +28,7 @@ _Last updated: 2 November 2026, with Phase 36._
 | 34 | The road to the gym: walking fills a step ring at the right edge; at 1000 + 500 x the leader's place a gold badge button appears, opening a challenge card (FIGHT -> team picker); the ladder shows the steps still to walk. Rematches and hard stay free | v1.19 |
 | 35 | Honest steps: no free first gym challenge (gymV resets the road to 0 once); a gold gym dial at the right edge; the step plate and the dial open a PASOS panel (today, last 7 days, road to the gym with FIGHT when ready, adventure route, lifetime total); STATS prints steps= | v1.20 |
 | 36 | A gym a week: 10 000 + 2 000 steps per place, at most one new badge every 7 days, and the gym road stops at its leader (a win empties it); a clock on the dial and "challenge in N days" while the week runs. Steps from a background reader every 10 ms instead of one sample a frame: a counted walk went from 73 to 105 of 100, and 0 at rest | v1.20 |
+| 36b | One I2C lock for the step reader, touch, RTC and PMU (the task garbled the clock and USB reads, so "today" jumped and reset the step count); RTC reads that jump are double-checked; a clock glitch never resets today or wipes the 7 days; STATS shows clockjumps= and dropped= | v1.21 |
 
 ## Next
 | # | Item | Needs | Notes |
@@ -91,3 +92,6 @@ _Last updated: 2 November 2026, with Phase 36._
   frame missed about a quarter of real steps. The chip's FIFO was tried and rejected: on
   this board it returned garbage (0..2.5 g at rest, phantom steps) and each read took ~1 s.
   Serial IMULOG shows 4 s of samples, their spread and the steps they make.
+- **The I2C bus** is shared by the step-reader task and the loop (touch, RTC, PMU): every
+  user holds `i2cLock()` (imu.cpp). Without it the RTC read 0, January 2026 and the right
+  time within seconds.

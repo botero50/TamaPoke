@@ -1,4 +1,5 @@
 #include "rtcbat.h"
+#include "imu.h"     // i2cLock: the bus is shared with the IMU task
 #include "pin_config.h"  // define XPOWERS_CHIP_AXP2101
 #include <Wire.h>
 #include <time.h>
@@ -18,7 +19,9 @@ bool rtcBegin() {
 
 uint32_t rtcEpoch() {
   if (!rtcOk) return 0;
+  i2cLock();
   RTC_DateTime t = rtc.getDateTime();
+  i2cUnlock();
   if (t.getYear() < 2025 || t.getYear() > 2120) return 0;  // no valid time
   struct tm tmv = {};
   tmv.tm_year = t.getYear() - 1900;
@@ -36,8 +39,10 @@ void rtcSetEpoch(uint32_t e) {
   time_t tt = e;
   struct tm tmv;
   gmtime_r(&tt, &tmv);
+  i2cLock();
   rtc.setDateTime(RTC_DateTime(tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday,
                                tmv.tm_hour, tmv.tm_min, tmv.tm_sec));
+  i2cUnlock();
 }
 
 bool batBegin() {
@@ -70,9 +75,11 @@ static void refreshPower() {
   if (powerCacheT && now - powerCacheT < 2000) return;
   powerCacheT = now ? now : 1;
   if (!pmuOk) { cachedPct = -1; cachedCharging = false; cachedUsb = true; return; }
+  i2cLock();
   cachedPct = pmu.isBatteryConnect() ? pmu.getBatteryPercent() : -1;
   cachedCharging = pmu.isCharging();
   cachedUsb = pmu.isVbusIn();
+  i2cUnlock();
 }
 
 int batPercent() { refreshPower(); return cachedPct; }
@@ -89,8 +96,10 @@ void pwrSetup() {
 
 bool pwrShortPressed() {
   if (!pmuOk) return false;
+  i2cLock();
   pmu.getIrqStatus();
   bool hit = pmu.isPekeyShortPressIrq();
   if (hit) pmu.clearIrqStatus();
+  i2cUnlock();
   return hit;
 }

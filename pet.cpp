@@ -114,6 +114,10 @@ static uint8_t dropTo(uint8_t v, uint8_t d, uint8_t fl) {
 
 void Pet::setClock(uint32_t nowEpoch) {
   lastSeenEpoch = nowEpoch;
+  // a deliberate clock change (Wi-Fi sync, TIME) may move the date back: then
+  // the step day and the 7-day history follow it, where a glitch would not
+  if (nowEpoch && stepDay > today()) { stepDay = today(); stepCount = 0; }
+  if (nowEpoch && stepHistDay > today()) { stepHistDay = 0; for (int k = 0; k < 7; k++) stepHist[k] = 0; }
   if (nowEpoch) save();  // persists already: a power cut does not lose the reference
 }
 
@@ -578,7 +582,8 @@ int Pet::careBonus() const {
 // marking it pending often is free, but it should not be every footfall.
 void Pet::stepHistRoll(uint32_t d) {
   if (d == stepHistDay) return;
-  uint32_t shift = stepHistDay && d > stepHistDay ? d - stepHistDay : 7;   // the first day, or a clock gone back: start over
+  if (stepHistDay && d < stepHistDay) return;   // the clock seems to have gone back: keep what we have
+  uint32_t shift = stepHistDay ? d - stepHistDay : 7;   // the first day: start clean
   for (int k = 6; k >= 0; k--) stepHist[k] = (k >= (int)shift) ? stepHist[k - shift] : 0;
   stepHistDay = d;
   pendingSave = true;
@@ -594,7 +599,7 @@ uint16_t Pet::stepsDaysAgo(uint8_t ago) const {
 void Pet::addSteps(uint32_t n) {
   if (!n) return;
   uint32_t d = today();
-  if (d != stepDay) {
+  if (d > stepDay || !stepDay) {                // a new day (never a step back: a clock glitch keeps today)
     stepDay = d;
     stepCount = 0;
     pendingSave = true;
