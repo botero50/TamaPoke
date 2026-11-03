@@ -123,7 +123,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 31
     "Un bano de burbujas", "Lavale los dientes", "Una siesta o una nana", "Come algo casero", "Gana %u tickets", "Gira la capsula", "Haz el quiz de tipos", "Entra al concurso", "Pasea por el parque", "Llega a una parada", "Pesca %u veces", "Juega en la playa", "Visita el Centro", "Cocina un plato", "Planta o cosecha", "Haz %u tareas", "Lee un libro", "Estudia un rato", "Pon una cancion", "Abre una carta", "Ahorra en la alcancia", "Compra comida", "Compra algo", "Decora su casa", "Ayuda con una tarea", "Compra en la tienda", "Gana tickets en el arcade", "Camina 3000 pasos", "El huerto de Bulbasaur", "A Psyduck le duele la cabeza", "La gran siesta de Snorlax", "La fiesta de Eevee", "Squirtle va a la playa", "Magikarp quiere volar", "La noche de luna de Clefairy", "Abra va a la escuela",
     // phase 32
-    "Barrer la caca", "No hay nada que barrer", "Barre la caca tambien!", "+%u de limpieza", "Todo barrido!", },
+    "Barrer la caca", "No hay nada que barrer", "Barre la caca tambien!", "+%u de limpieza", "Todo barrido!",
+    // phase 32b
+    "Todo barrido! +%u de limpieza", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -241,7 +243,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 31
     "A bubble bath", "Brush its teeth", "A nap or a lullaby", "Eat a home-cooked dish", "Win %u tickets", "Spin the capsule", "Play the type quiz", "Enter the contest", "A walk in the park", "Reach an adventure stop", "Fish %u times", "Play at the beach", "Visit the Center", "Cook a dish", "Plant or harvest", "Do %u chores", "Read a book", "Study for a while", "Play a song", "Open a letter", "Save in the piggy bank", "Buy some food", "Buy something", "Decorate its home", "Help with a chore", "Buy at the shop", "Win arcade tickets", "Walk 3000 steps", "Bulbasaur's garden", "Psyduck's headache", "Snorlax's big nap", "Eevee's birthday party", "Squirtle's beach day", "Magikarp wants to fly", "Clefairy's moon night", "Abra's first school day",
     // phase 32
-    "Sweep the poop", "Nothing to sweep", "Sweep the poop too!", "+%u clean", "All swept!", },
+    "Sweep the poop", "Nothing to sweep", "Sweep the poop too!", "+%u clean", "All swept!",
+    // phase 32b
+    "All swept! +%u clean", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -358,7 +362,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 31
     "Un bain moussant", "Brosse-lui les dents", "Sieste ou berceuse", "Un plat fait maison", "Gagne %u tickets", "Tourne la capsule", "Fais le quiz des types", "Va au concours", "Promenade au parc", "Atteins une etape", "Peche %u fois", "Joue a la plage", "Va au Centre", "Cuisine un plat", "Plante ou recolte", "Fais %u taches", "Lis un livre", "Etudie un peu", "Mets une chanson", "Ouvre une lettre", "Epargne dans la tirelire", "Achete a manger", "Achete quelque chose", "Decore sa maison", "Aide a une tache", "Achete a la boutique", "Gagne des tickets", "Marche 3000 pas", "Le jardin de Bulbizarre", "La migraine de Psykokwak", "La grande sieste de Ronflex", "La fete d'Evoli", "Carapuce a la plage", "Magicarpe veut voler", "La nuit de lune de Melofee", "Abra va a l'ecole",
     // phase 32
-    "Balayer le caca", "Rien a balayer", "Balaie le caca aussi !", "+%u de proprete", "Tout est balaye !", },
+    "Balayer le caca", "Rien a balayer", "Balaie le caca aussi !", "+%u de proprete", "Tout est balaye !",
+    // phase 32b
+    "Tout est balaye ! +%u", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -475,7 +481,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 31
     "Ein Schaumbad", "Zaehne putzen", "Nickerchen oder Schlaflied", "Etwas Selbstgekochtes", "Gewinne %u Tickets", "Dreh die Kapsel", "Mach das Typenquiz", "Mach beim Wettbewerb mit", "Spaziergang im Park", "Erreiche eine Station", "Angle %u mal", "Spiel am Strand", "Besuch das Center", "Koche ein Gericht", "Pflanzen oder ernten", "Mach %u Aufgaben", "Lies ein Buch", "Lerne ein bisschen", "Spiel ein Lied", "Oeffne einen Brief", "Spar im Sparschwein", "Kauf Essen", "Kauf etwas", "Schmueck sein Zuhause", "Hilf im Haushalt", "Kauf im Laden ein", "Gewinn Arcade-Tickets", "Geh 3000 Schritte", "Bisasams Garten", "Enton hat Kopfweh", "Relaxos grosses Nickerchen", "Evolis Geburtstag", "Schiggy am Strand", "Karpador will fliegen", "Piepis Mondnacht", "Abras erster Schultag",
     // phase 32
-    "Kacka fegen", "Nichts zu fegen", "Feg auch die Kacka!", "+%u Sauberkeit", "Alles gefegt!", },
+    "Kacka fegen", "Nichts zu fegen", "Feg auch die Kacka!", "+%u Sauberkeit", "Alles gefegt!",
+    // phase 32b
+    "Alles gefegt! +%u Sauberkeit", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -592,7 +600,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 31
     "Un bagno di bolle", "Lavagli i denti", "Pisolino o ninna nanna", "Un piatto fatto in casa", "Vinci %u biglietti", "Gira la capsula", "Fai il quiz dei tipi", "Partecipa alla gara", "Passeggia al parco", "Raggiungi una tappa", "Pesca %u volte", "Gioca in spiaggia", "Visita il Centro", "Cucina un piatto", "Pianta o raccogli", "Fai %u faccende", "Leggi un libro", "Studia un po", "Metti una canzone", "Apri una lettera", "Risparmia nel salvadanaio", "Compra da mangiare", "Compra qualcosa", "Decora la sua casa", "Aiuta in casa", "Compra al negozio", "Vinci biglietti", "Cammina 3000 passi", "L'orto di Bulbasaur", "Il mal di testa di Psyduck", "Il pisolino di Snorlax", "La festa di Eevee", "Squirtle va al mare", "Magikarp vuole volare", "La notte di luna di Clefairy", "Abra va a scuola",
     // phase 32
-    "Spazza la cacca", "Niente da spazzare", "Spazza anche la cacca!", "+%u di pulizia", "Tutto spazzato!", },
+    "Spazza la cacca", "Niente da spazzare", "Spazza anche la cacca!", "+%u di pulizia", "Tutto spazzato!",
+    // phase 32b
+    "Tutto spazzato! +%u di pulizia", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -709,7 +719,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 31
     "Um banho de espuma", "Escove os dentes", "Soneca ou cancao de ninar", "Coma algo caseiro", "Ganhe %u tickets", "Gire a capsula", "Faca o quiz de tipos", "Entre no concurso", "Passeie no parque", "Chegue a uma parada", "Pesque %u vezes", "Brinque na praia", "Visite o Centro", "Cozinhe um prato", "Plante ou colha", "Faca %u tarefas", "Leia um livro", "Estude um pouco", "Toque uma musica", "Abra uma carta", "Guarde no cofrinho", "Compre comida", "Compre algo", "Decore a casa", "Ajude numa tarefa", "Compre na loja", "Ganhe tickets no arcade", "Ande 3000 passos", "A horta do Bulbasaur", "A dor de cabeca do Psyduck", "A grande soneca do Snorlax", "A festa do Eevee", "Squirtle vai a praia", "Magikarp quer voar", "A noite de lua da Clefairy", "Abra vai a escola",
     // phase 32
-    "Varrer o coco", "Nada para varrer", "Varra o coco tambem!", "+%u de limpeza", "Tudo varrido!", },
+    "Varrer o coco", "Nada para varrer", "Varra o coco tambem!", "+%u de limpeza", "Tudo varrido!",
+    // phase 32b
+    "Tudo varrido! +%u de limpeza", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -828,7 +840,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 31
     "泡泡浴", "刷牙", "午睡或摇篮曲", "吃一道家常菜", "赢得%u张奖券", "转一次扭蛋", "玩属性测验", "参加比赛", "去公园散步", "到达冒险站点", "钓鱼%u次", "去海滩玩", "去宝可梦中心", "做一道菜", "种植或收获", "做%u件家务", "读一本书", "学习一会儿", "放一首歌", "打开一封信", "存进存钱罐", "买食物", "买点东西", "装饰小屋", "帮忙做家务", "去商店买东西", "在街机赢奖券", "走3000步", "妙蛙种子的菜园", "可达鸭头疼了", "卡比兽的大午觉", "伊布的生日派对", "杰尼龟的海滩日", "鲤鱼王想飞", "皮皮的月亮之夜", "凯西去上学",
     // phase 32
-    "扫掉便便", "没有要扫的", "也把便便扫掉吧!", "清洁+%u", "扫干净了!", },
+    "扫掉便便", "没有要扫的", "也把便便扫掉吧!", "清洁+%u", "扫干净了!",
+    // phase 32b
+    "扫干净了! 清洁+%u", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -946,7 +960,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 31
     "거품 목욕", "양치하기", "낮잠이나 자장가", "집밥 먹기", "티켓 %u장 얻기", "캡슐 뽑기", "타입 퀴즈 하기", "콘테스트 참가", "공원 산책", "모험 지점 도착", "낚시 %u번", "해변에서 놀기", "포켓몬센터 방문", "요리하기", "심기 또는 수확", "집안일 %u개", "책 읽기", "공부하기", "노래 틀기", "편지 열기", "저금통에 저금", "음식 사기", "무언가 사기", "집 꾸미기", "집안일 돕기", "상점에서 사기", "오락실 티켓 얻기", "3000걸음 걷기", "이상해씨의 텃밭", "고라파덕의 두통", "잠만보의 긴 낮잠", "이브이의 생일 파티", "꼬부기의 해변 나들이", "잉어킹은 날고 싶어", "삐삐의 달밤", "캐이시의 첫 등교",
     // phase 32
-    "응가 쓸기", "쓸 게 없어요", "응가도 쓸어 주세요!", "청결 +%u", "깨끗하게 쓸었어요!", },
+    "응가 쓸기", "쓸 게 없어요", "응가도 쓸어 주세요!", "청결 +%u", "깨끗하게 쓸었어요!",
+    // phase 32b
+    "깨끗하게 쓸었어요! 청결 +%u", },
 };
 
 // Medal names in their three lengths [language][medal].

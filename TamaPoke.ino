@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.32"
+#define FW_VERSION "3.14-funpack.33"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -8406,7 +8406,12 @@ void drawSweep() {
   uint32_t now = millis();
   if (now >= sweepUntil) {
     sweepUntil = 0;
-    if (pet.sweep()) { sfxPlay(SFX_HEART); fpShowToast(S_SWEPT, UI_BAR_OK); }
+    uint8_t h0 = pet.hygiene;
+    if (pet.sweep()) {
+      sfxPlay(SFX_HEART);
+      if (pet.hygiene > h0) { fpShowToast(S_SWEPT_FMT, UI_BAR_OK); fpToastNum = pet.hygiene - h0; }
+      else fpShowToast(S_SWEPT, UI_BAR_OK);
+    }
     return;
   }
   uint32_t t = now - sweepStart;

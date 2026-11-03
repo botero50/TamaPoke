@@ -1852,6 +1852,7 @@ bool Pet::brush() {
 // The broom: the floor is clean again. The wash is for the creature.
 bool Pet::sweep() {
   if (!poops || ceremony != CER_NONE) return false;
+  hygiene = clamp100((int)hygiene + SWEEP_PER_PILE * poops);   // a clean floor feels cleaner too
   poops = 0;
   if (hygiene >= 15) dirtyTicks = 0;
   earnCoins(1, true);

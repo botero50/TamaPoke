@@ -337,8 +337,9 @@ int main(){
     p.hygiene = 90; p.clean(WASH_SHOWER);
     ck(p.hygiene == 100, "never past 100");
     uint32_t c = p.coins; p.coinDay = 20000; p.coinsToday = 0; p.missionDone = 0xBF;
-    p.dirtyTicks = 30;
+    p.hygiene = 40; p.dirtyTicks = 30; uint8_t h0 = p.hygiene;
     ck(p.sweep() && p.poops == 0 && p.dirtyTicks == 0 && p.coins == c + 1, "the broom: no poop, no dirt clock, a coin");
+    ck(p.hygiene == (h0 + 3 * SWEEP_PER_PILE > 100 ? 100 : h0 + 3 * SWEEP_PER_PILE), "and SWEEP_PER_PILE CLEAN for each of the 3 piles");
     c = p.coins;
     ck(!p.sweep() && p.coins == c, "nothing to sweep: nothing happens");
     p.saveNow();
