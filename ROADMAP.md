@@ -22,6 +22,7 @@ _Last updated: 2 November 2026, with Phase 32._
 | 30 | The quick wash is a real shower (water, no bubbles); the bubble bath keeps the bubble game; food with none in the bag is bought and eaten in one tap from the food menu | v1.13 |
 | 31 | Six daily missions from 36 kinds (care, play, outdoors, home, shop: one of each, plus one), only ones she can do today; two tabs (MISIONES DE HOY / AVENTURA) on the missions panel; 12 weekly stories of 4 steps; the Center step of Chansey's story now counts | v1.14 |
 | 32 | Levels of clean (quick shower +35, sponge +65, bubble bath to 100) with a toast of what it did; washes leave the poop, and a broom sweeps it away (its own row, a 2 s animation); the bath menu gets six compact rows | v1.15 |
+| 32b | The shop and bag categories come in 2 pages of 4 (arrows) instead of 7 squeezed rows; seeds get their own aisle, HUERTO; the garden sells a seed on its button when there is none | v1.16 |
 
 ## Next
 | # | Item | Needs | Notes |

@@ -274,7 +274,7 @@ int main(int argc, char **argv) {
   click(155, 176);                       // hub tile 0: SHOP (2x4 grid, rows 150 + 58 r)
   if (!shopOpen) { printf("FAIL: SHOP row did not open the shop\n"); return 1; }
   // shop and bag rows sit at SHOP_ROW_Y(i) = 146 + 54 i, so +24 is mid-row
-  click(233, 76 + 52 + 20);              // category 0: HATS (rows CATL_ROW_Y = 128 + 44 i)
+  click(233, 138 + 25);                  // category 0: HATS (4 a page, rows CATL_ROW_Y = 138 + 56 r)
   if (shopCat != 0) { printf("FAIL: HATS did not open the hats\n"); return 1; }
   click(233, 146 + 24);                  // hats row 0: the cap
   if (shopConfirm != HAT_CAP) { printf("FAIL: tapping a hat did not ask to buy it\n"); return 1; }
@@ -327,7 +327,7 @@ int main(int argc, char **argv) {
   click(20, 233);                        // outside: back to the categories
   if (!shopOpen || shopCat != -1) { printf("FAIL: tapping outside did not go back to the categories\n"); return 1; }
   pet.decorOwned = 0; pet.slotL = pet.slotR = -1;
-  click(233, 76 + 52 + 44 + 20);         // category 1: TOYS
+  click(233, 138 + 56 + 25);             // category 1: TOYS
   click(233, 146 + 24);                  // toys row 0: the ball
   click(163, 307);                       // BUY
   if (!pet.ownsDecor(DEC_BALL) || pet.slotL != DEC_BALL) { printf("FAIL: buying the ball did not put it out\n"); return 1; }
@@ -340,7 +340,7 @@ int main(int argc, char **argv) {
   click(366, 72);
   click(311, 176);                       // hub tile 1: BAG
   if (!bagOpen) { printf("FAIL: BAG row did not open the bag\n"); return 1; }
-  click(233, 76 + 52 + 20);              // category 0: HATS (rows CATL_ROW_Y = 128 + 44 i)
+  click(233, 138 + 25);                  // category 0: HATS (4 a page, rows CATL_ROW_Y = 138 + 56 r)
   click(233, 146 + 24);                  // bag row 0: move the hat
   if (!hatAdjust) { printf("FAIL: MOVE HAT did not open the pad\n"); return 1; }
   click(233, 372 - 48);                  // up arrow
@@ -536,20 +536,33 @@ int main(int argc, char **argv) {
     pet.coins = 1000; pet.sceneryOwned = 0; pet.sceneryPick = -1;
     click(366, 72);
     click(155, 176);                     // SHOP
-    click(233, 76 + 52 + 5 * 38 + 17);     // category 5: SCENERY (rows 128 + 38 i)
-    if (shopCat != 5) { printf("FAIL: SCENERY did not open (cat %d)\n", shopCat); return 1; }
+    click(357, 376);                       // the category list's next page
+    click(233, 138 + 2 * 56 + 25);         // page 2, row 2: category 6, SCENERY
+    if (shopCat != 6) { printf("FAIL: SCENERY did not open (cat %d)\n", shopCat); return 1; }
     click(233, 146 + 54 + 24);             // row 1: the beach
     click(163, 307);                       // BUY
     if (!pet.ownsScenery(1)) { printf("FAIL: the beach was not bought\n"); return 1; }
     click(20, 233); click(20, 233);
     printf("PASS: purse -> trophies; shop -> scenery -> the beach\n");
+    pet.coins = 100; pet.seedCount = 0;
+    click(366, 72);
+    click(155, 176);                       // SHOP
+    click(357, 376);                       // the next page
+    click(233, 138 + 56 + 25);             // page 2, row 1: category 5, HUERTO
+    if (shopCat != 5) { printf("FAIL: the garden aisle did not open (cat %d)\n", shopCat); return 1; }
+    click(233, 146 + 24);                  // its only row: the seed
+    click(163, 307);                       // BUY
+    if (pet.seedCount != 1 || pet.coins != 100 - SEED_PRICE) { printf("FAIL: the garden aisle did not sell a seed\n"); return 1; }
+    for (int k = 0; k < 2 && shopOpen; k++) click(20, 233);
+    printf("PASS: the shop's garden aisle sells seeds (page 2 of the categories)\n");
 
     // furniture: bought in the shop, it goes up in the room
     pet.coins = 1000; pet.furnOwned = 0; pet.furnWallL = pet.furnWallR = -1; pet.sceneryPick = -1;
     click(366, 72);
     click(155, 176);                       // SHOP
-    click(233, 76 + 52 + 6 * 38 + 17);     // category 6: FURNITURE
-    if (shopCat != 6) { printf("FAIL: FURNITURE did not open (cat %d)\n", shopCat); return 1; }
+    click(357, 376);                       // the next page
+    click(233, 138 + 3 * 56 + 25);         // page 2, row 3: category 7, FURNITURE
+    if (shopCat != 7) { printf("FAIL: FURNITURE did not open (cat %d)\n", shopCat); return 1; }
     click(233, 146 + 24);                  // row 0: the window
     click(163, 307);                       // BUY
     if (!pet.ownsFurn(FURN_WINDOW) || pet.furnWallL != FURN_WINDOW || pet.sceneryPick != SCENERY_ROOM) { printf("FAIL: the window was not bought and hung up\n"); return 1; }

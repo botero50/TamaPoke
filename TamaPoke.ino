@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.31"
+#define FW_VERSION "3.14-funpack.32"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -261,6 +261,7 @@ int8_t shopConfirm = -1;     // the item whose purchase dialog is open
 // The try-on mirror (phase 24): what is being tried, in RAM only -- trying never
 // touches pet.hatOn / accOn, so backing out has nothing to undo or save.
 int8_t mirrorItem = -1, tryHat = -1, tryAcc = -1;
+uint8_t catListPage = 0;            // the shop/bag category list page (4 a page)
 int8_t shopCat = -1, bagCat = -1;   // -1 = the category list
 // the food menu: -1 its first page, else MEALS / SWEETS / DRINKS
 bool foodOpen = false;
@@ -9946,8 +9947,8 @@ void hubTap(int16_t x, int16_t y) {
   if (i < 0) return;
   sfxPlay(SFX_TAP);
   switch (i) {
-    case 0: shopOpen = true; shopCat = -1; shopPage = 0; shopConfirm = -1; mirrorItem = -1; break;
-    case 1: bagOpen = true; bagCat = -1; bagPage = 0; break;
+    case 0: shopOpen = true; shopCat = -1; catListPage = 0; shopPage = 0; shopConfirm = -1; mirrorItem = -1; break;
+    case 1: bagOpen = true; bagCat = -1; catListPage = 0; bagPage = 0; break;
     case 2: choresOpen = true; break;
     case 3: piggyOpen = true; break;
     case 4: trophyOpen = true; trophyPage = 0; break;
@@ -9962,9 +9963,11 @@ void hubTap(int16_t x, int16_t y) {
 // each category is a paged list. A category is a slice of one catalogue: the
 // hats, or a run of DecorId.
 
-enum : uint8_t { CAT_HATS = 0, CAT_TOYS, CAT_DECOR, CAT_FOOD, CAT_CARE, CAT_SCENE, CAT_FURN, CAT_COUNT };
+// CAT_GARDEN is the seeds' own aisle: care item 2, listed apart so it can be found
+enum : uint8_t { CAT_HATS = 0, CAT_TOYS, CAT_DECOR, CAT_FOOD, CAT_CARE, CAT_GARDEN, CAT_SCENE, CAT_FURN, CAT_COUNT };
+#define CARE_LIKE(c) ((c) == CAT_CARE || (c) == CAT_GARDEN)
 static StrId accName(uint8_t a);   // with the wardrobe code
-static const StrId CAT_NAME[CAT_COUNT] = { S_WARDROBE, S_TOYS, S_DECOR, S_FOOD_TITLE, S_CARE, S_SCENERY, S_FURNITURE };
+static const StrId CAT_NAME[CAT_COUNT] = { S_WARDROBE, S_TOYS, S_DECOR, S_FOOD_TITLE, S_CARE, S_PLACE_GARDEN, S_SCENERY, S_FURNITURE };
 static StrId furnName(uint8_t f) {
   static const StrId T_[FURN_COUNT] = {
     S_FURN_WINDOW, S_FURN_CLOCK, S_FURN_PAINTING, S_FURN_SHELF, S_FURN_SOFA, S_FURN_TV, S_FURN_AQUARIUM,
@@ -9983,21 +9986,22 @@ bool feedFromBag(uint8_t f);   // defined with the food menu
 // everything there is in a category (the bag) ...
 static uint8_t catCountAll(uint8_t c) {
   return c == CAT_HATS ? HAT_COUNT + ACC_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_COUNT - DEC_TOY_COUNT
-       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : 3;
+       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : c == CAT_GARDEN ? 1 : 2;
 }
 // ... and what the shop sells: the arcade prizes are won, never bought
 static uint8_t catCount(uint8_t c) {
   return c == CAT_HATS ? HAT_SHOP_COUNT + ACC_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_SHOP_COUNT - DEC_TOY_COUNT
-       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : 3;   // CARE: the soap, the brush, garden seeds
+       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : c == CAT_GARDEN ? 1 : 2;   // CARE: soap, brush; GARDEN: seeds
 }
 static uint8_t catPages(uint8_t c) { return (catCount(c) + SHOP_PER_PAGE - 1) / SHOP_PER_PAGE; }
 // the catalogue id (HatId or DecorId) of item i in category c
 static uint8_t catItem(uint8_t c, uint8_t i) {
   if (c == CAT_HATS && i >= HAT_SHOP_COUNT) return HAT_COUNT + (i - HAT_SHOP_COUNT);   // past the shop's hats: the accessories
+  if (c == CAT_GARDEN) return 2;                          // the seeds are care item 2
   return c == CAT_DECOR ? DEC_TOY_COUNT + i : i;
 }
 // the bag lists everything owned, prizes included
-static uint8_t bagItem(uint8_t c, uint8_t i) { return c == CAT_DECOR ? DEC_TOY_COUNT + i : i; }
+static uint8_t bagItem(uint8_t c, uint8_t i) { return c == CAT_GARDEN ? 2 : c == CAT_DECOR ? DEC_TOY_COUNT + i : i; }
 
 static StrId decorName(uint8_t d) {
   static const StrId T_[DEC_COUNT] = {
@@ -10008,30 +10012,30 @@ static StrId decorName(uint8_t d) {
 }
 static StrId foodName(uint8_t f);
 static const char *const *catIcon(uint8_t c, uint8_t id) {
-  if (c == CAT_CARE) return id == 0 ? SPR_CARE_SOAP : id == 1 ? SPR_CARE_BRUSH : SPR_PLACE_SEED;
+  if (CARE_LIKE(c)) return id == 0 ? SPR_CARE_SOAP : id == 1 ? SPR_CARE_BRUSH : SPR_PLACE_SEED;
   if (c == CAT_SCENE) return id == SCENERY_ROOM ? SPR_FURN_WINDOW : SPR_PLACE_TREE;
   if (c == CAT_FURN) return SPR_FURN[id];
   if (c == CAT_HATS && id >= HAT_COUNT) return SPR_ACC[id - HAT_COUNT];   // past the hats: the accessories
   return c == CAT_HATS ? SPR_HATS[id] : c == CAT_FOOD ? SPR_FOODS[id] : SPR_DECOR[id];
 }
 static StrId catName(uint8_t c, uint8_t id) {
-  if (c == CAT_CARE) return id == 0 ? S_SOAP : id == 1 ? S_BRUSH_ITEM : S_SEED;
+  if (CARE_LIKE(c)) return id == 0 ? S_SOAP : id == 1 ? S_BRUSH_ITEM : S_SEED;
   if (c == CAT_SCENE) return sceneryName(id);
   if (c == CAT_FURN) return furnName(id);
   if (c == CAT_HATS && id >= HAT_COUNT) return accName(id - HAT_COUNT);
   return c == CAT_HATS ? hatName(id) : c == CAT_FOOD ? foodName(id) : decorName(id);
 }
 static uint16_t catPrice(uint8_t c, uint8_t id) {
-  if (c == CAT_CARE) return id == 0 ? SOAP_PRICE : id == 1 ? BRUSH_PRICE : SEED_PRICE;
+  if (CARE_LIKE(c)) return id == 0 ? SOAP_PRICE : id == 1 ? BRUSH_PRICE : SEED_PRICE;
   if (c == CAT_SCENE) return Pet::sceneryPrice(id);
   if (c == CAT_FURN) return Pet::furnPrice(id);
   if (c == CAT_HATS && id >= HAT_COUNT) return Pet::accPrice(id - HAT_COUNT);
   return c == CAT_HATS ? Pet::hatPrice(id) : c == CAT_FOOD ? Pet::foodInfo(id).price : Pet::decorPrice(id);
 }
 // Foods are bought by the serving: never "owned" in the shop, always buyable.
-static bool catConsumable(uint8_t c, uint8_t id) { return c == CAT_FOOD || (c == CAT_CARE && id != 1); }
+static bool catConsumable(uint8_t c, uint8_t id) { return c == CAT_FOOD || (CARE_LIKE(c) && id != 1); }
 static bool catOwned(uint8_t c, uint8_t id) {
-  if (c == CAT_CARE) return id == 0 ? pet.soapCount > 0 : id == 1 ? pet.brushOwned : pet.seedCount > 0;
+  if (CARE_LIKE(c)) return id == 0 ? pet.soapCount > 0 : id == 1 ? pet.brushOwned : pet.seedCount > 0;
   if (c == CAT_SCENE) return pet.ownsScenery(id);
   if (c == CAT_FURN) return pet.ownsFurn(id);
   if (c == CAT_HATS && id >= HAT_COUNT) return pet.ownsAcc(id - HAT_COUNT);
@@ -10041,10 +10045,10 @@ static bool catInUse(uint8_t c, uint8_t id) {
   if (c == CAT_SCENE) return pet.sceneryPick == (int8_t)id;
   if (c == CAT_FURN) return pet.furnPlaced(id);
   if (c == CAT_HATS && id >= HAT_COUNT) return pet.wearingAcc(id - HAT_COUNT);
-  return c == CAT_HATS ? pet.hatOn == (int8_t)id : (c == CAT_FOOD || c == CAT_CARE) ? false : pet.hasDecorOut(id);
+  return c == CAT_HATS ? pet.hatOn == (int8_t)id : (c == CAT_FOOD || CARE_LIKE(c)) ? false : pet.hasDecorOut(id);
 }
 static bool catBuy(uint8_t c, uint8_t id) {
-  if (c == CAT_CARE) return id == 0 ? pet.buySoap() : id == 1 ? pet.buyBrush() : pet.buySeed();
+  if (CARE_LIKE(c)) return id == 0 ? pet.buySoap() : id == 1 ? pet.buyBrush() : pet.buySeed();
   if (c == CAT_SCENE) return pet.buyScenery(id);
   if (c == CAT_FURN) return pet.buyFurn(id);
   if (c == CAT_HATS && id >= HAT_COUNT) return pet.buyAcc(id - HAT_COUNT);
@@ -10052,7 +10056,7 @@ static bool catBuy(uint8_t c, uint8_t id) {
 }
 // the row label: a food shows how many servings are in the bag
 static const char *catLabel(uint8_t c, uint8_t id, char *buf, size_t n) {
-  uint8_t have = c == CAT_FOOD ? pet.foodCount[id] : c != CAT_CARE ? 0 : id == 0 ? pet.soapCount : id == 2 ? pet.seedCount : 0;
+  uint8_t have = c == CAT_FOOD ? pet.foodCount[id] : !CARE_LIKE(c) ? 0 : id == 0 ? pet.soapCount : id == 2 ? pet.seedCount : 0;
   if (!have) return T(catName(c, id));
   char cnt[8];
   snprintf(cnt, sizeof(cnt), T(S_COUNT_FMT), (unsigned)have);
@@ -10066,7 +10070,7 @@ static void catUse(uint8_t c, uint8_t id) {
   else if (c == CAT_SCENE) pet.pickScenery((int8_t)id);   // again: back to its own
   else if (c == CAT_FURN) pet.placeFurn(id);              // and off to the room to see it
   else if (c == CAT_FOOD) { if (feedFromBag(id)) bagOpen = false; }   // eat it, and watch
-  else if (c == CAT_CARE) {                                            // use it now
+  else if (CARE_LIKE(c)) {                                             // use it now
     if (id == 0 && !bathUntil && !pet.sleeping) { bagOpen = false; bathKind = 1; startBath(); }
     else if (id == 1 && pet.brush()) { bagOpen = false; sfxPlay(SFX_HEART); }
     else if (id == 2) { bagOpen = false; placeScene = 4; }   // seeds: off to the garden
@@ -10074,25 +10078,37 @@ static void catUse(uint8_t c, uint8_t id) {
   else pet.placeDecor(id);
 }
 
-#define CATL_ROW_Y(i) (PANEL_Y + 52 + (i) * 38)   // seven categories
-#define CATL_ROW_H 35
+#define CATL_PER_PAGE 4                             // the round screen cuts a fifth row
+#define CATL_PAGES ((CAT_COUNT + CATL_PER_PAGE - 1) / CATL_PER_PAGE)
+#define CATL_ROW_Y(i) (PANEL_Y + 62 + (i) * 56)
+#define CATL_ROW_H 50
 static void drawCatList(StrId title) {
   drawPanelBase();
   uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(title), UI_INK, 1, PANEL_W - 80);
-  static const char *const *const ICON[CAT_COUNT] = { SPR_HAT_CAP, SPR_DEC_BALL, SPR_DEC_PLANT, SPR_FOOD_SANDWICH, SPR_CARE_SOAP, SPR_PLACE_TREE, SPR_FURN_SOFA };
-  for (int c = 0; c < CAT_COUNT; c++) {
-    int y = CATL_ROW_Y(c);
+  static const char *const *const ICON[CAT_COUNT] = { SPR_HAT_CAP, SPR_DEC_BALL, SPR_DEC_PLANT, SPR_FOOD_SANDWICH, SPR_CARE_SOAP, SPR_PLACE_SEED, SPR_PLACE_TREE, SPR_FURN_SOFA };
+  if (catListPage >= CATL_PAGES) catListPage = 0;
+  for (int r = 0; r < CATL_PER_PAGE; r++) {
+    int c = catListPage * CATL_PER_PAGE + r;
+    if (c >= CAT_COUNT) break;
+    int y = CATL_ROW_Y(r);
     gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, CATL_ROW_H, 12, UI_BG_DAY);
     gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, CATL_ROW_H, 12, UI_INK);
     drawMap(ICON[c], 16, PANEL_X + 24, y + (CATL_ROW_H - 32) / 2, 2, false);
     uiTextFit(UIF_SMALL, PANEL_X + 66, uiMidY(UIF_SMALL, y, CATL_ROW_H), T(CAT_NAME[c]), UI_INK, 0, 230);
   }
+  drawPageNav(catListPage, CATL_PAGES);
+  drawFpToast();
   gfx->flush();
 }
+// a category, -1 for nothing; the arrows turn the page here and say -2
 static int catListHit(int16_t x, int16_t y) {
+  int nav = pageNavHit(x, y, CATL_PAGES);
+  if (nav) { catListPage = (uint8_t)((catListPage + CATL_PAGES + nav) % CATL_PAGES); sfxPlay(SFX_TAP); return -2; }
   if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14) return -1;
-  for (int c = 0; c < CAT_COUNT; c++)
-    if (y >= CATL_ROW_Y(c) && y <= CATL_ROW_Y(c) + CATL_ROW_H) return c;
+  for (int r = 0; r < CATL_PER_PAGE; r++) {
+    int c = catListPage * CATL_PER_PAGE + r;
+    if (c < CAT_COUNT && y >= CATL_ROW_Y(r) && y <= CATL_ROW_Y(r) + CATL_ROW_H) return c;
+  }
   return -1;
 }
 
@@ -11134,6 +11150,15 @@ void renderPlace() {
       gardenScene();
       act = pet.gardenReady() ? S_HARVEST : S_PLANT;
       on = pet.gardenReady() || (!pet.plantEpoch && pet.seedCount);
+      if (!pet.gardenReady() && !pet.plantEpoch && !pet.seedCount) {   // no seed: buy one right here
+        act = S_BUY;
+        on = pet.coins >= SEED_PRICE;
+        if (!placeMsgUntil) {
+          char b[24];
+          snprintf(b, sizeof(b), "%s %u", T(S_SEED), (unsigned)SEED_PRICE);
+          uiTextFit(UIF_SMALL, PLACE_ACT_X + PLACE_BTN_W / 2, PLACE_BTN_Y - 8, b, fpInk(), 1, 200);
+        }
+      }
       break;
     default: placeScene = PLACE_NONE; return;
   }
@@ -11172,7 +11197,7 @@ void placeTap(int16_t x, int16_t y) {
       break;
     case PLACE_STORE:
       sfxPlay(SFX_TAP);
-      shopOpen = true; shopCat = -1; shopPage = 0; shopConfirm = -1; mirrorItem = -1;   // the shop opens over the store
+      shopOpen = true; shopCat = -1; catListPage = 0; shopPage = 0; shopConfirm = -1; mirrorItem = -1;   // the shop opens over the store
       break;
     case PLACE_CENTER: {
       if (placeFx == FX_HEAL) break;                 // already healing
@@ -11190,7 +11215,8 @@ void placeTap(int16_t x, int16_t y) {
         sfxPlay(SFX_MEDAL);
         placeSay(b);
       } else if (!pet.plantEpoch) {
-        if (pet.plantSeed()) { sfxPlay(SFX_TAP); fxStart(FX_PLANT); }
+        if (!pet.seedCount && !pet.buySeed()) { sfxPlay(SFX_DENY); placeSay(T(S_NOT_ENOUGH)); }
+        else if (pet.plantSeed()) { sfxPlay(SFX_TAP); fxStart(FX_PLANT); }
         else { sfxPlay(SFX_DENY); placeSay(T(S_NEED_SEED)); }
       }
       break;
