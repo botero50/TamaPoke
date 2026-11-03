@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.38"
+#define FW_VERSION "3.14-funpack.39"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -241,6 +241,7 @@ bool hubOpen = false;
 bool trophyOpen = false;     // the trophies list (from the purse)
 uint8_t trophyPage = 0;
 bool choresOpen = false, piggyOpen = false, diaryOpen = false;   // more of the purse
+uint8_t chorePage = 0, bathPage = 0;   // phase 37: these two lists come in pages
 uint8_t diaryPage = 0;
 bool alarmRinging = false;   // the alarm clock is going off
 bool questView = false;      // the missions panel shows the weekly quest
@@ -2370,7 +2371,7 @@ void onTap(int16_t x, int16_t y) {
       sfxPlay(SFX_TAP);
       if (i == BTN_FOOD) { foodOpen = true; foodCat = -1; }
       else if (i == BTN_LIGHT) { if (pet.sleeping) pet.toggleLight(); else sleepOpen = true; }
-      else if (i == BTN_BATH) bathOpen = true;
+      else if (i == BTN_BATH) { bathOpen = true; bathPage = 0; }
       else if (i == BTN_MAP) mapOpen = true;
       else if (!fpBlockedBySick()) trainOpen = true;
       return;
@@ -9938,8 +9939,15 @@ static void utf8Nth(const char *s, int n, char *out, size_t cap) {
   out[0] = 0;
 }
 
-#define STP_FIGHT_Y (PANEL_Y + 214)
-#define STP_FIGHT_H 30
+#define STP_FIGHT_Y (PANEL_Y + 218)
+#define STP_FIGHT_H 28
+
+// which step of the ladder a leader is: "Medalla 3 de 8", Elite Four, the Champion
+static void gymStageText(int8_t i, char *b, size_t n) {
+  if (i < TRAINER_GYMS) snprintf(b, n, T(S_GYM_BADGE_FMT), (unsigned)(i + 1));
+  else if (i < TRAINER_GYMS + TRAINER_ELITE4) snprintf(b, n, T(S_GYM_ELITE_FMT), (unsigned)(i - TRAINER_GYMS + 1));
+  else snprintf(b, n, "%s", T(S_GYM_CHAMPION));
+}
 
 void renderSteps() {
   drawPanelBase();
@@ -9971,30 +9979,33 @@ void renderSteps() {
   uint8_t rg = pet.gymChallengeRegion();
   int8_t gi = pet.gymChallengeIdx();
   if (gi >= 0 && rg < GYM_REGIONS) {
-    snprintf(b, sizeof(b), T(S_ROAD_GYM_FMT), TRAINER_SETS[rg].list[gi].name);
-    uiTextFit(UIF_TINY, L, PANEL_Y + 188, b, UI_INK, 0, W);
+    uiTextFit(UIF_TINY, L, PANEL_Y + 184, T(S_STEPS_TO_GYM), UI_INK, 0, W);   // phase 37: says what this is
+    char st[28];
+    gymStageText(gi, st, sizeof(st));
+    snprintf(b, sizeof(b), "%s - %s", TRAINER_SETS[rg].list[gi].name, st);
+    uiTextFit(UIF_TINY, L, PANEL_Y + 199, b, UI_TRACK_TEXT, 0, W);
     uint16_t need = Pet::gymStepsNeed((uint8_t)gi);
-    drawPmBar(L, PANEL_Y + 196, W - 118, 10, pet.gymSteps, need, C565(0xff, 0xcb, 0x05));
+    drawPmBar(L, PANEL_Y + 204, W - 118, 10, pet.gymSteps, need, C565(0xff, 0xcb, 0x05));
     snprintf(b, sizeof(b), "%u/%u", (unsigned)(pet.gymSteps < need ? pet.gymSteps : need), (unsigned)need);
-    uiText(UIF_TINY, L + W, PANEL_Y + 206, b, UI_INK, 2);
+    uiText(UIF_TINY, L + W, PANEL_Y + 214, b, UI_INK, 2);
     if (pet.gymChallengeReady()) {
       gfx->fillRoundRect(L, STP_FIGHT_Y, W, STP_FIGHT_H, 12, UI_BAR_BAD);
       gfx->drawRoundRect(L, STP_FIGHT_Y, W, STP_FIGHT_H, 12, UI_INK);
       uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, STP_FIGHT_Y, STP_FIGHT_H), T(S_READY_FIGHT), UI_WHITE, 1, W - 20);
     } else if (pet.gymWalked()) {                          // phase 36: the week is still running
       gymWaitText(b, sizeof(b));
-      uiTextFit(UIF_TINY, CX, PANEL_Y + 232, b, UI_BAR_OK, 1, W);
+      uiTextFit(UIF_TINY, CX, PANEL_Y + 238, b, UI_BAR_OK, 1, W);
     } else {
       snprintf(b, sizeof(b), T(S_STEPS_TO_FMT), (unsigned)(need - pet.gymSteps));
-      uiTextFit(UIF_TINY, CX, PANEL_Y + 232, b, UI_BAR_WARN, 1, W);
+      uiTextFit(UIF_TINY, CX, PANEL_Y + 238, b, UI_BAR_WARN, 1, W);
     }
   } else {
     uiTextFit(UIF_TINY, CX, PANEL_Y + 206, T(S_ALL_GYMS_DONE), UI_BAR_OK, 1, W);
   }
   // the adventure route: the next stop
-  uiText(UIF_TINY, L, PANEL_Y + 262, T(S_ADV_ROUTE), UI_TRACK_TEXT, 0);
+  uiText(UIF_TINY, L, PANEL_Y + 266, T(S_ADV_ROUTE), UI_TRACK_TEXT, 0);
   uint16_t an = Pet::advNeed(pet.advStop);
-  drawPmBar(L + 150, PANEL_Y + 253, W - 150, 10, pet.advSteps, an, C565(0x4f, 0x93, 0xc4));
+  drawPmBar(L + 150, PANEL_Y + 257, W - 150, 10, pet.advSteps, an, C565(0x4f, 0x93, 0xc4));
   // everything ever walked
   snprintf(b, sizeof(b), T(S_STEPS_TOTAL_FMT), (unsigned)pet.stepTotal);
   uiTextFit(UIF_TINY, CX, PANEL_Y + 290, b, UI_INK, 1, W);
@@ -10035,9 +10046,7 @@ void renderGymCard() {
     gfx->fillCircle(CX, PANEL_Y + 118, 26, accent);
   }
   uiTextFit(UIF_SMALL, CX, PANEL_Y + 196, t.place, UI_INK, 1, PANEL_W - 60);
-  if (i < TRAINER_GYMS) snprintf(b, sizeof(b), T(S_GYM_BADGE_FMT), (unsigned)(i + 1));
-  else if (i < TRAINER_GYMS + TRAINER_ELITE4) snprintf(b, sizeof(b), T(S_GYM_ELITE_FMT), (unsigned)(i - TRAINER_GYMS + 1));
-  else snprintf(b, sizeof(b), "%s", T(S_GYM_CHAMPION));
+  gymStageText(i, b, sizeof(b));
   uiTextFit(UIF_SMALL, CX, PANEL_Y + 220, b, UI_TRACK_TEXT, 1, PANEL_W - 60);
   gfx->fillRoundRect(GCARD_FIGHT_X, GCARD_BTN_Y, GCARD_BTN_W, GCARD_BTN_H, 12, UI_BAR_BAD);
   gfx->drawRoundRect(GCARD_FIGHT_X, GCARD_BTN_Y, GCARD_BTN_W, GCARD_BTN_H, 12, UI_INK);
@@ -10119,6 +10128,7 @@ static void drawCheck(int cx, int cy, int r, bool done) {
 
 #define MROW_Y(i) (PANEL_Y + 52 + (i) * 37)
 #define MROW_H 34
+static_assert(MROW_Y(MISSIONS_PER_DAY - 1) + MROW_H <= PANEL_Y + 274, "the missions must leave room for the footer");
 
 void renderMissions() {
   pet.missionsToday();
@@ -10146,14 +10156,14 @@ void renderMissions() {
     snprintf(rw, sizeof(rw), "+%u", COIN_MISSION);
     uiText(UIF_TINY, PANEL_X + PANEL_W - 22, uiMidY(UIF_TINY, y, MROW_H), rw, done ? UI_BAR_OK : UI_BAR_WARN, 2);
   }
-  int fy = PANEL_Y + 276;                     // the footer: the all-done bonus and the purse
+  int fy = PANEL_Y + 274;                     // the footer: the all-done bonus and the purse
   char b[40];
   snprintf(b, sizeof(b), T(S_ALL_MISSIONS_FMT), COIN_ALL_MISSIONS);
-  uiTextFit(UIF_SMALL, PANEL_X + 20, uiMidY(UIF_SMALL, fy, 32), b, (pet.missionDone & 0x80) ? UI_BAR_OK : UI_INK, 0, PANEL_W - 150);
-  drawMap(SPR_ICON_COIN, 16, PANEL_X + PANEL_W - 122, fy, 2, false);
+  uiTextFit(UIF_SMALL, PANEL_X + 20, uiMidY(UIF_SMALL, fy, 26), b, (pet.missionDone & 0x80) ? UI_BAR_OK : UI_INK, 0, PANEL_W - 150);
+  drawMap(SPR_ICON_COIN, 16, PANEL_X + PANEL_W - 104, fy + 5, 1, false);
   char c[12];
   snprintf(c, sizeof(c), "%lu", (unsigned long)pet.coins);
-  uiTextFit(UIF_MID, PANEL_X + PANEL_W - 84, uiMidY(UIF_MID, fy, 32), c, UI_INK, 0, 70);
+  uiTextFit(UIF_SMALL, PANEL_X + PANEL_W - 84, uiMidY(UIF_SMALL, fy, 26), c, UI_INK, 0, 70);
   gfx->flush();
 }
 
@@ -10297,7 +10307,7 @@ void hubTap(int16_t x, int16_t y) {
   switch (i) {
     case 0: shopOpen = true; shopCat = -1; catListPage = 0; shopPage = 0; shopConfirm = -1; mirrorItem = -1; break;
     case 1: bagOpen = true; bagCat = -1; catListPage = 0; bagPage = 0; break;
-    case 2: choresOpen = true; break;
+    case 2: choresOpen = true; chorePage = 0; break;
     case 3: piggyOpen = true; break;
     case 4: trophyOpen = true; trophyPage = 0; break;
     case 5: diaryOpen = true; diaryPage = 0; break;
@@ -10732,6 +10742,7 @@ bool hatPadTap(int16_t x, int16_t y) {
 
 #define FOOD_ROW_Y(i) (PANEL_Y + 46 + (i) * 52)
 #define FOOD_ROW_H 46
+static_assert(FOOD_ROW_Y(4) + FOOD_ROW_H <= PANEL_Y + 300, "five food rows must stay off the round edge");
 #define FOOD_QUICK_W 64
 #define FOOD_QUICK_X(j) (PANEL_X + 18 + (j) * 76)
 
@@ -10881,16 +10892,20 @@ static void drawMenuTitle(StrId t) {
 
 // ---------- the bath menu ----------
 
-// Six compact rows (the food lists keep their five tall ones).
-#define BATH_ROW_Y(i) (PANEL_Y + 50 + (i) * 44)
-#define BATH_ROW_H 40
+// Phase 37: two pages of three large rows; the sweep stays first, one tap away.
+#define BATH_PER_PAGE 3
+#define BATH_PAGES 2
+#define BATH_ROW_Y(i) (PANEL_Y + 58 + (i) * 62)
+#define BATH_ROW_H 54
 enum { BR_SWEEP = 0, BR_SHOWER, BR_SCRUB, BR_BUBBLE, BR_BRUSH, BR_TEETH, BR_COUNT };
+
+static_assert(BATH_ROW_Y(BATH_PER_PAGE - 1) + BATH_ROW_H <= PANEL_Y + 300, "the bath rows must clear the page arrows and the round edge");
 
 static void drawBathRow(int i, const char *const *icon, const char *label, const char *right, uint16_t fill) {
   int y = BATH_ROW_Y(i);
   gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, BATH_ROW_H, 12, fill);
   gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, BATH_ROW_H, 12, UI_INK);
-  drawMap(icon, 16, PANEL_X + 24, y + 4, 2, false);
+  drawMap(icon, 16, PANEL_X + 24, y + (BATH_ROW_H - 32) / 2, 2, false);
   uiTextFit(UIF_SMALL, PANEL_X + 66, uiMidY(UIF_SMALL, y, BATH_ROW_H), label, UI_INK, 0, 190);
   if (right && *right) uiText(UIF_TINY, PANEL_X + PANEL_W - 26, uiMidY(UIF_TINY, y, BATH_ROW_H), right, UI_INK, 2);
 }
@@ -10898,17 +10913,21 @@ static void drawBathRow(int i, const char *const *icon, const char *label, const
 void renderBathMenu() {
   drawMenuTitle(S_BATH_TITLE);
   char n[12];
-  snprintf(n, sizeof(n), pet.poops ? T(S_COUNT_FMT) : "", (unsigned)pet.poops);
-  drawBathRow(BR_SWEEP, SPR_CARE_BROOM, T(S_SWEEP), n, pet.poops ? UI_BG_DAY : UI_TRACK_TEXT);
-  snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SHOWER);
-  drawBathRow(BR_SHOWER, SPR_ICON_CLEAN, T(S_QUICK_WASH), n, UI_BG_DAY);
-  snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SCRUB);
-  drawBathRow(BR_SCRUB, SPR_CARE_SPONGE, T(S_SCRUB), n, UI_BG_DAY);
-  snprintf(n, sizeof(n), pet.soapCount ? T(S_COUNT_FMT) : "", (unsigned)pet.soapCount);
-  drawBathRow(BR_BUBBLE, SPR_CARE_SOAP, T(S_BUBBLE_BATH), n, pet.soapCount ? UI_BG_DAY : UI_TRACK_TEXT);
-  drawBathRow(BR_BRUSH, SPR_CARE_BRUSH, T(S_BRUSH), "", pet.brushOwned ? UI_BG_DAY : UI_TRACK_TEXT);
-  snprintf(n, sizeof(n), pet.teethLeftToday() ? T(S_COUNT_FMT) : "", (unsigned)pet.teethLeftToday());
-  drawBathRow(BR_TEETH, SPR_ICON_CLEAN, T(S_TEETH), n, pet.teethLeftToday() ? UI_BG_DAY : UI_TRACK_TEXT);
+  if (bathPage == 0) {
+    snprintf(n, sizeof(n), pet.poops ? T(S_COUNT_FMT) : "", (unsigned)pet.poops);
+    drawBathRow(0, SPR_CARE_BROOM, T(S_SWEEP), n, pet.poops ? UI_BG_DAY : UI_TRACK_TEXT);
+    snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SHOWER);
+    drawBathRow(1, SPR_ICON_CLEAN, T(S_QUICK_WASH), n, UI_BG_DAY);
+    snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SCRUB);
+    drawBathRow(2, SPR_CARE_SPONGE, T(S_SCRUB), n, UI_BG_DAY);
+  } else {
+    snprintf(n, sizeof(n), pet.soapCount ? T(S_COUNT_FMT) : "", (unsigned)pet.soapCount);
+    drawBathRow(0, SPR_CARE_SOAP, T(S_BUBBLE_BATH), n, pet.soapCount ? UI_BG_DAY : UI_TRACK_TEXT);
+    drawBathRow(1, SPR_CARE_BRUSH, T(S_BRUSH), "", pet.brushOwned ? UI_BG_DAY : UI_TRACK_TEXT);
+    snprintf(n, sizeof(n), pet.teethLeftToday() ? T(S_COUNT_FMT) : "", (unsigned)pet.teethLeftToday());
+    drawBathRow(2, SPR_ICON_CLEAN, T(S_TEETH), n, pet.teethLeftToday() ? UI_BG_DAY : UI_TRACK_TEXT);
+  }
+  drawPageNav(bathPage, BATH_PAGES);
   drawFpToast();
   gfx->flush();
 }
@@ -10917,13 +10936,15 @@ void startScrub();
 
 static int bathRowHit(int16_t x, int16_t y) {
   if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14) return -1;
-  for (int i = 0; i < BR_COUNT; i++)
-    if (y >= BATH_ROW_Y(i) - 2 && y <= BATH_ROW_Y(i) + BATH_ROW_H + 2) return i;
+  for (int r = 0; r < BATH_PER_PAGE; r++)
+    if (y >= BATH_ROW_Y(r) - 2 && y <= BATH_ROW_Y(r) + BATH_ROW_H + 2) return bathPage * BATH_PER_PAGE + r;
   return -1;
 }
 
 void bathMenuTap(int16_t x, int16_t y) {
   if (!inPanel(x, y)) { bathOpen = false; return; }
+  int nav = pageNavHit(x, y, BATH_PAGES);
+  if (nav) { bathPage = (uint8_t)((bathPage + BATH_PAGES + nav) % BATH_PAGES); sfxPlay(SFX_TAP); return; }
   int i = bathRowHit(x, y);
   if (i < 0) return;
   if (i == BR_TEETH) { bathOpen = false; if (teethAllowed()) startTeeth(); return; }
@@ -12297,18 +12318,29 @@ static StrId choreName(uint8_t c) {
   return T_[c % CHORE_COUNT];
 }
 
-#define CHORE_ROW_Y(i) (PANEL_Y + 52 + (i) * 44)
-#define CHORE_ROW_H 40
+// Phase 37: six rows ran to the panel's edge and the round screen cut the last one.
+#define CHORE_PER_PAGE 4
+#define CHORE_PAGES ((CHORE_COUNT + CHORE_PER_PAGE - 1) / CHORE_PER_PAGE)
+#define CHORE_ROW_Y(i) (PANEL_Y + 60 + (i) * 54)
+#define CHORE_ROW_H 48
+static_assert(CHORE_ROW_Y(CHORE_PER_PAGE - 1) + CHORE_ROW_H <= PANEL_Y + 300, "the chores must clear the page arrows and the round edge");
 
 void renderChores() {
   drawPanelBase();
-  uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(S_CHORES), UI_INK, 1, PANEL_W - 80);
-  for (int i = 0; i < CHORE_COUNT; i++) {
-    int y = CHORE_ROW_Y(i);
+  uint8_t doneN = 0;
+  for (int i = 0; i < CHORE_COUNT; i++) if (pet.choreDoneToday(i)) doneN++;
+  char t[32];
+  snprintf(t, sizeof(t), "%s %u/%u", T(S_CHORES), (unsigned)doneN, (unsigned)CHORE_COUNT);
+  uiTextFit(UIF_MID, CX, PANEL_Y + 34, t, UI_INK, 1, PANEL_W - 80);
+  if (chorePage >= CHORE_PAGES) chorePage = 0;
+  for (int r = 0; r < CHORE_PER_PAGE; r++) {
+    int i = chorePage * CHORE_PER_PAGE + r;
+    if (i >= CHORE_COUNT) break;
+    int y = CHORE_ROW_Y(r);
     bool done = pet.choreDoneToday(i);
     gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, CHORE_ROW_H, 12, done ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : UI_BG_DAY);
     gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, CHORE_ROW_H, 12, UI_INK);
-    int bx = PANEL_X + 26, by = y + 9;                     // the tick box
+    int bx = PANEL_X + 26, by = y + 13;                    // the tick box
     gfx->fillRoundRect(bx, by, 22, 22, 5, UI_WHITE);
     gfx->drawRoundRect(bx, by, 22, 22, 5, UI_INK);
     if (done) { gfx->drawLine(bx + 4, by + 11, bx + 9, by + 17, UI_BAR_OK); gfx->drawLine(bx + 9, by + 17, bx + 18, by + 5, UI_BAR_OK);
@@ -12320,16 +12352,20 @@ void renderChores() {
       uiText(UIF_TINY, PANEL_X + PANEL_W - 26, uiMidY(UIF_TINY, y, CHORE_ROW_H), p, UI_INK, 2);
     }
   }
+  drawPageNav(chorePage, CHORE_PAGES);
   drawFpToast();
   gfx->flush();
 }
 
 void choresTap(int16_t x, int16_t y) {
   if (!inPanel(x, y)) { choresOpen = false; return; }
+  int nav = pageNavHit(x, y, CHORE_PAGES);
+  if (nav) { chorePage = (uint8_t)((chorePage + CHORE_PAGES + nav) % CHORE_PAGES); sfxPlay(SFX_TAP); return; }
   if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14) return;
-  for (int i = 0; i < CHORE_COUNT; i++) {
-    int ry = CHORE_ROW_Y(i);
-    if (y < ry || y > ry + CHORE_ROW_H) continue;
+  for (int r = 0; r < CHORE_PER_PAGE; r++) {
+    int i = chorePage * CHORE_PER_PAGE + r;
+    int ry = CHORE_ROW_Y(r);
+    if (i >= CHORE_COUNT || y < ry || y > ry + CHORE_ROW_H) continue;
     if (pet.doChore(i)) { sfxPlay(SFX_MEDAL); fpShowToast(S_CHORE_THANKS, UI_BAR_OK); }
     else sfxPlay(SFX_DENY);
     return;
@@ -12396,14 +12432,18 @@ void renderDiary() {
   if (diaryPage >= pages) diaryPage = 0;
   const DiaryDay &d = pet.diary[diaryPage];
   char b[48];
-  if (diaryPage == 0) snprintf(b, sizeof(b), "%s %s", T(S_DIARY), T(S_DIARY_TODAY));
+  if (diaryPage == 0) snprintf(b, sizeof(b), "%s", T(S_DIARY_TODAY));
   else if (diaryPage == 1) snprintf(b, sizeof(b), "%s", T(S_DIARY_YESTERDAY));
   else { int yy, mm, dd; Pet::civilDate(d.day, yy, mm, dd); snprintf(b, sizeof(b), "%02d/%02d", dd, mm); }
-  uiTextFit(UIF_MID, CX, PANEL_Y + 34, b, UI_INK, 1, PANEL_W - 80);
-  drawMap(SPR_ICON_DIARY, 16, PANEL_X + 20, PANEL_Y + 10, 2, false);
-  drawAlbumButton();
-  int y = PANEL_Y + 78, lines = 0;
-  auto line = [&](const char *t) { if (lines < 8) { uiTextFit(UIF_SMALL, PANEL_X + 30, y, t, UI_INK, 0, PANEL_W - 60); y += 28; lines++; } };
+  for (int i = 0; i < 2; i++) {                            // phase 37: DIARY | ALBUM, nothing over the title
+    gfx->fillRoundRect(MTAB_X(i), MTAB_Y, MTAB_W, MTAB_H, 12, i ? UI_BAR_WARN : UI_BAR_OK);
+    gfx->drawRoundRect(MTAB_X(i), MTAB_Y, MTAB_W, MTAB_H, 12, UI_INK);
+    if (!i) gfx->drawRoundRect(MTAB_X(i) + 1, MTAB_Y + 1, MTAB_W - 2, MTAB_H - 2, 11, UI_INK);
+    uiTextFit(UIF_TINY, MTAB_X(i) + MTAB_W / 2, uiMidY(UIF_TINY, MTAB_Y, MTAB_H), T(i ? S_ALBUM : S_DIARY), UI_INK, 1, MTAB_W - 10);
+  }
+  uiTextFit(UIF_SMALL, CX, PANEL_Y + 70, b, UI_TRACK_TEXT, 1, PANEL_W - 80);
+  int y = PANEL_Y + 96, lines = 0;
+  auto line = [&](const char *t) { if (lines < 8) { uiTextFit(UIF_SMALL, PANEL_X + 30, y, t, UI_INK, 0, PANEL_W - 60); y += 26; lines++; } };
   struct { uint8_t v; StrId fmt; } rows[] = {
     { d.meals, S_D_MEALS_FMT }, { d.games, S_D_GAMES_FMT }, { d.baths, S_D_BATHS_FMT }, { d.walks, S_D_WALKS_FMT },
     { d.fish, S_D_FISH_FMT }, { d.study, S_D_STUDY_FMT }, { d.chores, S_D_CHORES_FMT },
@@ -12427,7 +12467,7 @@ void renderDiary() {
 
 void diaryTap(int16_t x, int16_t y) {
   if (!inPanel(x, y)) { diaryOpen = false; return; }
-  if (albumButtonHit(x, y)) { sfxPlay(SFX_TAP); albumOpen = true; albumIdx = 0; albumShown = 255; albumDlg = 0; return; }
+  if (missionTabHit(x, y) == 1) { sfxPlay(SFX_TAP); albumOpen = true; albumIdx = 0; albumShown = 255; albumDlg = 0; return; }
   uint8_t pages = diaryPages();
   int a = pageNavHit(x, y, pages);
   if (a) { diaryPage = (uint8_t)((diaryPage + pages + a) % pages); sfxPlay(SFX_TAP); }
@@ -13311,6 +13351,7 @@ void drawEvents() {
 #define GM_TILE_Y(r) (PANEL_Y + 56 + (r) * 80)
 #define GL_ROW_Y(i) (PANEL_Y + 56 + (i) * 50)
 #define GL_ROW_H 44
+static_assert(GL_ROW_Y(4) + GL_ROW_H <= PANEL_Y + 300, "five game rows must stay off the round edge");
 
 static const char *const *catIconOf(uint8_t c) {
   static const char *const *const I[FP_CAT_COUNT] = { SPR_CAT_STRENGTH, SPR_CAT_SPEED, SPR_CAT_DEFENCE, SPR_CAT_BRAIN, SPR_CAT_FUN, SPR_CAT_ARCADE };
@@ -14518,17 +14559,17 @@ void renderQuest() {
   fpThumb(WHO[q], PANEL_X + 36, PANEL_Y + 72, 1, false);
   uiTextFit(UIF_SMALL, PANEL_X + 62, uiMidY(UIF_SMALL, PANEL_Y + 52, 38), T(QT[q]), UI_INK, 0, PANEL_W - 80);
   for (uint8_t i = 0; i < QUEST_STEPS; i++) {
-    int y = PANEL_Y + 96 + i * 50;
+    int y = PANEL_Y + 92 + i * 46;
     bool done = pet.questStep > i, next = pet.questStep == i;
-    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, 44, 12, done ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : next ? UI_BG_DAY : UI_WHITE);
-    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, 44, 12, done || next ? UI_INK : UI_TRACK_TEXT);
-    int cx = PANEL_X + 34, cy = y + 22;
+    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, 42, 12, done ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : next ? UI_BG_DAY : UI_WHITE);
+    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, 42, 12, done || next ? UI_INK : UI_TRACK_TEXT);
+    int cx = PANEL_X + 34, cy = y + 21;
     if (done) drawCheck(cx, cy, 11, true);
     else { char n[2] = { (char)('1' + i), 0 }; gfx->drawCircle(cx, cy, 11, UI_INK); uiText(UIF_TINY, cx, cy + 5, n, UI_INK, 1); }
-    uiTextFit(*rf, PANEL_X + 54, uiMidY(*rf, y, 44), T(QK[Pet::questStepKind(q, i) % QK_COUNT]), done || next ? UI_INK : UI_TRACK_TEXT, 0, PANEL_W - 80);
+    uiTextFit(*rf, PANEL_X + 54, uiMidY(*rf, y, 42), T(QK[Pet::questStepKind(q, i) % QK_COUNT]), done || next ? UI_INK : UI_TRACK_TEXT, 0, PANEL_W - 80);
   }
   if (pet.questStep < QUEST_STEPS && !pet.questStepReady())
-    uiTextFit(UIF_TINY, CX, uiMidY(UIF_TINY, PANEL_Y + 292, 20), T(S_QUEST_NEXT_DAY), UI_TRACK_TEXT, 1, PANEL_W - 60);
+    uiTextFit(UIF_TINY, CX, uiMidY(UIF_TINY, PANEL_Y + 276, 22), T(S_QUEST_NEXT_DAY), UI_TRACK_TEXT, 1, PANEL_W - 60);
   gfx->flush();
 }
 
@@ -14568,18 +14609,6 @@ void drawSeasonDecor() {
 // at big moments (a trophy, a birthday, a finished quest, an evolution) or with
 // PHOTO in the album, and kept on the SD card (albumSave in sdmon.cpp).
 // ===========================================================================
-
-#define ABTN_X (PANEL_X + PANEL_W - 104)
-#define ABTN_Y (PANEL_Y + 14)
-#define ABTN_W 88
-#define ABTN_H 34
-
-void drawAlbumButton() {
-  gfx->fillRoundRect(ABTN_X, ABTN_Y, ABTN_W, ABTN_H, 12, UI_BAR_WARN);
-  gfx->drawRoundRect(ABTN_X, ABTN_Y, ABTN_W, ABTN_H, 12, UI_INK);
-  uiTextFit(UIF_TINY, ABTN_X + ABTN_W / 2, uiMidY(UIF_TINY, ABTN_Y, ABTN_H), T(S_ALBUM), UI_INK, 1, ABTN_W - 8);
-}
-bool albumButtonHit(int16_t x, int16_t y) { return x >= ABTN_X && x <= ABTN_X + ABTN_W && y >= ABTN_Y && y <= ABTN_Y + ABTN_H; }
 
 #define AL_NAV_Y 420
 #define AL_PHOTO_X CX

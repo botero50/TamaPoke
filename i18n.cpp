@@ -131,7 +131,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 34
     "%s te reta!", "Medalla %u de 8", "Alto Mando %u de 4", "La gran final: el Campeon", "LUCHAR!", "LUEGO",
     // phase 35
-    "PASOS", "Hoy", "Ultimos 7 dias", "Camino al gimnasio: %s", "Ruta de aventura", "Total: %u pasos", "Listo! A luchar!", "LMXJVSD", "Todos los gimnasios ganados!",
+    "PASOS", "Hoy", "Ultimos 7 dias", "Pasos para llegar al gimnasio", "Ruta de aventura", "Total: %u pasos", "Listo! A luchar!", "LMXJVSD", "Todos los gimnasios ganados!",
     // phase 36
     "Pasos listos! El reto llega en %u dias", "Pasos listos! El reto llega manana",
     // phase 36
@@ -261,7 +261,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 34
     "%s challenges you!", "Badge %u of 8", "Elite Four %u of 4", "The final: the Champion", "FIGHT!", "LATER",
     // phase 35
-    "STEPS", "Today", "Last 7 days", "Road to the gym: %s", "Adventure route", "Total: %u steps", "Ready! Let's fight!", "MTWTFSS", "Every gym beaten!",
+    "STEPS", "Today", "Last 7 days", "Steps to reach the gym", "Adventure route", "Total: %u steps", "Ready! Let's fight!", "MTWTFSS", "Every gym beaten!",
     // phase 36
     "Steps done! The challenge comes in %u days", "Steps done! The challenge comes tomorrow",
     // phase 36
@@ -390,7 +390,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 34
     "%s te defie !", "Badge %u sur 8", "Conseil 4 : %u sur 4", "La finale : le Maitre", "COMBAT !", "PLUS TARD",
     // phase 35
-    "PAS", "Aujourd'hui", "Les 7 derniers jours", "Vers l'arene : %s", "Route d'aventure", "Total : %u pas", "Pret ! Au combat !", "LMMJVSD", "Toutes les arenes gagnees !",
+    "PAS", "Aujourd'hui", "Les 7 derniers jours", "Pas pour aller a l'arene", "Route d'aventure", "Total : %u pas", "Pret ! Au combat !", "LMMJVSD", "Toutes les arenes gagnees !",
     // phase 36
     "Pas faits ! Le defi arrive dans %u jours", "Pas faits ! Le defi arrive demain",
     // phase 36
@@ -519,7 +519,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 34
     "%s fordert dich!", "Orden %u von 8", "Top Vier %u von 4", "Das Finale: der Champion", "KAEMPFEN!", "SPAETER",
     // phase 35
-    "SCHRITTE", "Heute", "Letzte 7 Tage", "Weg zur Arena: %s", "Abenteuerroute", "Gesamt: %u Schritte", "Bereit! Kampf!", "MDMDFSS", "Alle Arenen besiegt!",
+    "SCHRITTE", "Heute", "Letzte 7 Tage", "Schritte bis zur Arena", "Abenteuerroute", "Gesamt: %u Schritte", "Bereit! Kampf!", "MDMDFSS", "Alle Arenen besiegt!",
     // phase 36
     "Schritte geschafft! Herausforderung in %u Tagen", "Schritte geschafft! Herausforderung morgen",
     // phase 36
@@ -648,7 +648,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 34
     "%s ti sfida!", "Medaglia %u di 8", "Superquattro %u di 4", "La finale: il Campione", "LOTTA!", "DOPO",
     // phase 35
-    "PASSI", "Oggi", "Ultimi 7 giorni", "Verso la palestra: %s", "Percorso avventura", "Totale: %u passi", "Pronto! Si lotta!", "LMMGVSD", "Tutte le palestre vinte!",
+    "PASSI", "Oggi", "Ultimi 7 giorni", "Passi per la palestra", "Percorso avventura", "Totale: %u passi", "Pronto! Si lotta!", "LMMGVSD", "Tutte le palestre vinte!",
     // phase 36
     "Passi fatti! La sfida arriva tra %u giorni", "Passi fatti! La sfida arriva domani",
     // phase 36
@@ -777,7 +777,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 34
     "%s te desafia!", "Insignia %u de 8", "Elite Quatro %u de 4", "A final: o Campeao", "LUTAR!", "DEPOIS",
     // phase 35
-    "PASSOS", "Hoje", "Ultimos 7 dias", "Rumo ao ginasio: %s", "Rota de aventura", "Total: %u passos", "Pronto! A lutar!", "STQQSSD", "Todos os ginasios vencidos!",
+    "PASSOS", "Hoje", "Ultimos 7 dias", "Passos ate o ginasio", "Rota de aventura", "Total: %u passos", "Pronto! A lutar!", "STQQSSD", "Todos os ginasios vencidos!",
     // phase 36
     "Passos prontos! O desafio chega em %u dias", "Passos prontos! O desafio chega amanha",
     // phase 36
@@ -908,7 +908,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 34
     "%s向你挑战!", "徽章 %u/8", "四天王 %u/4", "决赛: 冠军", "战斗!", "稍后",
     // phase 35
-    "步数", "今天", "最近7天", "前往道馆: %s", "冒险路线", "总计: %u步", "准备好了! 开战!", "一二三四五六日", "所有道馆都赢了!",
+    "步数", "今天", "最近7天", "到道馆的步数", "冒险路线", "总计: %u步", "准备好了! 开战!", "一二三四五六日", "所有道馆都赢了!",
     // phase 36
     "步数够了! %u天后迎来挑战", "步数够了! 明天迎来挑战",
     // phase 36
@@ -1038,7 +1038,7 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 34
     "%s의 도전!", "배지 %u/8", "사천왕 %u/4", "결승: 챔피언", "싸우자!", "나중에",
     // phase 35
-    "걸음", "오늘", "지난 7일", "체육관 가는 길: %s", "모험 루트", "총 %u걸음", "준비 완료! 싸우자!", "월화수목금토일", "모든 체육관 승리!",
+    "걸음", "오늘", "지난 7일", "체육관까지 걸음", "모험 루트", "총 %u걸음", "준비 완료! 싸우자!", "월화수목금토일", "모든 체육관 승리!",
     // phase 36
     "걸음 완료! %u일 후 도전이 와요", "걸음 완료! 내일 도전이 와요",
     // phase 36
