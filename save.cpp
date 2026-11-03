@@ -59,7 +59,7 @@ const SaveField SAVE_FIELDS[] = {
   { "tthd", SK_U32 },   { "tthn", SK_U8 },    { "stdd", SK_U32 },   { "stdn", SK_U8 },
   { "qzhi", SK_U8 },    { "pbed", SK_U8 },    { "pgam", SK_U8 },    { "gmtd", SK_U8 },
   // adventures, fishing, alarm, chores, piggy bank, diary
-  { "advR", SK_U8 },    { "advN", SK_U8 },    { "advS", SK_U32 },   { "fshd", SK_U32 },
+  { "advR", SK_U8 },    { "advN", SK_U8 },    { "advS", SK_U32 },   { "gymS", SK_U16 },   { "fshd", SK_U32 },
   { "fshn", SK_U8 },    { "alOn", SK_BOOL },  { "alH", SK_U8 },     { "alM", SK_U8 },
   { "alD", SK_U32 },    { "brD", SK_U32 },    { "chrD", SK_U32 },   { "chrB", SK_U8 },
   { "pig", SK_U32 },    { "pigD", SK_U32 },   { "diary", SK_BYTES },{ "dcb", SK_U32 },

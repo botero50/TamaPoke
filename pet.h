@@ -906,10 +906,36 @@ public:
   bool hasBadge(uint8_t rg, uint8_t i, bool hard) const {
     return (badgeMask(rg, hard) >> i) & 1;
   }
+  // Phase 34: the road to the gym. Walking fills gymSteps; the next leader not
+  // yet beaten on an easy ladder needs gymStepsNeed(its place) of them, and the
+  // first win spends them (the rest carries on). Rematches and hard are free.
+  uint16_t gymSteps = 0;
+  static uint16_t gymStepsNeed(uint8_t i) { return (uint16_t)(1000 + 500 * i); }
+  bool gymStepsOk(uint8_t rg, uint8_t i, bool hard) const {
+    return hard || hasBadge(rg, i, false) || gymSteps >= gymStepsNeed(i);
+  }
+  int8_t gymNextIn(uint8_t rg) const {           // the first leader not beaten on easy, or -1
+    for (uint8_t i = 0; i < 13; i++) if (!hasBadge(rg, i, false)) return (int8_t)i;
+    return -1;
+  }
+  uint8_t gymChallengeRegion() const {           // its own region first, else the first unfinished; 0xFF all done
+    if (region < GYM_REGIONS && gymNextIn(region) >= 0) return region;
+    for (uint8_t r = 0; r < GYM_REGIONS; r++) if (gymNextIn(r) >= 0) return r;
+    return 0xFF;
+  }
+  int8_t gymChallengeIdx() const { uint8_t r = gymChallengeRegion(); return r < GYM_REGIONS ? gymNextIn(r) : -1; }
+  bool gymChallengeReady() const {
+    int8_t i = gymChallengeIdx();
+    return i >= 0 && !isEgg() && gymSteps >= gymStepsNeed((uint8_t)i);
+  }
   void winBadge(uint8_t rg, uint8_t i, bool hard) {
     if (rg >= GYM_REGIONS) return;
     uint16_t bit = (uint16_t)1 << i;
     bool isNew = !hasBadge(rg, i, hard);
+    if (isNew && !hard) {                          // a first easy win spends the walk
+      uint16_t need = gymStepsNeed(i);
+      gymSteps = gymSteps > need ? gymSteps - need : 0;
+    }
     if (rg == 0) { if (hard) badgesHard |= bit; else badges |= bit; }
     else if (hard) badgesHardX[rg - 1] |= bit;
     else badgesX[rg - 1] |= bit;

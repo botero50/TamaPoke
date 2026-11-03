@@ -216,6 +216,8 @@ enum StrId : uint16_t {
   S_SWEPT_FMT,
   // phase 33: the album
   S_DEL_PHOTO_Q, S_DELETE, S_DELETE_ALL, S_DEL_ALL_Q, S_PHOTO_DELETED, S_FAV_FULL_FMT,
+  // phase 34: the road to the gym
+  S_GYM_CHALLENGE_FMT, S_GYM_BADGE_FMT, S_GYM_ELITE_FMT, S_GYM_CHAMPION, S_FIGHT_NOW, S_LATER,
   STR_COUNT
 };
 

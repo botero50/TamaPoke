@@ -1110,9 +1110,38 @@ int main(int argc, char **argv) {
   battleOpen = false; btlMenu = 0;
   for (int i = 0; i < 3; i++) party.releaseAt(i);
 
+  // ---- phase 34: the road to the gym -- the next leader needs its steps, then
+  // a badge button at the right edge opens its challenge card
+  {
+    extern bool gymCardOpen, gymPick;
+    bool gymButtonHit(int16_t, int16_t);
+    extern bool cardOpen;
+    battleOpen = false; pickOpen = false; gymOpen = false; cardOpen = false;   // back to the pet
+    pet.badges = 0; pet.region = 0; pet.gymSteps = 0;
+    pump(4);
+    if (gymButtonHit(424, 233)) { printf("FAIL: the gym button showed before any walking\n"); return 1; }
+    gymOpen = true; gymHard = false; gymPage = 0; gymPick = false; gymRegion = 0;
+    click(233, 110 + 0 * 50 + 20);      // BROCK, not walked to yet
+    if (pickOpen || !gymOpen) { printf("FAIL: a leader not walked to was enterable\n"); return 1; }
+    gymOpen = false; gymPick = false; pump(4);   // straight back to the pet
+    { extern uint32_t lastInteract; extern uint8_t dimStage; lastInteract = millis(); dimStage = 0; pump(4); }   // awake: a dim screen only wakes on a tap
+    pet.addSteps(Pet::gymStepsNeed(0));
+    pump(4);
+    if (!gymButtonHit(424, 233)) { printf("FAIL: 1000 steps did not bring the gym button\n"); return 1; }
+    click(424, 233);
+    if (!gymCardOpen) { printf("FAIL: the gym button did not open the challenge card\n"); return 1; }
+    click(303, 327);                    // LATER
+    if (gymCardOpen || pickOpen) { printf("FAIL: LATER did not just close the card\n"); return 1; }
+    pump(4);
+    click(424, 233); click(163, 327);   // the card again, then FIGHT
+    if (gymCardOpen || !pickOpen || pickTrainer != 0 || pickHard) { printf("FAIL: FIGHT did not open the team picker for Brock\n"); return 1; }
+    pickOpen = false;
+    printf("PASS: road to the gym: no button before walking, then button -> card -> LATER / FIGHT -> Brock's team picker\n");
+  }
   // ---- the gym ladder is sequential: only the next one may be entered
   battleOpen = false; pickOpen = false;
   pet.badges = 0;                       // nothing beaten yet
+  pet.gymSteps = 60000;                 // walked plenty: this is about the order
   gymOpen = true; gymHard = false; gymPage = 0;
   click(233, 110 + 1 * 50 + 20);        // MISTY, the second row
   if (pickOpen || battleOpen) { printf("FAIL: a locked leader was enterable\n"); return 1; }

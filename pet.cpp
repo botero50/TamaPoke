@@ -587,6 +587,7 @@ void Pet::addSteps(uint32_t n) {
   stepCount += n;
   if (stepCount > STEP_MAX) stepCount = STEP_MAX;
   if (advSteps < 60000) advSteps += n;          // the adventure route moves too
+  gymSteps = gymSteps + n > 60000 ? 60000 : (uint16_t)(gymSteps + n);   // and the road to the gym
   stepsUnsaved += n;
   if (stepsUnsaved >= 20) {
     stepsUnsaved = 0;
@@ -3096,6 +3097,7 @@ void Pet::save() {
   prefs.putUChar("advR", advRoute);
   prefs.putUChar("advN", advStop);
   prefs.putUInt("advS", advSteps);
+  prefs.putUShort("gymS", gymSteps);
   prefs.putUInt("fshd", fishDay);
   prefs.putUChar("fshn", fishToday);
   prefs.putBool("alOn", alarmOn);
@@ -3346,6 +3348,8 @@ void Pet::load() {
   advStop = prefs.getUChar("advN", 0);
   if (advStop > ROUTE_STOPS) advStop = 0;
   advSteps = prefs.getUInt("advS", 0);
+  if (prefs.isKey("gymS")) gymSteps = prefs.getUShort("gymS", 0);
+  else gymSteps = 0xFFFF;                        // before phase 34: settled below, once the badges are in
   fishDay = prefs.getUInt("fshd", 0);
   fishToday = prefs.getUChar("fshn", 0);
   alarmOn = prefs.getBool("alOn", false);
@@ -3413,4 +3417,8 @@ void Pet::load() {
   }
   // seeding: the current pet counts as raised (old saves)
   if (speciesId >= 1) registerSpecies(speciesId);
+  if (gymSteps == 0xFFFF) {                      // a pet from before phase 34: its next leader is ready now
+    int8_t gi = gymChallengeIdx();
+    gymSteps = gi >= 0 ? gymStepsNeed((uint8_t)gi) : 0;
+  }
 }

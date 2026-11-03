@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.34"
+#define FW_VERSION "3.14-funpack.35"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -230,6 +230,7 @@ bool fpOpen = false;
 uint8_t fpGame = 0;
 StrId fpToast = S_TOO_SICK;
 int16_t fpToastNum = -1;      // >= 0: fpToast is a format with one %u
+char fpToastText[48] = "";    // set: shown instead of fpToast
 uint16_t fpToastColor = 0;
 uint32_t fpToastUntil = 0;
 // Coins: the two panels behind the top buttons
@@ -377,6 +378,8 @@ uint8_t spdGain = 0;
 bool spdNewHi = false;
 
 bool gymOpen = false;
+bool gymCardOpen = false;   // phase 34: the next leader's challenge card
+int8_t gymToastFor = -1;    // the challenge already announced this boot (region * 16 + leader)
 bool gymHard = false;   // which ladder the list is showing
 
 // LAN battle. `lanOpen` is the pairing screen; once both squads are known the
@@ -989,6 +992,7 @@ void loop() {
   if (now - lastTrophyCheck > 5000 && uiCurrentScreen() == SCR_MAIN && !screenOff) {
     lastTrophyCheck = now;
     checkTrophyToast();
+    gymReadyToast();
   }
   studyTick();
   alarmTick();
@@ -1404,6 +1408,7 @@ void handleSerial() {
     Serial.printf("wxraw code=%d precip=%u.%u mm cloud=%u%%\n", weatherLast().rawCode, weatherLast().precip10 / 10, weatherLast().precip10 % 10, weatherLast().cloud);
     { char dg[96]; wifiDiag(dg, sizeof(dg)); Serial.printf("wifidiag %s\n", dg); }
     Serial.printf("tickets=%u today=%u golds=%u\n", pet.tickets, pet.ticketsToday, pet.goldBadges());
+    { int8_t gi = pet.gymChallengeIdx(); Serial.printf("gym=%u/%u next=%d region=%u ready=%d\n", pet.gymSteps, gi >= 0 ? Pet::gymStepsNeed((uint8_t)gi) : 0, gi, pet.gymChallengeRegion(), pet.gymChallengeReady()); }
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
                   (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
     Serial.println("DONE");
@@ -1971,6 +1976,9 @@ void onTap(int16_t x, int16_t y) {
   // mid-shower, a finger pops the bubbles
   if (bathUntil && !pet.awaitingStarter() && uiCurrentScreen() == SCR_MAIN && bathTap(x, y)) return;
   if (sweepUntil && uiCurrentScreen() == SCR_MAIN) return;   // the broom is busy
+  if (uiCurrentScreen() == SCR_MAIN && !pet.awaitingStarter() && !pet.ceremony && gymButtonHit(x, y)) {
+    sfxPlay(SFX_TAP); gymCardOpen = true; return;   // phase 34: the next leader is waiting
+  }
   if (pet.awaitingStarter()) {  // first game: region, then starter
     if (!starterRegionDone) {
       int r = regionPickTap(x, y, RPICK_FOR_START);
@@ -2051,6 +2059,12 @@ void onTap(int16_t x, int16_t y) {
       int ry = GYM_ROW_Y(i);
       if (x < 70 || x > 396 || y < ry || y > ry + 44) continue;
       if (!gymUnlocked(idx, gymHard)) { sfxPlay(SFX_DENY); return; }
+      if (!pet.gymStepsOk(gymRegion, idx, gymHard)) {        // phase 34: walk there first
+        sfxPlay(SFX_DENY);
+        fpShowToast(S_STEPS_TO_FMT, UI_BAR_WARN);
+        fpToastNum = Pet::gymStepsNeed(idx) - pet.gymSteps;
+        return;
+      }
       sfxPlay(SFX_TAP);
       gymOpen = false;
       pickTrainer = idx;
@@ -2225,6 +2239,7 @@ void onTap(int16_t x, int16_t y) {
   if (trophyOpen) { trophyTap(x, y); return; }
   if (choresOpen) { choresTap(x, y); return; }
   if (piggyOpen) { piggyTap(x, y); return; }
+  if (gymCardOpen) { gymCardTap(x, y); return; }
   if (albumOpen) { albumTap(x, y); return; }
   if (diaryOpen) { diaryTap(x, y); return; }
   if (mailOpen) { mailOpen = false; return; }   // any tap folds the letter away
@@ -4044,7 +4059,7 @@ uint8_t uiCurrentScreen() {
   if (shopOpen) return SCR_MENU;               // the shop can open over the store
   if (placeScene) return SCR_GAME;
   if (trainOpen || fpMenuCat || arcadeView) return SCR_TRAIN;
-  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen || albumOpen) return SCR_MENU;
+  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen || albumOpen || gymCardOpen) return SCR_MENU;
   return SCR_MAIN;
 }
 
@@ -4174,6 +4189,7 @@ void render() {
   }
   if (choresOpen) { renderChores(); return; }
   if (piggyOpen) { renderPiggy(); return; }
+  if (gymCardOpen) { renderGymCard(); return; }
   if (albumOpen) { renderAlbum(); return; }
   if (diaryOpen) { renderDiary(); return; }
   if (mailOpen) { renderMail(); return; }
@@ -6894,7 +6910,11 @@ void renderGyms() {
     gfx->fillRoundRect(70, y, 326, 44, 10, done ? UI_TRACK_TEXT : UI_BG_DAY);
     gfx->drawRoundRect(70, y, 326, 44, 10, open_ ? UI_INK : UI_TRACK_TEXT);
     uiTextFit(UIF_TINY, 84, y + 19, t.name, open_ ? UI_INK : UI_TRACK_TEXT, 0, 270);
-    uiTextFit(UIF_TINY, 84, y + 38, open_ ? t.place : T(S_LOCKED), UI_TRACK_TEXT, 0, 180);
+    if (open_ && !pet.gymStepsOk(gymRegion, idx, gymHard)) {   // phase 34: the steps still to walk
+      char st[32];
+      snprintf(st, sizeof(st), T(S_STEPS_TO_FMT), (unsigned)(Pet::gymStepsNeed(idx) - pet.gymSteps));
+      uiTextFit(UIF_TINY, 84, y + 38, st, UI_BAR_WARN, 0, 180);
+    } else uiTextFit(UIF_TINY, 84, y + 38, open_ ? t.place : T(S_LOCKED), UI_TRACK_TEXT, 0, 180);
     // the level of the strongest creature: the honest measure of the wall
     uint8_t top = 0;
     for (int k = 0; k < t.count; k++)
@@ -7712,6 +7732,70 @@ void drawBattery() {
 // swipe is actually allowed -- onSwipe() refuses it during a ceremony, a
 // pending confirm and the starter choice -- and nudged back and forth so they
 // read as a gesture rather than decoration.
+// ---------- phase 34: the road to the gym ----------
+
+#define GYMBTN_X 424
+#define GYMBTN_Y 233
+#define GYMBTN_R 28
+
+// how far she has walked towards the next leader, 0..1000
+static uint16_t gymWalkPermille() {
+  int8_t i = pet.gymChallengeIdx();
+  if (i < 0) return 0;
+  uint32_t need = Pet::gymStepsNeed((uint8_t)i);
+  return (uint16_t)(pet.gymSteps >= need ? 1000 : (uint32_t)pet.gymSteps * 1000 / need);
+}
+
+// a ring of dots around the little badge, filling as she walks
+static void drawGymRing(int bx, int by) {
+  if (pet.gymChallengeIdx() < 0) return;
+  uint16_t pm = gymWalkPermille();
+  for (int k = 0; k < 12; k++) {
+    float a = -1.5708f + k * 0.5236f;
+    int x = bx + (int)(cosf(a) * 13), y = by + (int)(sinf(a) * 13);
+    bool on = k * 1000 / 12 < pm;
+    gfx->fillCircle(x, y, on ? 2 : 1, on ? UI_BAR_OK : UI_TRACK_TEXT);
+  }
+}
+
+// the next leader is waiting: a big pulsing badge at the right edge, with a "!"
+bool drawGymEdge(uint16_t ink) {
+  if (!pet.gymChallengeReady()) return false;
+  int r = GYMBTN_R + (int)(sinf(millis() * 0.006f) * 3);
+  const uint16_t gold = C565(0xff, 0xcb, 0x05);
+  gfx->fillCircle(GYMBTN_X, GYMBTN_Y, r + 4, lerp565(gold, UI_WHITE, 5, 8));
+  gfx->fillCircle(GYMBTN_X, GYMBTN_Y, r, gold);
+  gfx->drawCircle(GYMBTN_X, GYMBTN_Y, r, ink);
+  int bx = GYMBTN_X, by = GYMBTN_Y;
+  gfx->fillTriangle(bx, by - 15, bx - 13, by, bx + 13, by, UI_BAR_WARN);
+  gfx->fillTriangle(bx, by + 15, bx - 13, by, bx + 13, by, UI_BAR_WARN);
+  gfx->drawLine(bx, by - 15, bx + 13, by, UI_INK); gfx->drawLine(bx + 13, by, bx, by + 15, UI_INK);
+  gfx->drawLine(bx, by + 15, bx - 13, by, UI_INK); gfx->drawLine(bx - 13, by, bx, by - 15, UI_INK);
+  gfx->fillCircle(bx + r - 4, by - r + 4, 9, UI_BAR_BAD);                    // the "!"
+  gfx->fillRect(bx + r - 5, by - r - 1, 3, 7, UI_WHITE);
+  gfx->fillRect(bx + r - 5, by - r + 8, 3, 2, UI_WHITE);
+  return true;
+}
+
+bool gymButtonHit(int16_t x, int16_t y) {
+  if (!pet.gymChallengeReady()) return false;
+  int dx = x - GYMBTN_X, dy = y - GYMBTN_Y;
+  return dx * dx + dy * dy <= (GYMBTN_R + 14) * (GYMBTN_R + 14);
+}
+
+// announced once a boot, when the challenge is ready and the main screen is up
+void gymReadyToast() {
+  if (!pet.gymChallengeReady() || uiCurrentScreen() != SCR_MAIN || fpToastUntil) return;
+  uint8_t rg = pet.gymChallengeRegion();
+  int8_t i = pet.gymChallengeIdx();
+  int8_t key = (int8_t)(rg * 16 + i);
+  if (gymToastFor == key) return;
+  gymToastFor = key;
+  fpShowToast(S_GYM_CHALLENGE_FMT, UI_BAR_OK);
+  snprintf(fpToastText, sizeof(fpToastText), T(S_GYM_CHALLENGE_FMT), TRAINER_SETS[rg].list[i].name);
+  sfxPlay(SFX_VICTORY);
+}
+
 static void drawSwipeHints() {
   if (pet.ceremony || confirmUntil || pet.awaitingStarter()) return;
   const int cy = 233;
@@ -7726,12 +7810,14 @@ static void drawSwipeHints() {
   gfx->drawCircle(lx + 6, cy + 24, 7, ink);
   gfx->drawFastHLine(lx - 1, cy + 24, 14, ink);
   gfx->fillCircle(lx + 6, cy + 24, 2, ink);
+  if (drawGymEdge(ink)) return;              // phase 34: the next leader is ready
   int rx = 454 - nudge;                      // gym: swipe LEFT, chevron points left
   for (int k = 0; k < 2; k++) {
     gfx->drawLine(rx - k, cy - 10, rx - 8 - k, cy, ink);
     gfx->drawLine(rx - 8 - k, cy, rx - k, cy + 10, ink);
   }
   int bx = rx - 6, by = cy + 24;                      // badge
+  drawGymRing(bx, by);
   gfx->fillTriangle(bx, by - 8, bx - 7, by, bx + 7, by, UI_BAR_WARN);
   gfx->fillTriangle(bx, by + 8, bx - 7, by, bx + 7, by, UI_BAR_WARN);
   gfx->drawLine(bx, by - 8, bx + 7, by, ink);
@@ -8804,6 +8890,7 @@ static StrId fpTitle(uint8_t g) {
 void fpShowToast(uint16_t s, uint16_t color) {
   fpToast = (StrId)s;
   fpToastNum = -1;
+  fpToastText[0] = 0;
   fpToastColor = color;
   fpToastUntil = millis() + 2500;
 }
@@ -8835,7 +8922,8 @@ void drawFpToast() {
   gfx->fillRoundRect(63, 186, 340, 60, 16, fpToastColor);
   gfx->drawRoundRect(63, 186, 340, 60, 16, UI_INK);
   char b[48];
-  if (fpToastNum >= 0) snprintf(b, sizeof(b), T(fpToast), (unsigned)fpToastNum);
+  if (fpToastText[0]) snprintf(b, sizeof(b), "%s", fpToastText);
+  else if (fpToastNum >= 0) snprintf(b, sizeof(b), T(fpToast), (unsigned)fpToastNum);
   else snprintf(b, sizeof(b), "%s", T(fpToast));
   uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, 186, 60), b, UI_WHITE, 1, 316);
 }
@@ -9723,6 +9811,62 @@ static void drawPanelBase() {
     gfx->drawFastHLine(0, y, 466, gNight ? 0x0000 : 0x2104);
   gfx->fillRoundRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 18, UI_WHITE);
   gfx->drawRoundRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 18, UI_INK);
+}
+
+// ---------- phase 34: the challenge card ----------
+
+#define GCARD_FIGHT_X 103
+#define GCARD_LATER_X 243
+#define GCARD_BTN_Y 300
+#define GCARD_BTN_W 120
+#define GCARD_BTN_H 54
+
+void renderGymCard() {
+  uint8_t rg = pet.gymChallengeRegion();
+  int8_t i = pet.gymChallengeIdx();
+  if (rg >= GYM_REGIONS || i < 0) { gymCardOpen = false; return; }
+  const Trainer &t = TRAINER_SETS[rg].list[i];
+  drawPanelBase();
+  const uint16_t accent = typeColor(t.type);
+  gfx->fillRoundRect(PANEL_X + 14, PANEL_Y + 14, PANEL_W - 28, 40, 12, accent);
+  char b[48];
+  snprintf(b, sizeof(b), T(S_GYM_CHALLENGE_FMT), t.name);
+  uiTextFit(UIF_MID, CX, uiMidY(UIF_MID, PANEL_Y + 14, 40), b, UI_WHITE, 1, PANEL_W - 50);
+  gfx->fillCircle(CX, PANEL_Y + 118, 52, lerp565(accent, UI_WHITE, 6, 8));   // the leader's first creature
+  gfx->drawCircle(CX, PANEL_Y + 118, 52, UI_INK);
+  if (!fpThumb(t.team[0].dex, CX, PANEL_Y + 118, 1, false)) {
+    gfx->fillCircle(CX, PANEL_Y + 118, 26, accent);
+  }
+  uiTextFit(UIF_SMALL, CX, PANEL_Y + 196, t.place, UI_INK, 1, PANEL_W - 60);
+  if (i < TRAINER_GYMS) snprintf(b, sizeof(b), T(S_GYM_BADGE_FMT), (unsigned)(i + 1));
+  else if (i < TRAINER_GYMS + TRAINER_ELITE4) snprintf(b, sizeof(b), T(S_GYM_ELITE_FMT), (unsigned)(i - TRAINER_GYMS + 1));
+  else snprintf(b, sizeof(b), "%s", T(S_GYM_CHAMPION));
+  uiTextFit(UIF_SMALL, CX, PANEL_Y + 220, b, UI_TRACK_TEXT, 1, PANEL_W - 60);
+  gfx->fillRoundRect(GCARD_FIGHT_X, GCARD_BTN_Y, GCARD_BTN_W, GCARD_BTN_H, 12, UI_BAR_BAD);
+  gfx->drawRoundRect(GCARD_FIGHT_X, GCARD_BTN_Y, GCARD_BTN_W, GCARD_BTN_H, 12, UI_INK);
+  uiTextFit(UIF_SMALL, GCARD_FIGHT_X + GCARD_BTN_W / 2, uiMidY(UIF_SMALL, GCARD_BTN_Y, GCARD_BTN_H), T(S_FIGHT_NOW), UI_WHITE, 1, GCARD_BTN_W - 10);
+  gfx->fillRoundRect(GCARD_LATER_X, GCARD_BTN_Y, GCARD_BTN_W, GCARD_BTN_H, 12, UI_BG_DAY);
+  gfx->drawRoundRect(GCARD_LATER_X, GCARD_BTN_Y, GCARD_BTN_W, GCARD_BTN_H, 12, UI_INK);
+  uiTextFit(UIF_SMALL, GCARD_LATER_X + GCARD_BTN_W / 2, uiMidY(UIF_SMALL, GCARD_BTN_Y, GCARD_BTN_H), T(S_LATER), UI_INK, 1, GCARD_BTN_W - 10);
+  drawFpToast();
+  gfx->flush();
+}
+
+void gymCardTap(int16_t x, int16_t y) {
+  bool fight = y >= GCARD_BTN_Y && y <= GCARD_BTN_Y + GCARD_BTN_H && x >= GCARD_FIGHT_X && x <= GCARD_FIGHT_X + GCARD_BTN_W;
+  if (!fight) { gymCardOpen = false; sfxPlay(SFX_TAP); return; }   // LATER, or anywhere else
+  if (fpBlockedBySick()) return;
+  uint8_t rg = pet.gymChallengeRegion();
+  int8_t i = pet.gymChallengeIdx();
+  if (rg >= GYM_REGIONS || i < 0) { gymCardOpen = false; return; }
+  sfxPlay(SFX_TAP);
+  gymCardOpen = false;
+  gymRegion = rg; gymPick = false; gymHard = false; gymPage = (uint8_t)(i / GYM_ROWS);
+  pickTrainer = (uint8_t)i;
+  pickHard = false;
+  pickPage = 0;
+  pickDefault(squadCap((uint8_t)i, false));
+  pickOpen = true;
 }
 
 static StrId missionText(uint8_t m) {

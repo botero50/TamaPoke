@@ -127,7 +127,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32b
     "Todo barrido! +%u de limpieza",
     // phase 33
-    "Borrar esta foto?", "BORRAR", "BORRAR TODAS", "Borrar todas menos las favoritas?", "Foto borrada", "Ya tienes %u favoritas", },
+    "Borrar esta foto?", "BORRAR", "BORRAR TODAS", "Borrar todas menos las favoritas?", "Foto borrada", "Ya tienes %u favoritas",
+    // phase 34
+    "%s te reta!", "Medalla %u de 8", "Alto Mando %u de 4", "La gran final: el Campeon", "LUCHAR!", "LUEGO", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -249,7 +251,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32b
     "All swept! +%u clean",
     // phase 33
-    "Delete this photo?", "DELETE", "DELETE ALL", "Delete all but the favourites?", "Photo deleted", "You already have %u favourites", },
+    "Delete this photo?", "DELETE", "DELETE ALL", "Delete all but the favourites?", "Photo deleted", "You already have %u favourites",
+    // phase 34
+    "%s challenges you!", "Badge %u of 8", "Elite Four %u of 4", "The final: the Champion", "FIGHT!", "LATER", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -370,7 +374,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32b
     "Tout est balaye ! +%u",
     // phase 33
-    "Effacer cette photo ?", "EFFACER", "TOUT EFFACER", "Tout effacer sauf les favorites ?", "Photo effacee", "Deja %u favorites", },
+    "Effacer cette photo ?", "EFFACER", "TOUT EFFACER", "Tout effacer sauf les favorites ?", "Photo effacee", "Deja %u favorites",
+    // phase 34
+    "%s te defie !", "Badge %u sur 8", "Conseil 4 : %u sur 4", "La finale : le Maitre", "COMBAT !", "PLUS TARD", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -491,7 +497,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32b
     "Alles gefegt! +%u Sauberkeit",
     // phase 33
-    "Dieses Foto loeschen?", "LOESCHEN", "ALLE LOESCHEN", "Alle ausser Favoriten loeschen?", "Foto geloescht", "Schon %u Favoriten", },
+    "Dieses Foto loeschen?", "LOESCHEN", "ALLE LOESCHEN", "Alle ausser Favoriten loeschen?", "Foto geloescht", "Schon %u Favoriten",
+    // phase 34
+    "%s fordert dich!", "Orden %u von 8", "Top Vier %u von 4", "Das Finale: der Champion", "KAEMPFEN!", "SPAETER", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -612,7 +620,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32b
     "Tutto spazzato! +%u di pulizia",
     // phase 33
-    "Cancellare questa foto?", "CANCELLA", "CANCELLA TUTTE", "Cancellare tutte tranne le preferite?", "Foto cancellata", "Hai gia %u preferite", },
+    "Cancellare questa foto?", "CANCELLA", "CANCELLA TUTTE", "Cancellare tutte tranne le preferite?", "Foto cancellata", "Hai gia %u preferite",
+    // phase 34
+    "%s ti sfida!", "Medaglia %u di 8", "Superquattro %u di 4", "La finale: il Campione", "LOTTA!", "DOPO", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -733,7 +743,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32b
     "Tudo varrido! +%u de limpeza",
     // phase 33
-    "Apagar esta foto?", "APAGAR", "APAGAR TODAS", "Apagar todas menos as favoritas?", "Foto apagada", "Ja tem %u favoritas", },
+    "Apagar esta foto?", "APAGAR", "APAGAR TODAS", "Apagar todas menos as favoritas?", "Foto apagada", "Ja tem %u favoritas",
+    // phase 34
+    "%s te desafia!", "Insignia %u de 8", "Elite Quatro %u de 4", "A final: o Campeao", "LUTAR!", "DEPOIS", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -856,7 +868,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32b
     "扫干净了! 清洁+%u",
     // phase 33
-    "删除这张照片?", "删除", "全部删除", "删除除收藏外的所有照片?", "照片已删除", "已经有%u张收藏了", },
+    "删除这张照片?", "删除", "全部删除", "删除除收藏外的所有照片?", "照片已删除", "已经有%u张收藏了",
+    // phase 34
+    "%s向你挑战!", "徽章 %u/8", "四天王 %u/4", "决赛: 冠军", "战斗!", "稍后", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -978,7 +992,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32b
     "깨끗하게 쓸었어요! 청결 +%u",
     // phase 33
-    "이 사진을 지울까요?", "지우기", "모두 지우기", "즐겨찾기 빼고 모두 지울까요?", "사진을 지웠어요", "이미 즐겨찾기가 %u개예요", },
+    "이 사진을 지울까요?", "지우기", "모두 지우기", "즐겨찾기 빼고 모두 지울까요?", "사진을 지웠어요", "이미 즐겨찾기가 %u개예요",
+    // phase 34
+    "%s의 도전!", "배지 %u/8", "사천왕 %u/4", "결승: 챔피언", "싸우자!", "나중에", },
 };
 
 // Medal names in their three lengths [language][medal].
