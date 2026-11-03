@@ -185,22 +185,53 @@ static int g_resetReason = ESP_RST_POWERON;
 esp_reset_reason_t emuResetReason() { return g_resetReason; }
 void emuSetResetReason(int r) { g_resetReason = r; }
 
-// the photo album, kept in memory: the same newest-first order as on the card
+// the photo album: the real slot rules (album.cpp), the pixels kept in memory
 #include <vector>
-static std::vector<std::vector<uint16_t>> g_album;
+static Album g_albumSlots;
+static bool g_albumLoaded = false;
+static std::vector<uint16_t> g_albumPix[ALBUM_MAX];
+static Album &hostAlbum() {
+  if (!g_albumLoaded) { g_albumSlots.load(); g_albumLoaded = true; }
+  return g_albumSlots;
+}
 bool albumSave(const uint16_t *fb) {
   if (!fb) return false;
-  std::vector<uint16_t> ph(ALBUM_W * ALBUM_W);
+  int8_t slot = hostAlbum().pickForSave();
+  if (slot < 0) return false;
+  std::vector<uint16_t> &ph = g_albumPix[slot];
+  ph.assign(ALBUM_W * ALBUM_W, 0);
   for (int y = 0; y < ALBUM_W; y++) for (int x = 0; x < ALBUM_W; x++) ph[y * ALBUM_W + x] = fb[(y * 2) * 466 + x * 2];
-  g_album.push_back(ph);
-  if (g_album.size() > ALBUM_MAX) g_album.erase(g_album.begin());
+  hostAlbum().markSaved((uint8_t)slot);
+  hostAlbum().save();
   return true;
 }
-uint8_t albumCount() { return (uint8_t)g_album.size(); }
+uint8_t albumCount() { return hostAlbum().count(); }
 bool albumLoad(uint8_t newest, uint16_t *out) {
-  if (newest >= g_album.size() || !out) return false;
-  const std::vector<uint16_t> &ph = g_album[g_album.size() - 1 - newest];
-  for (size_t i = 0; i < ph.size(); i++) out[i] = ph[i];
+  int8_t slot = hostAlbum().slotFor(newest);
+  if (slot < 0 || !out || g_albumPix[slot].size() != ALBUM_W * ALBUM_W) return false;
+  for (size_t i = 0; i < g_albumPix[slot].size(); i++) out[i] = g_albumPix[slot][i];
   return true;
 }
+bool albumIsFav(uint8_t newest) { int8_t s = hostAlbum().slotFor(newest); return s >= 0 && hostAlbum().isFav((uint8_t)s); }
+bool albumToggleFav(uint8_t newest) {
+  int8_t s = hostAlbum().slotFor(newest);
+  if (s < 0 || !hostAlbum().toggleFav((uint8_t)s)) return false;
+  hostAlbum().save();
+  return true;
+}
+bool albumDelete(uint8_t newest) {
+  int8_t s = hostAlbum().slotFor(newest);
+  if (s < 0 || !hostAlbum().remove((uint8_t)s)) return false;
+  g_albumPix[s].clear();
+  hostAlbum().save();
+  return true;
+}
+uint8_t albumDeleteAllButFav() {
+  uint8_t gone[ALBUM_MAX];
+  uint8_t n = hostAlbum().removeAllButFav(gone);
+  for (uint8_t k = 0; k < n; k++) g_albumPix[gone[k]].clear();
+  if (n) hostAlbum().save();
+  return n;
+}
+void albumMigrate() {}
 uint16_t *albumBuffer() { static std::vector<uint16_t> b(ALBUM_W * ALBUM_W); return b.data(); }

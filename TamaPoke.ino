@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.33"
+#define FW_VERSION "3.14-funpack.34"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -246,6 +246,7 @@ bool questView = false;      // the missions panel shows the weekly quest
 bool photoPending = false;   // the next main-screen frame goes into the album
 bool albumOpen = false;      // browsing the photos
 uint8_t albumIdx = 0, albumShown = 255;   // the photo asked for, and the one in the buffer
+uint8_t albumDlg = 0;        // 0 none, 1 delete: this one / all / cancel, 2 "all but the favourites?"
 uint8_t mapPage = 0;         // the map has two pages of places
 uint8_t arcadeView = 0;      // 1 the prize counter, 2 the weekly records (phase 26)
 uint8_t boardPage = 0;
@@ -831,6 +832,7 @@ void setup() {
   party.begin();
   pet.begin();
   sdBegin();
+  albumMigrate();          // phase 33: the old photos become BMPs, once
   thumbs.load();
 
   // real clock: apply the time it was switched off
@@ -12084,7 +12086,7 @@ void renderDiary() {
 
 void diaryTap(int16_t x, int16_t y) {
   if (!inPanel(x, y)) { diaryOpen = false; return; }
-  if (albumButtonHit(x, y)) { sfxPlay(SFX_TAP); albumOpen = true; albumIdx = 0; albumShown = 255; return; }
+  if (albumButtonHit(x, y)) { sfxPlay(SFX_TAP); albumOpen = true; albumIdx = 0; albumShown = 255; albumDlg = 0; return; }
   uint8_t pages = diaryPages();
   int a = pageNavHit(x, y, pages);
   if (a) { diaryPage = (uint8_t)((diaryPage + pages + a) % pages); sfxPlay(SFX_TAP); }
@@ -14241,6 +14243,49 @@ bool albumButtonHit(int16_t x, int16_t y) { return x >= ABTN_X && x <= ABTN_X + 
 #define AL_NAV_Y 420
 #define AL_PHOTO_X CX
 #define AL_PHOTO_W 120
+#define AL_TOOL_Y 70                 // the star and the bin, either side of the top
+#define AL_STAR_X (CX - 100)
+#define AL_BIN_X (CX + 100)
+#define AL_DLG_X 73
+#define AL_DLG_Y 120
+#define AL_DLG_W 320
+#define AL_DLG_H 230
+#define AL_BTN_X 103
+#define AL_BTN_W 260
+#define AL_BTN_H 44
+#define AL_BTN_Y(i) (AL_DLG_Y + 56 + (i) * 54)
+#define AL_YES_X 103
+#define AL_NO_X 243
+#define AL_YN_W 120
+#define AL_YN_Y (AL_DLG_Y + 150)
+
+// a five-pointed star: filled, or just its outline
+static void drawStar(int cx, int cy, int r, uint16_t col, bool filled) {
+  int px[10], py[10];
+  for (int k = 0; k < 10; k++) {
+    float a = -1.5708f + k * 0.6283f;
+    float rr = (k & 1) ? r * 0.45f : r;
+    px[k] = cx + (int)(cosf(a) * rr); py[k] = cy + (int)(sinf(a) * rr);
+  }
+  for (int k = 0; k < 10; k++) {
+    int n = (k + 1) % 10;
+    if (filled) gfx->fillTriangle(cx, cy, px[k], py[k], px[n], py[n], col);
+    gfx->drawLine(px[k], py[k], px[n], py[n], filled ? UI_INK : col);
+  }
+}
+
+static void drawBin(int cx, int cy, uint16_t col) {
+  gfx->fillRect(cx - 4, cy - 14, 8, 3, col);           // the handle
+  gfx->fillRect(cx - 12, cy - 11, 24, 4, col);         // the lid
+  gfx->fillRoundRect(cx - 9, cy - 5, 18, 20, 3, col);  // the can
+  for (int k = -1; k <= 1; k++) gfx->drawFastVLine(cx + k * 5, cy - 2, 14, UI_WHITE);
+}
+
+static void albumButton(int x, int y, int w, int h, uint16_t fill, StrId label, uint16_t ink) {
+  gfx->fillRoundRect(x, y, w, h, 12, fill);
+  gfx->drawRoundRect(x, y, w, h, 12, UI_INK);
+  uiTextFit(UIF_SMALL, x + w / 2, uiMidY(UIF_SMALL, y, h), T(label), ink, 1, w - 12);
+}
 
 void renderAlbum() {
   gfx->fillScreen(RGB565_BLACK);
@@ -14258,8 +14303,17 @@ void renderAlbum() {
     }
     char t[12];
     snprintf(t, sizeof(t), "%u/%u", (unsigned)(albumIdx + 1), (unsigned)n);
+    bool fav = albumIsFav(albumIdx);
     gfx->fillRoundRect(CX - 40, 24, 80, 30, 12, UI_WHITE);
     uiText(UIF_SMALL, CX, 46, t, UI_INK, 1);
+    if (fav) drawStar(CX + 56, 39, 11, C565(0xff, 0xd9, 0x5e), true);
+    for (int k = 0; k < 2; k++) {                          // the star and the bin
+      int cx = k ? AL_BIN_X : AL_STAR_X;
+      gfx->fillCircle(cx, AL_TOOL_Y, 24, UI_WHITE);
+      gfx->drawCircle(cx, AL_TOOL_Y, 24, UI_INK);
+    }
+    drawStar(AL_STAR_X, AL_TOOL_Y + 1, 15, fav ? C565(0xff, 0xd9, 0x5e) : UI_INK, fav);
+    drawBin(AL_BIN_X, AL_TOOL_Y + 1, UI_BAR_BAD);
   } else {
     uiTextFit(UIF_MID, CX, 220, T(S_NO_PHOTOS), UI_WHITE, 1, 320);
   }
@@ -14272,11 +14326,60 @@ void renderAlbum() {
   }
   gfx->fillRoundRect(AL_PHOTO_X - AL_PHOTO_W / 2, AL_NAV_Y - 40, AL_PHOTO_W, 40, 14, UI_BAR_OK);
   uiTextFit(UIF_SMALL, AL_PHOTO_X, uiMidY(UIF_SMALL, AL_NAV_Y - 40, 40), T(S_TAKE_PHOTO), UI_WHITE, 1, AL_PHOTO_W - 10);
+  if (albumDlg) {                                          // the delete questions
+    gfx->fillRoundRect(AL_DLG_X, AL_DLG_Y, AL_DLG_W, AL_DLG_H, 18, UI_WHITE);
+    gfx->drawRoundRect(AL_DLG_X, AL_DLG_Y, AL_DLG_W, AL_DLG_H, 18, UI_INK);
+    gfx->drawRoundRect(AL_DLG_X + 1, AL_DLG_Y + 1, AL_DLG_W - 2, AL_DLG_H - 2, 17, UI_INK);
+    if (albumDlg == 1) {
+      uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, AL_DLG_Y + 10, 40), T(S_DEL_PHOTO_Q), UI_INK, 1, AL_DLG_W - 30);
+      albumButton(AL_BTN_X, AL_BTN_Y(0), AL_BTN_W, AL_BTN_H, UI_BAR_BAD, S_DELETE, UI_WHITE);
+      albumButton(AL_BTN_X, AL_BTN_Y(1), AL_BTN_W, AL_BTN_H, UI_BAR_WARN, S_DELETE_ALL, UI_INK);
+      albumButton(AL_BTN_X, AL_BTN_Y(2), AL_BTN_W, AL_BTN_H, UI_BG_DAY, S_CANCEL, UI_INK);
+    } else {
+      gfx->fillCircle(CX, AL_DLG_Y + 46, 20, UI_BAR_WARN);
+      drawBin(CX, AL_DLG_Y + 47, UI_WHITE);
+      uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, AL_DLG_Y + 80, 50), T(S_DEL_ALL_Q), UI_INK, 1, AL_DLG_W - 30);
+      albumButton(AL_YES_X, AL_YN_Y, AL_YN_W, 54, UI_BAR_BAD, S_YES, UI_WHITE);
+      albumButton(AL_NO_X, AL_YN_Y, AL_YN_W, 54, UI_BG_DAY, S_NO, UI_INK);
+    }
+  }
+  drawFpToast();
   gfx->flush();
+}
+
+static bool inBox(int16_t x, int16_t y, int bx, int by, int bw, int bh) { return x >= bx && x <= bx + bw && y >= by && y <= by + bh; }
+
+// after a delete: stay on the photo that slid into this place, or the last one
+static void albumAfterDelete() {
+  uint8_t n = albumCount();
+  if (albumIdx >= n) albumIdx = n ? n - 1 : 0;
+  albumShown = 255;
+  sfxPlay(SFX_TAP);
+  fpShowToast(S_PHOTO_DELETED, UI_BAR_OK);
 }
 
 void albumTap(int16_t x, int16_t y) {
   uint8_t n = albumCount();
+  if (albumDlg == 1) {                                     // delete: this one / all / cancel
+    if (inBox(x, y, AL_BTN_X, AL_BTN_Y(0), AL_BTN_W, AL_BTN_H)) { albumDlg = 0; if (albumDelete(albumIdx)) albumAfterDelete(); return; }
+    if (inBox(x, y, AL_BTN_X, AL_BTN_Y(1), AL_BTN_W, AL_BTN_H)) { albumDlg = 2; sfxPlay(SFX_TAP); return; }
+    albumDlg = 0; sfxPlay(SFX_TAP);                        // CANCEL, or anywhere else
+    return;
+  }
+  if (albumDlg == 2) {                                     // all but the favourites: sure?
+    albumDlg = 0;
+    if (inBox(x, y, AL_YES_X, AL_YN_Y, AL_YN_W, 54) && albumDeleteAllButFav()) albumAfterDelete();
+    else sfxPlay(SFX_TAP);
+    return;
+  }
+  if (n && abs(y - AL_TOOL_Y) <= 30) {
+    if (abs(x - AL_STAR_X) <= 30) {                         // the star: a favourite, or not
+      if (albumToggleFav(albumIdx)) sfxPlay(albumIsFav(albumIdx) ? SFX_HEART : SFX_TAP);
+      else { sfxPlay(SFX_DENY); fpShowToast(S_FAV_FULL_FMT, UI_BAR_WARN); fpToastNum = ALBUM_FAV_MAX; }
+      return;
+    }
+    if (abs(x - AL_BIN_X) <= 30) { albumDlg = 1; sfxPlay(SFX_TAP); return; }
+  }
   if (y >= AL_NAV_Y - 44 && y <= AL_NAV_Y + 4) {
     if (abs(x - (CX - 110)) <= 28 && n) { albumIdx = (uint8_t)((albumIdx + n - 1) % n); sfxPlay(SFX_TAP); return; }
     if (abs(x - (CX + 110)) <= 28 && n) { albumIdx = (uint8_t)((albumIdx + 1) % n); sfxPlay(SFX_TAP); return; }

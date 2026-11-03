@@ -868,6 +868,34 @@ int main(int argc, char **argv) {
       printf("PASS: diary -> album -> photo saved\n");
       pump(90);
 
+      // phase 33: a star keeps a photo, the bin deletes one, or all but the favourites
+      {
+        extern uint8_t albumIdx, albumDlg;
+        bool albumIsFav(uint8_t);
+        for (int k = 0; k < 3; k++) { photoPending = true; pump(6); }   // a few more photos
+        uint8_t have = albumCount();
+        click(366, 72); click(311, 292); click(343, 107);              // DIARY -> ALBUM
+        if (!albumOpen || albumIdx != 0) { printf("FAIL: the album did not open on the newest\n"); return 1; }
+        click(133, 70);                                                // the star
+        if (!albumIsFav(0)) { printf("FAIL: the star did not make it a favourite\n"); return 1; }
+        click(343, 400);                                               // the next photo
+        click(333, 70);                                                // the bin
+        if (albumDlg != 1) { printf("FAIL: the bin did not ask\n"); return 1; }
+        click(233, 120 + 56 + 2 * 54 + 22);                            // CANCEL
+        if (albumDlg || albumCount() != have) { printf("FAIL: CANCEL changed something\n"); return 1; }
+        click(333, 70); click(233, 120 + 56 + 22);                     // the bin -> DELETE
+        if (albumCount() != have - 1 || !albumIsFav(0)) { printf("FAIL: DELETE did not take just that photo (%u)\n", albumCount()); return 1; }
+        click(333, 70); click(233, 120 + 56 + 54 + 22);                // the bin -> DELETE ALL
+        if (albumDlg != 2) { printf("FAIL: DELETE ALL did not ask again\n"); return 1; }
+        click(163, 120 + 150 + 27);                                    // YES
+        if (albumCount() != 1 || !albumIsFav(0) || !albumOpen) { printf("FAIL: DELETE ALL should leave only the favourite (%u)\n", albumCount()); return 1; }
+        click(233, 400);                                               // PHOTO: back to the pet, and snap it
+        pump(6);
+        if (albumCount() != 2 || albumOpen) { printf("FAIL: a photo after deleting was not saved\n"); return 1; }
+        printf("PASS: album: star, delete one, delete all but the favourite, cancel changes nothing\n");
+        pump(90);
+      }
+
       // each place has its tune; leaving it goes quiet
       click(349, 388);
       click(155, 154);                       // the park

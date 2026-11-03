@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 2 November 2026, with Phase 32._
+_Last updated: 2 November 2026, with Phase 33._
 
 ## Done
 | Phase | What | Release |
@@ -24,6 +24,7 @@ _Last updated: 2 November 2026, with Phase 32._
 | 32 | Levels of clean (quick shower +35, sponge +65, bubble bath to 100) with a toast of what it did; washes leave the poop, and a broom sweeps it away (its own row, a 2 s animation); the bath menu gets six compact rows | v1.15 |
 | 32b | The shop and bag categories come in 2 pages of 4 (arrows) instead of 7 squeezed rows; seeds get their own aisle, HUERTO; the garden sells a seed on its button when there is none | v1.16 |
 | 32c | Sweeping adds +10 CLEAN per pile, and the toast says how much | v1.17 |
+| 33 | The photo album: a star keeps a favourite (up to 20), the bin deletes one or all but the favourites, photos are saved as BMPs a computer opens (old ones converted once); still at most 24 photos, about 2.6 MB on the SD card | v1.18 |
 
 ## Next
 | # | Item | Needs | Notes |
@@ -74,3 +75,6 @@ _Last updated: 2 November 2026, with Phase 32._
   finished under the old 3 steps stays finished (`qver`).
 - **Washing and sweeping are separate** since phase 32: a wash never removes poop, and a
   wash with poop on the floor says to sweep it too (poop keeps draining CLEAN).
+- **Photos** live on the SD card only (`/album/NN.bmp`), at most 24 (about 2.6 MB); the
+  ball keeps a 96-byte slot table in NVS `album`. A new photo takes an empty slot, else the
+  oldest non-favourite; favourites are capped at 20 so a slot is always free.

@@ -301,55 +301,132 @@ bool sdSerialCommand(const String &line) {
 }
 
 // ---------------------------------------------------------------------------
-// The photo album. The counter lives in its own NVS namespace: it belongs to the
-// card's files, not to the pet's save.
+// The photo album. Which slots hold what lives in its own NVS namespace (album.h):
+// it belongs to the card's files, not to the pet's save.
 // ---------------------------------------------------------------------------
 
-static uint16_t albumNext() {
-  Preferences p;
-  p.begin("album", true);
-  uint16_t n = p.getUShort("n", 0);
-  p.end();
-  return n;
+static Album gAlbum;
+static bool gAlbumLoaded = false;
+static Album &album() {
+  if (!gAlbumLoaded) { gAlbum.load(); gAlbumLoaded = true; }
+  return gAlbum;
+}
+static void albumPath(char *b, size_t n, uint8_t slot, bool bmp) {
+  snprintf(b, n, "/album/%02u.%s", (unsigned)slot, bmp ? "bmp" : "raw");
+}
+static void albumRemoveFiles(uint8_t slot) {
+  char p[24];
+  albumPath(p, sizeof(p), slot, true);  if (SD_MMC.exists(p)) SD_MMC.remove(p);
+  albumPath(p, sizeof(p), slot, false); if (SD_MMC.exists(p)) SD_MMC.remove(p);
+}
+// one photo as a BMP: the header, then each row with two bytes of padding
+static bool albumWriteBmp(uint8_t slot, const uint16_t *px, int stride, int step) {
+  char path[24];
+  albumPath(path, sizeof(path), slot, true);
+  File f = SD_MMC.open(path, FILE_WRITE);
+  if (!f) return false;
+  uint8_t h[ALBUM_BMP_HDR];
+  albumBmpHeader(h);
+  f.write(h, sizeof(h));
+  static uint16_t row[ALBUM_BMP_ROW / 2];
+  row[ALBUM_W] = 0;
+  for (int y = 0; y < ALBUM_W; y++) {
+    for (int x = 0; x < ALBUM_W; x++) row[x] = px[(y * step) * stride + x * step];
+    f.write((const uint8_t *)row, ALBUM_BMP_ROW);
+  }
+  f.close();
+  return true;
 }
 
 bool albumSave(const uint16_t *fb) {
   if (!sdReady || !fb) return false;
   SD_MMC.mkdir("/album");
-  uint16_t n = albumNext();
-  char path[24];
-  snprintf(path, sizeof(path), "/album/%02u.raw", (unsigned)(n % ALBUM_MAX));
-  File f = SD_MMC.open(path, FILE_WRITE);
-  if (!f) return false;
-  static uint16_t row[ALBUM_W];
-  for (int y = 0; y < ALBUM_W; y++) {
-    for (int x = 0; x < ALBUM_W; x++) row[x] = fb[(y * 2) * 466 + x * 2];
-    f.write((const uint8_t *)row, sizeof(row));
-  }
-  f.close();
-  Preferences p;
-  p.begin("album", false);
-  p.putUShort("n", n + 1);
-  p.end();
+  Album &a = album();
+  int8_t slot = a.pickForSave();
+  if (slot < 0) return false;
+  albumRemoveFiles((uint8_t)slot);
+  if (!albumWriteBmp((uint8_t)slot, fb, 466, 2)) return false;   // every other pixel: half size
+  a.markSaved((uint8_t)slot);
+  a.save();
   return true;
 }
 
-uint8_t albumCount() {
-  uint16_t n = albumNext();
-  return n > ALBUM_MAX ? ALBUM_MAX : (uint8_t)n;
-}
+uint8_t albumCount() { return album().count(); }
 
 bool albumLoad(uint8_t newest, uint16_t *out) {
-  if (!sdReady || !out || newest >= albumCount()) return false;
-  uint16_t n = albumNext();
+  if (!sdReady || !out) return false;
+  int8_t slot = album().slotFor(newest);
+  if (slot < 0) return false;
   char path[24];
-  snprintf(path, sizeof(path), "/album/%02u.raw", (unsigned)((n - 1 - newest) % ALBUM_MAX));
+  albumPath(path, sizeof(path), (uint8_t)slot, true);
   File f = SD_MMC.open(path, FILE_READ);
+  if (f) {
+    bool ok = f.size() == ALBUM_BMP_SIZE && f.seek(ALBUM_BMP_HDR);
+    static uint8_t row[ALBUM_BMP_ROW];
+    for (int y = 0; ok && y < ALBUM_W; y++) {
+      ok = f.read(row, ALBUM_BMP_ROW) == ALBUM_BMP_ROW;
+      if (ok) memcpy(out + y * ALBUM_W, row, ALBUM_W * 2);
+    }
+    f.close();
+    return ok;
+  }
+  albumPath(path, sizeof(path), (uint8_t)slot, false);   // not converted yet
+  f = SD_MMC.open(path, FILE_READ);
   if (!f) return false;
   size_t want = ALBUM_W * ALBUM_W * 2;
   size_t got = f.read((uint8_t *)out, want);
   f.close();
   return got == want;
+}
+
+bool albumIsFav(uint8_t newest) {
+  int8_t slot = album().slotFor(newest);
+  return slot >= 0 && album().isFav((uint8_t)slot);
+}
+
+bool albumToggleFav(uint8_t newest) {
+  int8_t slot = album().slotFor(newest);
+  if (slot < 0 || !album().toggleFav((uint8_t)slot)) return false;
+  album().save();
+  return true;
+}
+
+bool albumDelete(uint8_t newest) {
+  int8_t slot = album().slotFor(newest);
+  if (slot < 0 || !album().remove((uint8_t)slot)) return false;
+  if (sdReady) albumRemoveFiles((uint8_t)slot);
+  album().save();
+  return true;
+}
+
+uint8_t albumDeleteAllButFav() {
+  uint8_t gone[ALBUM_MAX];
+  uint8_t n = album().removeAllButFav(gone);
+  for (uint8_t k = 0; sdReady && k < n; k++) albumRemoveFiles(gone[k]);
+  if (n) album().save();
+  return n;
+}
+
+// Once, at boot: the photos from before phase 33 (raw screen dumps) become BMPs,
+// and a slot whose file is gone (another card) is let go.
+void albumMigrate() {
+  if (!sdReady) return;
+  Album &a = album();
+  bool changed = false;
+  uint16_t *buf = albumBuffer();
+  for (uint8_t k = 0; k < ALBUM_MAX; k++) {
+    if (!(a.s[k].flags & AS_USED)) continue;
+    char bmp[24], raw[24];
+    albumPath(bmp, sizeof(bmp), k, true);
+    albumPath(raw, sizeof(raw), k, false);
+    if (SD_MMC.exists(bmp)) { if (SD_MMC.exists(raw)) SD_MMC.remove(raw); continue; }
+    File f = SD_MMC.open(raw, FILE_READ);
+    bool ok = f && buf && f.read((uint8_t *)buf, ALBUM_W * ALBUM_W * 2) == ALBUM_W * ALBUM_W * 2;
+    if (f) f.close();
+    if (ok && albumWriteBmp(k, buf, ALBUM_W, 1)) SD_MMC.remove(raw);
+    else if (!SD_MMC.exists(raw)) { a.remove(k); changed = true; }
+  }
+  if (changed) a.save();
 }
 
 uint16_t *albumBuffer() {

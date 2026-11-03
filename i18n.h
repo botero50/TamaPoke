@@ -214,6 +214,8 @@ enum StrId : uint16_t {
   S_SWEEP, S_NOTHING_SWEEP, S_SWEEP_TOO, S_CLEAN_GAIN_FMT, S_SWEPT,
   // phase 32b: what the broom cleans
   S_SWEPT_FMT,
+  // phase 33: the album
+  S_DEL_PHOTO_Q, S_DELETE, S_DELETE_ALL, S_DEL_ALL_Q, S_PHOTO_DELETED, S_FAV_FULL_FMT,
   STR_COUNT
 };
 

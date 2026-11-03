@@ -52,13 +52,18 @@ struct PmdMon {
 
 
 // The photo album: up to ALBUM_MAX photos at half size (ALBUM_W x ALBUM_W RGB565)
-// in /album on the SD card, the oldest overwritten first.
-#define ALBUM_MAX 24
-#define ALBUM_W 233
+// in /album on the SD card as BMPs a computer opens; the oldest non-favourite is
+// overwritten first. The bookkeeping is album.h. "newest" counts from 0 = the newest.
+#include "album.h"
 bool albumSave(const uint16_t *fb466);       // downscales the screen and writes the next photo
 uint8_t albumCount();
-bool albumLoad(uint8_t newest, uint16_t *out);   // 0 = the newest
+bool albumLoad(uint8_t newest, uint16_t *out);
 uint16_t *albumBuffer();                     // room for one photo (PSRAM)
+bool albumIsFav(uint8_t newest);
+bool albumToggleFav(uint8_t newest);         // false: already ALBUM_FAV_MAX favourites
+bool albumDelete(uint8_t newest);
+uint8_t albumDeleteAllButFav();              // how many went
+void albumMigrate();                         // at boot: old .raw photos become .bmp
 
 // gallery thumbnails (the whole thumbs.bin in PSRAM)
 struct SdThumbs {

@@ -125,7 +125,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32
     "Barrer la caca", "No hay nada que barrer", "Barre la caca tambien!", "+%u de limpieza", "Todo barrido!",
     // phase 32b
-    "Todo barrido! +%u de limpieza", },
+    "Todo barrido! +%u de limpieza",
+    // phase 33
+    "Borrar esta foto?", "BORRAR", "BORRAR TODAS", "Borrar todas menos las favoritas?", "Foto borrada", "Ya tienes %u favoritas", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -245,7 +247,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32
     "Sweep the poop", "Nothing to sweep", "Sweep the poop too!", "+%u clean", "All swept!",
     // phase 32b
-    "All swept! +%u clean", },
+    "All swept! +%u clean",
+    // phase 33
+    "Delete this photo?", "DELETE", "DELETE ALL", "Delete all but the favourites?", "Photo deleted", "You already have %u favourites", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -364,7 +368,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32
     "Balayer le caca", "Rien a balayer", "Balaie le caca aussi !", "+%u de proprete", "Tout est balaye !",
     // phase 32b
-    "Tout est balaye ! +%u", },
+    "Tout est balaye ! +%u",
+    // phase 33
+    "Effacer cette photo ?", "EFFACER", "TOUT EFFACER", "Tout effacer sauf les favorites ?", "Photo effacee", "Deja %u favorites", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -483,7 +489,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32
     "Kacka fegen", "Nichts zu fegen", "Feg auch die Kacka!", "+%u Sauberkeit", "Alles gefegt!",
     // phase 32b
-    "Alles gefegt! +%u Sauberkeit", },
+    "Alles gefegt! +%u Sauberkeit",
+    // phase 33
+    "Dieses Foto loeschen?", "LOESCHEN", "ALLE LOESCHEN", "Alle ausser Favoriten loeschen?", "Foto geloescht", "Schon %u Favoriten", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -602,7 +610,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32
     "Spazza la cacca", "Niente da spazzare", "Spazza anche la cacca!", "+%u di pulizia", "Tutto spazzato!",
     // phase 32b
-    "Tutto spazzato! +%u di pulizia", },
+    "Tutto spazzato! +%u di pulizia",
+    // phase 33
+    "Cancellare questa foto?", "CANCELLA", "CANCELLA TUTTE", "Cancellare tutte tranne le preferite?", "Foto cancellata", "Hai gia %u preferite", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -721,7 +731,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32
     "Varrer o coco", "Nada para varrer", "Varra o coco tambem!", "+%u de limpeza", "Tudo varrido!",
     // phase 32b
-    "Tudo varrido! +%u de limpeza", },
+    "Tudo varrido! +%u de limpeza",
+    // phase 33
+    "Apagar esta foto?", "APAGAR", "APAGAR TODAS", "Apagar todas menos as favoritas?", "Foto apagada", "Ja tem %u favoritas", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -842,7 +854,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32
     "扫掉便便", "没有要扫的", "也把便便扫掉吧!", "清洁+%u", "扫干净了!",
     // phase 32b
-    "扫干净了! 清洁+%u", },
+    "扫干净了! 清洁+%u",
+    // phase 33
+    "删除这张照片?", "删除", "全部删除", "删除除收藏外的所有照片?", "照片已删除", "已经有%u张收藏了", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -962,7 +976,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 32
     "응가 쓸기", "쓸 게 없어요", "응가도 쓸어 주세요!", "청결 +%u", "깨끗하게 쓸었어요!",
     // phase 32b
-    "깨끗하게 쓸었어요! 청결 +%u", },
+    "깨끗하게 쓸었어요! 청결 +%u",
+    // phase 33
+    "이 사진을 지울까요?", "지우기", "모두 지우기", "즐겨찾기 빼고 모두 지울까요?", "사진을 지웠어요", "이미 즐겨찾기가 %u개예요", },
 };
 
 // Medal names in their three lengths [language][medal].
