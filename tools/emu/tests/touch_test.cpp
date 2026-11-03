@@ -391,7 +391,7 @@ int main(int argc, char **argv) {
     printf("PASS: food -> meals -> none left: one tap buys and eats; no coins refuses\n");
   }
 
-  // the bath and sleep menus (rows at 122 + 52 i, so +23 is mid-row)
+  // the bath menu (phase 32: six rows at 126 + 44 i, so +20 is mid-row) and the sleep menu (122 + 52 i)
   {
     pump(80);
     int bbx, bby; uiButtonAt(2, &bbx, &bby, nullptr);   // the bath button, 3rd of 4
@@ -399,13 +399,30 @@ int main(int argc, char **argv) {
     click(bbx, bby);
     if (!bathOpen) { printf("FAIL: the bath button did not open the bath menu\n"); return 1; }
     pet.soapCount = 0;
-    click(233, 122 + 52 + 23);             // BUBBLE BATH without soap
+    click(233, 126 + 3 * 44 + 20);         // BUBBLE BATH without soap
     if (!bathOpen) { printf("FAIL: a bubble bath without soap should be refused\n"); return 1; }
-    click(233, 122 + 23);                  // QUICK WASH
+    click(233, 126 + 44 + 20);             // QUICK WASH
     if (bathOpen) { printf("FAIL: QUICK WASH did not start the bath\n"); return 1; }
     pump(130);                             // the 3 s bath plays out
-    if (pet.poops != 0 || pet.hygiene != 100) { printf("FAIL: the quick wash did not clean it\n"); return 1; }
-    printf("PASS: bath -> quick wash cleans it; no soap, no bubble bath\n");
+    if (pet.poops != 2 || pet.hygiene < 30 + WASH_SHOWER - 6 || pet.hygiene > 30 + WASH_SHOWER) {
+      printf("FAIL: the quick wash should add %u and leave the poop (hyg %u, poops %u)\n", WASH_SHOWER, pet.hygiene, pet.poops); return 1; }
+    printf("PASS: bath -> quick wash adds %u and leaves the poop; no soap, no bubble bath\n", WASH_SHOWER);
+    {                                      // the broom
+      extern uint32_t sweepUntil;
+      pump(80);
+      click(bbx, bby);
+      click(233, 126 + 20);                // SWEEP THE POOP
+      if (bathOpen || !sweepUntil) { printf("FAIL: the sweep row did not start the broom\n"); return 1; }
+      if (pet.poops != 2) { printf("FAIL: the poop went before the broom got there\n"); return 1; }
+      for (int k = 0; k < 120 && sweepUntil; k++) pump(4);
+      if (sweepUntil || pet.poops != 0) { printf("FAIL: the broom did not sweep the poop\n"); return 1; }
+      pump(80);
+      click(bbx, bby);
+      click(233, 126 + 20);                // nothing left to sweep
+      if (!bathOpen || sweepUntil) { printf("FAIL: the broom on a clean floor should be refused\n"); return 1; }
+      click(20, 233);                      // close the menu
+      printf("PASS: the broom sweeps the poop away, and refuses a clean floor\n");
+    }
 
     int lbx, lby; uiButtonAt(1, &lbx, &lby, nullptr);   // the light button, 2nd of 4
     pet.sleeping = false;
@@ -562,8 +579,8 @@ int main(int argc, char **argv) {
       click(233, 200);
       if (bathPops != 0 || bathPlay) { printf("FAIL: a tap in the shower popped a bubble\n"); return 1; }
       for (int k = 0; k < 120 && bathUntil; k++) pump(4);
-      if (bathUntil || pet.hygiene != 100) { printf("FAIL: the shower did not end in a clean pet\n"); return 1; }
-      printf("PASS: the quick wash is a shower: nothing to pop, and clean\n");
+      if (bathUntil || pet.hygiene < 40 + WASH_SHOWER - 6 || pet.hygiene > 40 + WASH_SHOWER) { printf("FAIL: the shower did not add %u (hyg %u)\n", WASH_SHOWER, pet.hygiene); return 1; }
+      printf("PASS: the quick wash is a shower: nothing to pop, and +%u clean\n", WASH_SHOWER);
       pump(30);
     }
     // the bubble bath: a finger on a bubble pops it and turns the wash into a game

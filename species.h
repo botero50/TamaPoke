@@ -2128,6 +2128,25 @@ static const char* const SPR_CARE_SPONGE[16] = {  // 16x16
   "................",
 };
 
+static const char* const SPR_CARE_BROOM[16] = {  // 16x16
+  "...........kk...",
+  "..........kck...",
+  ".........kck....",
+  "........kck.....",
+  ".......kck......",
+  "......kck.......",
+  ".....kkkk.......",
+  "....kYYYYk......",
+  "...kyyyyyyk.....",
+  "..kyYyYyYyyk....",
+  ".kyYyYyYyYyyk...",
+  ".kyYyYyYyYyYk...",
+  "kyYyYyYyYyYk....",
+  "kkkkkkkkkkkk....",
+  "................",
+  "................",
+};
+
 static const char* const SPR_CARE_NOTE[16] = {  // 16x16
   "................",
   "................",

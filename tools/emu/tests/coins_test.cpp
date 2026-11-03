@@ -326,12 +326,24 @@ int main(){
     p.poops = 2; p.hygiene = 20; p.joy = 50;
     g_ms = 2000000;
     ck(p.bubbleBath() && p.soapCount == 0, "a bubble bath uses the soap");
-    ck(p.poops == 0 && p.hygiene == 100 && p.joy >= 60, "and cleans it, happier than a plain wash");
+    ck(p.poops == 2 && p.hygiene == 100 && p.joy >= 60, "and fills CLEAN, happier than a plain wash; the poop stays");
     p.joy = 50;
     ck(p.brush() && p.shining() && p.joy == 55, "brushing: joy and a shine");
     p.poops = 3; p.hygiene = 10; p.joy = 40;
     p.scrubDone(6);
-    ck(p.poops == 0 && p.hygiene == 100 && p.joy == 52, "the scrub game cleans it and pays joy");
+    ck(p.poops == 3 && p.hygiene == 10 + WASH_SCRUB && p.joy == 52, "the scrub game adds WASH_SCRUB and pays joy");
+    p.hygiene = 20; p.clean(WASH_SHOWER);
+    ck(p.hygiene == 20 + WASH_SHOWER, "a shower adds WASH_SHOWER");
+    p.hygiene = 90; p.clean(WASH_SHOWER);
+    ck(p.hygiene == 100, "never past 100");
+    uint32_t c = p.coins; p.coinDay = 20000; p.coinsToday = 0; p.missionDone = 0xBF;
+    p.dirtyTicks = 30;
+    ck(p.sweep() && p.poops == 0 && p.dirtyTicks == 0 && p.coins == c + 1, "the broom: no poop, no dirt clock, a coin");
+    c = p.coins;
+    ck(!p.sweep() && p.coins == c, "nothing to sweep: nothing happens");
+    p.saveNow();
+    Pet q; q.begin();
+    ck(q.poops == 0, "the clean floor survives a reboot");
   }
 
   // --- the nap ends by itself, rested and not grumpy; the lullaby puts it to bed

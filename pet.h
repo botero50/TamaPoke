@@ -158,6 +158,8 @@ enum FoodId : uint8_t {
 #define FOOD_STACK_MAX 99
 // Bath and sleep extras
 #define SOAP_PRICE 10            // one bubble bath
+#define WASH_SHOWER 35           // the quick shower adds this much CLEAN (the bubble bath fills it)
+#define WASH_SCRUB 65            // the sponge game
 #define BRUSH_PRICE 60           // bought once
 #define NAP_MINUTES 30
 #define SHINE_MS 60000UL         // sparkles after brushing
@@ -954,7 +956,8 @@ public:
   // syncClock() reads "seen" back out of NVS, so a test has to put it there
   void dbgSetSeen(uint32_t e) { lastSeenEpoch = e; prefs.putUInt("seen", e); }
   uint8_t sleepAuto = SLEEP_NONE;   // who decided the current sleep state  // sleep / wake
-  void clean();
+  void clean(uint8_t gain = 100);   // a wash: CLEAN up by gain; the poop stays for the broom
+  bool sweep();                     // the broom: the poop goes; false when there is none
   void caress();  // pet the creature
   void eggTap();  // tap the egg: 3 taps and it hatches
   void newEgg();   // start over with a random starter

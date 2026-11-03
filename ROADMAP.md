@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 2 November 2026, with Phase 31._
+_Last updated: 2 November 2026, with Phase 32._
 
 ## Done
 | Phase | What | Release |
@@ -21,6 +21,7 @@ _Last updated: 2 November 2026, with Phase 31._
 | 29 | A talkative Pokemon (147 phrases in 35 groups, 8 languages, never one of the last six) and honest weather (rain needs 0.3 mm really falling, drizzle is never rain, grey skies need 60% cloud, no pretend rain with Wi-Fi, a stale sky clears after 75 min) | v1.12 |
 | 30 | The quick wash is a real shower (water, no bubbles); the bubble bath keeps the bubble game; food with none in the bag is bought and eaten in one tap from the food menu | v1.13 |
 | 31 | Six daily missions from 36 kinds (care, play, outdoors, home, shop: one of each, plus one), only ones she can do today; two tabs (MISIONES DE HOY / AVENTURA) on the missions panel; 12 weekly stories of 4 steps; the Center step of Chansey's story now counts | v1.14 |
+| 32 | Levels of clean (quick shower +35, sponge +65, bubble bath to 100) with a toast of what it did; washes leave the poop, and a broom sweeps it away (its own row, a 2 s animation); the bath menu gets six compact rows | v1.15 |
 
 ## Next
 | # | Item | Needs | Notes |
@@ -69,3 +70,5 @@ _Last updated: 2 November 2026, with Phase 31._
   perfect day, outside the 50-coin activity cap. An old save rolls today's six fresh.
 - **Stories** never use the contest (once a week, it could leave a story stuck). A story
   finished under the old 3 steps stays finished (`qver`).
+- **Washing and sweeping are separate** since phase 32: a wash never removes poop, and a
+  wash with poop on the floor says to sweep it too (poop keeps draining CLEAN).

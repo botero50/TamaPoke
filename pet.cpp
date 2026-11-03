@@ -1829,7 +1829,7 @@ bool Pet::buyBrush() {
 bool Pet::bubbleBath() {
   if (!soapCount || isEgg() || sleeping || ceremony != CER_NONE) return false;
   soapCount--;
-  clean();                       // the bath itself: poops, hygiene, mission, coin
+  clean();                       // the bath itself: CLEAN to 100, mission, coin
   noteMission(MIS_BUBBLE, 1);
   joy = clamp100(joy + 10);
   addBond(2);
@@ -1849,9 +1849,21 @@ bool Pet::brush() {
   return true;
 }
 
+// The broom: the floor is clean again. The wash is for the creature.
+bool Pet::sweep() {
+  if (!poops || ceremony != CER_NONE) return false;
+  poops = 0;
+  if (hygiene >= 15) dirtyTicks = 0;
+  earnCoins(1, true);
+  addBond(1);
+  registerCare();
+  save();
+  return true;
+}
+
 void Pet::scrubDone(uint8_t spots) {
   if (isEgg() || ceremony != CER_NONE) return;
-  clean();
+  clean(WASH_SCRUB);
   uint8_t j = spots * 2;
   joy = clamp100(joy + (j > 12 ? 12 : j));
   heartUntil = millis() + HEART_MS;
@@ -2911,11 +2923,10 @@ void Pet::toggleLight() {
   save();
 }
 
-void Pet::clean() {
+void Pet::clean(uint8_t gain) {
   if (ceremony != CER_NONE) return;
-  poops = 0;
-  hygiene = 100;
-  dirtyTicks = 0;
+  hygiene = clamp100((int)hygiene + gain);
+  if (poops < 3) dirtyTicks = 0;      // three piles on the floor still count as dirty
   // the bath is the last step of curing a cold
   if (sickness == SICK_COLD && sickDoses >= 2) { sickness = SICK_NONE; sickTicks = 0; sickDoses = 0; }
   noteMission(MIS_BATH, 1);

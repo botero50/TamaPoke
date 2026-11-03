@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.30"
+#define FW_VERSION "3.14-funpack.31"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -189,6 +189,8 @@ uint8_t settingsPage = 0;
 // bath scene: foam over the creature, cleaned up when it bursts
 uint32_t bathUntil = 0;
 bool bathPending = false;
+uint32_t sweepStart = 0, sweepUntil = 0;   // the broom over the poop (phase 32)
+uint8_t sweepN = 0;                       // how many piles it is sweeping
 struct { int16_t x, y; uint8_t r, ph; uint32_t born, popAt; } bubbles[14];   // popAt: when a finger popped it
 bool bathPlay = false;        // a bubble was popped: the wash became a bubble game
 uint8_t bathPops = 0;
@@ -227,6 +229,7 @@ uint8_t fpMenuCat = 0;     // 0 = closed, else FP_CAT_* + 1: the open game list
 bool fpOpen = false;
 uint8_t fpGame = 0;
 StrId fpToast = S_TOO_SICK;
+int16_t fpToastNum = -1;      // >= 0: fpToast is a format with one %u
 uint16_t fpToastColor = 0;
 uint32_t fpToastUntil = 0;
 // Coins: the two panels behind the top buttons
@@ -1964,6 +1967,7 @@ void onTap(int16_t x, int16_t y) {
   if (alarmRinging) { alarmRinging = false; audioMusic(MUS_NONE); sfxPlay(SFX_TAP); return; }
   // mid-shower, a finger pops the bubbles
   if (bathUntil && !pet.awaitingStarter() && uiCurrentScreen() == SCR_MAIN && bathTap(x, y)) return;
+  if (sweepUntil && uiCurrentScreen() == SCR_MAIN) return;   // the broom is busy
   if (pet.awaitingStarter()) {  // first game: region, then starter
     if (!starterRegionDone) {
       int r = regionPickTap(x, y, RPICK_FOR_START);
@@ -4291,6 +4295,7 @@ void render() {
     drawEvents();
     drawSeasonDecor();
     drawPoops();
+    drawSweep();
     drawLightsOff();
     drawStepPlate();
     // lower panel: clean base for bars and buttons over the landscape
@@ -8024,7 +8029,7 @@ static int bathBubbleY(int i, uint32_t now) { return bubbles[i].y - (int)((now -
 void bathBubblePos(int i, int *x, int *y) { uint32_t now = millis(); *x = bathBubbleX(i, now / 220.0f); *y = bathBubbleY(i, now); }
 
 void startBath() {
-  if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil || pet.atWork()) return;
+  if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil || sweepUntil || pet.atWork()) return;
   uint32_t now = millis();
   bathUntil = now + 3000;
   bathPending = true;
@@ -8081,8 +8086,10 @@ void drawBath() {
     bathUntil = 0;
     if (bathPending) {
       bathPending = false;
+      uint8_t h0 = pet.hygiene;
       if (bathKind == 1) pet.bubbleBath();
-      else pet.clean();
+      else pet.clean(WASH_SHOWER);
+      washToast(pet.hygiene - h0);
       bathKind = 0;
       // playing with the bubbles cheers it up a little: a point of joy per two pops, at most 10
       if (bathPops) pet.joy = (uint8_t)min(100, pet.joy + min(10, bathPops / 2));
@@ -8361,6 +8368,7 @@ void overlayMouth(const Species &sp, int x, int y, int s, bool open) {
 }
 
 void drawPoops() {
+  if (sweepUntil) return;      // drawSweep() has them
   for (int i = 0; i < pet.poops; i++) {
     const int px = 36 + i * 46, py = 244;
     drawMap(SPR_POOP, 32, px, py, 2, false);
@@ -8374,6 +8382,75 @@ void drawPoops() {
       gfx->fillRect(fx, fy, 3, 3, INK_K);
       gfx->fillRect(fx - 1, fy - (up ? 2 : 1), 2, 2, UI_WHITE);
       gfx->fillRect(fx + 2, fy - (up ? 2 : 1), 2, 2, UI_WHITE);
+    }
+  }
+}
+
+// ---------- the broom (phase 32) ----------
+
+#define SWEEP_MS 2000
+
+void startSweep() {
+  if (!pet.poops || sweepUntil || bathUntil || pet.ceremony || pet.atWork()) return;
+  sweepStart = millis();
+  sweepUntil = sweepStart + SWEEP_MS;
+  sweepN = pet.poops;
+  sfxPlay(SFX_TAP);
+}
+
+// A broom sweeps from right to left along the bottom left, pushing the piles
+// ahead of it; they shrink away, dust puffs trail it, and it ends in a sparkle.
+void drawSweep() {
+  if (!sweepUntil) return;
+  uint32_t now = millis();
+  if (now >= sweepUntil) {
+    sweepUntil = 0;
+    if (pet.sweep()) { sfxPlay(SFX_HEART); fpShowToast(S_SWEPT, UI_BAR_OK); }
+    return;
+  }
+  uint32_t t = now - sweepStart;
+  float p = t / (float)(SWEEP_MS - 400);             // the sweep itself; the last 400 ms sparkle
+  if (p > 1) p = 1;
+  int bx = 260 - (int)(p * 300);                    // the bristles' left edge
+  const int ground = 306;
+  static uint32_t lastSwish = 0;
+  if (p < 1 && now - lastSwish > 380) { lastSwish = now; sfxPlay(SFX_TAP); }
+  for (int i = 0; i < sweepN; i++) {                 // the piles: still there, or pushed and shrinking
+    int px = 36 + i * 46, py = 244;
+    if (bx > px + 40) { drawMap(SPR_POOP, 32, px, py, 2, false); continue; }
+    int pushed = px + 40 - bx;
+    if (pushed > 70) continue;                      // gone
+    int s = pushed < 30 ? 2 : 1;
+    int qx = bx - (s == 2 ? 44 : 28), qy = s == 2 ? py : py + 32;
+    drawMap(SPR_POOP, 32, qx, qy, s, false);
+    for (int f = 0; f < 2; f++)                      // the flies leave
+      gfx->fillRect(px + 30 + f * 14 + pushed / 2, py - pushed - f * 10, 3, 3, INK_K);
+  }
+  const uint16_t dust = C565(0xc8, 0xbe, 0xae);
+  for (int k = 0; k < 6; k++) {                      // dust behind the broom
+    int age = (int)((t / 60 + k * 7) % 10);
+    int dx = bx + 70 + k * 9 + age * 2, dy = ground - 6 - age * 2 - (k & 1) * 5;
+    int r = 6 - age / 2;
+    if (r > 0 && dx < 300) gfx->fillCircle(dx, dy, r, dust);
+  }
+  if (p < 1) {                                       // the broom: a handle up to the right, the bristles
+    int sway = (int)(sinf(t * 0.025f) * 6);
+    int hx = bx + 70 + sway, hy = ground - 26;
+    for (int w = -2; w <= 2; w++) gfx->drawLine(hx + w, hy, hx + 70 + w, hy - 110, C565(0xb0, 0x7a, 0x45));
+    gfx->drawLine(hx - 3, hy, hx + 67, hy - 110, UI_INK);
+    gfx->fillRect(hx - 8, hy - 4, 18, 8, C565(0xe0, 0xb8, 0x60));          // the band
+    gfx->drawRect(hx - 8, hy - 4, 18, 8, UI_INK);
+    gfx->fillTriangle(bx, ground, bx + 92, ground, hx, hy + 2, C565(0xf8, 0xd9, 0x90));
+    gfx->drawLine(bx, ground, bx + 92, ground, UI_INK);   // the outline
+    gfx->drawLine(bx, ground, hx, hy + 2, UI_INK);
+    gfx->drawLine(bx + 92, ground, hx, hy + 2, UI_INK);
+    for (int k = 1; k < 8; k++) gfx->drawLine(hx, hy + 4, bx + k * 12 + sway / 3, ground - 1, C565(0xe0, 0xb8, 0x60));
+  } else {                                           // a sparkle where the piles were
+    for (int i = 0; i < sweepN; i++) {
+      int sx = 68 + i * 46, sy = 272, r = 4 + (int)((t / 50 + i * 3) % 8);
+      gfx->drawFastHLine(sx - r, sy, 2 * r + 1, UI_WHITE);
+      gfx->drawFastVLine(sx, sy - r, 2 * r + 1, UI_WHITE);
+      gfx->fillCircle(sx, sy, 2, C565(0xff, 0xd9, 0x5e));
     }
   }
 }
@@ -8718,6 +8795,7 @@ static StrId fpTitle(uint8_t g) {
 // Takes a plain integer: the generated prototypes sit above the #includes.
 void fpShowToast(uint16_t s, uint16_t color) {
   fpToast = (StrId)s;
+  fpToastNum = -1;
   fpToastColor = color;
   fpToastUntil = millis() + 2500;
 }
@@ -8748,7 +8826,17 @@ void drawFpToast() {
   if (millis() > fpToastUntil) { fpToastUntil = 0; return; }
   gfx->fillRoundRect(63, 186, 340, 60, 16, fpToastColor);
   gfx->drawRoundRect(63, 186, 340, 60, 16, UI_INK);
-  uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, 186, 60), T(fpToast), UI_WHITE, 1, 316);
+  char b[48];
+  if (fpToastNum >= 0) snprintf(b, sizeof(b), T(fpToast), (unsigned)fpToastNum);
+  else snprintf(b, sizeof(b), "%s", T(fpToast));
+  uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, 186, 60), b, UI_WHITE, 1, 316);
+}
+
+// After a wash: how much cleaner it is -- or, with poop still on the floor, the broom.
+void washToast(int gained) {
+  if (pet.poops) { fpShowToast(S_SWEEP_TOO, UI_BAR_WARN); return; }
+  fpShowToast(S_CLEAN_GAIN_FMT, UI_BAR_OK);
+  fpToastNum = gained > 0 ? gained : 0;
 }
 
 // the germ that floats beside a sick creature
@@ -10429,31 +10517,61 @@ static void drawMenuTitle(StrId t) {
 
 // ---------- the bath menu ----------
 
+// Six compact rows (the food lists keep their five tall ones).
+#define BATH_ROW_Y(i) (PANEL_Y + 50 + (i) * 44)
+#define BATH_ROW_H 40
+enum { BR_SWEEP = 0, BR_SHOWER, BR_SCRUB, BR_BUBBLE, BR_BRUSH, BR_TEETH, BR_COUNT };
+
+static void drawBathRow(int i, const char *const *icon, const char *label, const char *right, uint16_t fill) {
+  int y = BATH_ROW_Y(i);
+  gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, BATH_ROW_H, 12, fill);
+  gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, BATH_ROW_H, 12, UI_INK);
+  drawMap(icon, 16, PANEL_X + 24, y + 4, 2, false);
+  uiTextFit(UIF_SMALL, PANEL_X + 66, uiMidY(UIF_SMALL, y, BATH_ROW_H), label, UI_INK, 0, 190);
+  if (right && *right) uiText(UIF_TINY, PANEL_X + PANEL_W - 26, uiMidY(UIF_TINY, y, BATH_ROW_H), right, UI_INK, 2);
+}
+
 void renderBathMenu() {
   drawMenuTitle(S_BATH_TITLE);
-  drawFoodRow(0, SPR_ICON_CLEAN, T(S_QUICK_WASH), 0, UI_BG_DAY);
-  drawFoodRow(1, SPR_CARE_SOAP, T(S_BUBBLE_BATH), pet.soapCount, pet.soapCount ? UI_BG_DAY : UI_TRACK_TEXT);
-  drawFoodRow(2, SPR_CARE_SPONGE, T(S_SCRUB), 0, UI_BG_DAY);
-  drawFoodRow(3, SPR_CARE_BRUSH, T(S_BRUSH), 0, pet.brushOwned ? UI_BG_DAY : UI_TRACK_TEXT);
-  drawFoodRow(4, SPR_ICON_CLEAN, T(S_TEETH), pet.teethLeftToday(), pet.teethLeftToday() ? UI_BG_DAY : UI_TRACK_TEXT);
+  char n[12];
+  snprintf(n, sizeof(n), pet.poops ? T(S_COUNT_FMT) : "", (unsigned)pet.poops);
+  drawBathRow(BR_SWEEP, SPR_CARE_BROOM, T(S_SWEEP), n, pet.poops ? UI_BG_DAY : UI_TRACK_TEXT);
+  snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SHOWER);
+  drawBathRow(BR_SHOWER, SPR_ICON_CLEAN, T(S_QUICK_WASH), n, UI_BG_DAY);
+  snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SCRUB);
+  drawBathRow(BR_SCRUB, SPR_CARE_SPONGE, T(S_SCRUB), n, UI_BG_DAY);
+  snprintf(n, sizeof(n), pet.soapCount ? T(S_COUNT_FMT) : "", (unsigned)pet.soapCount);
+  drawBathRow(BR_BUBBLE, SPR_CARE_SOAP, T(S_BUBBLE_BATH), n, pet.soapCount ? UI_BG_DAY : UI_TRACK_TEXT);
+  drawBathRow(BR_BRUSH, SPR_CARE_BRUSH, T(S_BRUSH), "", pet.brushOwned ? UI_BG_DAY : UI_TRACK_TEXT);
+  snprintf(n, sizeof(n), pet.teethLeftToday() ? T(S_COUNT_FMT) : "", (unsigned)pet.teethLeftToday());
+  drawBathRow(BR_TEETH, SPR_ICON_CLEAN, T(S_TEETH), n, pet.teethLeftToday() ? UI_BG_DAY : UI_TRACK_TEXT);
   drawFpToast();
   gfx->flush();
 }
 
 void startScrub();
 
+static int bathRowHit(int16_t x, int16_t y) {
+  if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14) return -1;
+  for (int i = 0; i < BR_COUNT; i++)
+    if (y >= BATH_ROW_Y(i) - 2 && y <= BATH_ROW_Y(i) + BATH_ROW_H + 2) return i;
+  return -1;
+}
+
 void bathMenuTap(int16_t x, int16_t y) {
   if (!inPanel(x, y)) { bathOpen = false; return; }
-  int i = foodRowHit(x, y);
-  if (i < 0 || i > 4) return;
-  if (i == 4) { bathOpen = false; if (teethAllowed()) startTeeth(); return; }
-  if (i == 1 && !pet.soapCount) { sfxPlay(SFX_DENY); fpShowToast(S_NEED_SOAP, UI_BAR_BAD); return; }
-  if (i == 3 && !pet.brushOwned) { sfxPlay(SFX_DENY); fpShowToast(S_NEED_BRUSH, UI_BAR_BAD); return; }
+  int i = bathRowHit(x, y);
+  if (i < 0) return;
+  if (i == BR_TEETH) { bathOpen = false; if (teethAllowed()) startTeeth(); return; }
+  if (i == BR_SWEEP && !pet.poops) { sfxPlay(SFX_DENY); fpShowToast(S_NOTHING_SWEEP, UI_BAR_WARN); return; }
+  if (i == BR_BUBBLE && !pet.soapCount) { sfxPlay(SFX_DENY); fpShowToast(S_NEED_SOAP, UI_BAR_BAD); return; }
+  if (i == BR_BRUSH && !pet.brushOwned) { sfxPlay(SFX_DENY); fpShowToast(S_NEED_BRUSH, UI_BAR_BAD); return; }
   sfxPlay(SFX_TAP);
   bathOpen = false;
-  if (i == 0) { bathKind = 0; startBath(); }
-  else if (i == 1) { bathKind = 1; startBath(); }
-  else if (i == 2) startScrub();
+  if (i == BR_SWEEP) startSweep();
+  else if (i == BR_SHOWER) { bathKind = 0; startBath(); }
+  else if (i == BR_BUBBLE) { bathKind = 1; startBath(); }
+  else if (i == BR_SCRUB) startScrub();
   else if (pet.brush()) sfxPlay(SFX_HEART);
 }
 
@@ -10513,7 +10631,9 @@ void scrubRub(int16_t x, int16_t y) {
     break;
   }
   for (int i = 0; i < SCRUB_SPOTS; i++) if (scrubSpot[i].hp) return;
+  uint8_t h0 = pet.hygiene;
   pet.scrubDone(SCRUB_SPOTS);       // all clean
+  washToast(pet.hygiene - h0);
   sfxPlay(SFX_MEDAL);
   scrubDoneUntil = now + 2500;
 }
@@ -11683,7 +11803,7 @@ static StrId pickTalk() {
 }
 
 void drawTalk() {
-  if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil || uiCurrentScreen() != SCR_MAIN) { talkUntil = 0; return; }
+  if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil || sweepUntil || uiCurrentScreen() != SCR_MAIN) { talkUntil = 0; return; }
   uint32_t now = millis();
   if (!talkUntil && now >= talkNextAt) {
     talkMsg = pickTalk();
@@ -12720,7 +12840,7 @@ void drawRoom(bool night) {
 // ===========================================================================
 
 static bool mainSceneQuiet() {
-  return !pet.isEgg() && !pet.sleeping && !pet.ceremony && !bathUntil && uiCurrentScreen() == SCR_MAIN;
+  return !pet.isEgg() && !pet.sleeping && !pet.ceremony && !bathUntil && !sweepUntil && uiCurrentScreen() == SCR_MAIN;
 }
 
 void drawWish() {
