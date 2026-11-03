@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.35"
+#define FW_VERSION "3.14-funpack.37"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -379,6 +379,7 @@ bool spdNewHi = false;
 
 bool gymOpen = false;
 bool gymCardOpen = false;   // phase 34: the next leader's challenge card
+bool stepsOpen = false;     // phase 35: the steps panel
 int8_t gymToastFor = -1;    // the challenge already announced this boot (region * 16 + leader)
 bool gymHard = false;   // which ladder the list is showing
 
@@ -888,10 +889,16 @@ void loop() {
   // the case this exists for. A render frame is ~100 ms, so samples arrive
   // unevenly; StepDetector takes the timestamp and does not care.
   static StepDetector stepper;
-  float ax, ay, az;
-  if (imuReadAccel(ax, ay, az)) {
-    gAccX = ax; gAccY = ay; gAccZ = az; gAccFresh = true;   // the tilt maze reads the last sample
-    pet.addSteps(stepper.feed(ax, ay, az, now));
+  static float acc[IMU_BATCH_MAX * 3];
+  static uint32_t accMs[IMU_BATCH_MAX];
+  uint8_t na = imuReadBatch(acc, accMs, IMU_BATCH_MAX);   // phase 36: every sample since the last pass
+  if (na) {
+    uint32_t got = 0;
+    for (uint8_t i = 0; i < na; i++)                 // oldest first, each with the time it was read
+      got += stepper.feed(acc[i * 3], acc[i * 3 + 1], acc[i * 3 + 2], accMs[i]);
+    if (got) pet.addSteps(got);
+    gAccX = acc[(na - 1) * 3]; gAccY = acc[(na - 1) * 3 + 1]; gAccZ = acc[(na - 1) * 3 + 2];
+    gAccFresh = true;                                // the tilt games read the last sample
   }
 
   // The link is pumped here rather than from the LAN screen, because it has to
@@ -1113,6 +1120,37 @@ void handleSerial() {
     pet.ageMinutes = (uint32_t)(want - 1) * MINUTES_PER_LEVEL;
     pet.saveNow();
     Serial.printf("lvl=%u\n", pet.level());
+  } else if (line == "IMULOG") {
+    // IMULOG: 4 s of what the accelerometer delivers -- samples per pass, the
+    // magnitude's spread, and how many steps a fresh detector would count.
+    // Leave the ball still for a phantom-step check, or walk with it.
+    static float buf[IMU_BATCH_MAX * 3];
+    static uint32_t bms[IMU_BATCH_MAX];
+    StepDetector sd;
+    uint32_t t0 = millis(), passes = 0, n = 0, steps = 0, maxBatch = 0, drop0 = imuDroppedCount();
+    float mn = 99.0f, mx = 0.0f, sum = 0.0f, sum2 = 0.0f;
+    Serial.printf("imu fifo=%d\n", imuFifoOn());
+    while (millis() - t0 < 4000) {
+      uint8_t k = imuReadBatch(buf, bms, IMU_BATCH_MAX);
+      passes++;
+      if (k > maxBatch) maxBatch = k;
+      for (uint8_t i = 0; i < k; i++) {
+        float x = buf[i * 3], y = buf[i * 3 + 1], z = buf[i * 3 + 2];
+        float m = sqrtf(x * x + y * y + z * z);
+        if (m < mn) mn = m;
+        if (m > mx) mx = m;
+        sum += m; sum2 += m * m;
+        if (n < 6) Serial.printf("s%lu %.3f %.3f %.3f |%.3f|\n", (unsigned long)n, x, y, z, m);
+        steps += sd.feed(x, y, z, bms[i]);
+        n++;
+      }
+      delay(100);
+    }
+    float mean = n ? sum / n : 0, sd2 = n ? sum2 / n - mean * mean : 0;
+    Serial.printf("passes=%lu samples=%lu per_s=%.1f maxbatch=%lu dropped=%lu mag mean=%.4f sd=%.4f min=%.3f max=%.3f steps=%lu\n",
+                  (unsigned long)passes, (unsigned long)n, n / 4.0f, (unsigned long)maxBatch, (unsigned long)(imuDroppedCount() - drop0),
+                  mean, sd2 > 0 ? sqrtf(sd2) : 0.0f, mn, mx, (unsigned long)steps);
+    Serial.println("DONE");
   } else if (line.startsWith("STEPS ")) {
     // STEPS <n>: sets today's step count, to see the plate without a walk
     long want = line.substring(6).toInt();
@@ -1408,6 +1446,8 @@ void handleSerial() {
     Serial.printf("wxraw code=%d precip=%u.%u mm cloud=%u%%\n", weatherLast().rawCode, weatherLast().precip10 / 10, weatherLast().precip10 % 10, weatherLast().cloud);
     { char dg[96]; wifiDiag(dg, sizeof(dg)); Serial.printf("wifidiag %s\n", dg); }
     Serial.printf("tickets=%u today=%u golds=%u\n", pet.tickets, pet.ticketsToday, pet.goldBadges());
+    Serial.printf("imu fifo=%d\n", imuFifoOn());
+    Serial.printf("steps=%lu hist=%u,%u,%u,%u,%u,%u,%u total=%lu adv=%u/%u\n", (unsigned long)pet.stepsToday(), pet.stepsDaysAgo(0), pet.stepsDaysAgo(1), pet.stepsDaysAgo(2), pet.stepsDaysAgo(3), pet.stepsDaysAgo(4), pet.stepsDaysAgo(5), pet.stepsDaysAgo(6), (unsigned long)pet.stepTotal, (unsigned)pet.advSteps, (unsigned)Pet::advNeed(pet.advStop));
     { int8_t gi = pet.gymChallengeIdx(); Serial.printf("gym=%u/%u next=%d region=%u ready=%d\n", pet.gymSteps, gi >= 0 ? Pet::gymStepsNeed((uint8_t)gi) : 0, gi, pet.gymChallengeRegion(), pet.gymChallengeReady()); }
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
                   (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
@@ -1976,8 +2016,9 @@ void onTap(int16_t x, int16_t y) {
   // mid-shower, a finger pops the bubbles
   if (bathUntil && !pet.awaitingStarter() && uiCurrentScreen() == SCR_MAIN && bathTap(x, y)) return;
   if (sweepUntil && uiCurrentScreen() == SCR_MAIN) return;   // the broom is busy
-  if (uiCurrentScreen() == SCR_MAIN && !pet.awaitingStarter() && !pet.ceremony && gymButtonHit(x, y)) {
-    sfxPlay(SFX_TAP); gymCardOpen = true; return;   // phase 34: the next leader is waiting
+  if (uiCurrentScreen() == SCR_MAIN && !pet.awaitingStarter() && !pet.ceremony) {
+    if (gymButtonHit(x, y)) { sfxPlay(SFX_TAP); gymCardOpen = true; return; }   // phase 34: the next leader is waiting
+    if (gymDialHit(x, y) || stepPlateHit(x, y)) { sfxPlay(SFX_TAP); stepsOpen = true; return; }   // phase 35: how far
   }
   if (pet.awaitingStarter()) {  // first game: region, then starter
     if (!starterRegionDone) {
@@ -2061,8 +2102,13 @@ void onTap(int16_t x, int16_t y) {
       if (!gymUnlocked(idx, gymHard)) { sfxPlay(SFX_DENY); return; }
       if (!pet.gymStepsOk(gymRegion, idx, gymHard)) {        // phase 34: walk there first
         sfxPlay(SFX_DENY);
-        fpShowToast(S_STEPS_TO_FMT, UI_BAR_WARN);
-        fpToastNum = Pet::gymStepsNeed(idx) - pet.gymSteps;
+        if (pet.gymSteps >= Pet::gymStepsNeed(idx)) {       // phase 36: walked, the week is not up
+          fpShowToast(S_GYM_WAIT_1, UI_BAR_WARN);
+          gymWaitText(fpToastText, sizeof(fpToastText));
+        } else {
+          fpShowToast(S_STEPS_TO_FMT, UI_BAR_WARN);
+          fpToastNum = Pet::gymStepsNeed(idx) - pet.gymSteps;
+        }
         return;
       }
       sfxPlay(SFX_TAP);
@@ -2240,6 +2286,7 @@ void onTap(int16_t x, int16_t y) {
   if (choresOpen) { choresTap(x, y); return; }
   if (piggyOpen) { piggyTap(x, y); return; }
   if (gymCardOpen) { gymCardTap(x, y); return; }
+  if (stepsOpen) { stepsTap(x, y); return; }
   if (albumOpen) { albumTap(x, y); return; }
   if (diaryOpen) { diaryTap(x, y); return; }
   if (mailOpen) { mailOpen = false; return; }   // any tap folds the letter away
@@ -4059,7 +4106,7 @@ uint8_t uiCurrentScreen() {
   if (shopOpen) return SCR_MENU;               // the shop can open over the store
   if (placeScene) return SCR_GAME;
   if (trainOpen || fpMenuCat || arcadeView) return SCR_TRAIN;
-  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen || albumOpen || gymCardOpen) return SCR_MENU;
+  if (menuOpen || missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || foodOpen || bathOpen || sleepOpen || mapOpen || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen || albumOpen || gymCardOpen || stepsOpen) return SCR_MENU;
   return SCR_MAIN;
 }
 
@@ -4190,6 +4237,7 @@ void render() {
   if (choresOpen) { renderChores(); return; }
   if (piggyOpen) { renderPiggy(); return; }
   if (gymCardOpen) { renderGymCard(); return; }
+  if (stepsOpen) { renderSteps(); return; }
   if (albumOpen) { renderAlbum(); return; }
   if (diaryOpen) { renderDiary(); return; }
   if (mailOpen) { renderMail(); return; }
@@ -6911,9 +6959,15 @@ void renderGyms() {
     gfx->drawRoundRect(70, y, 326, 44, 10, open_ ? UI_INK : UI_TRACK_TEXT);
     uiTextFit(UIF_TINY, 84, y + 19, t.name, open_ ? UI_INK : UI_TRACK_TEXT, 0, 270);
     if (open_ && !pet.gymStepsOk(gymRegion, idx, gymHard)) {   // phase 34: the steps still to walk
-      char st[32];
-      snprintf(st, sizeof(st), T(S_STEPS_TO_FMT), (unsigned)(Pet::gymStepsNeed(idx) - pet.gymSteps));
-      uiTextFit(UIF_TINY, 84, y + 38, st, UI_BAR_WARN, 0, 180);
+      char st[48];
+      if (pet.gymSteps >= Pet::gymStepsNeed(idx)) {          // phase 36: walked, waiting (the short form fits the row)
+        uint8_t wd = pet.gymWaitDays();
+        if (wd <= 1) snprintf(st, sizeof(st), "%s", T(S_GYM_WAIT_SHORT_1));
+        else snprintf(st, sizeof(st), T(S_GYM_WAIT_SHORT_FMT), (unsigned)wd);
+      }
+      else snprintf(st, sizeof(st), T(S_STEPS_TO_FMT), (unsigned)(Pet::gymStepsNeed(idx) - pet.gymSteps));
+      uiTextFit(UIF_TINY, 84, y + 38, st, UI_BAR_WARN, 0, 220);
+      gfx->fillRect(306, y + 24, 86, 18, UI_BG_DAY);         // the level stays readable beside a long wait text
     } else uiTextFit(UIF_TINY, 84, y + 38, open_ ? t.place : T(S_LOCKED), UI_TRACK_TEXT, 0, 180);
     // the level of the strongest creature: the honest measure of the wall
     uint8_t top = 0;
@@ -7746,17 +7800,51 @@ static uint16_t gymWalkPermille() {
   return (uint16_t)(pet.gymSteps >= need ? 1000 : (uint32_t)pet.gymSteps * 1000 / need);
 }
 
-// a ring of dots around the little badge, filling as she walks
-static void drawGymRing(int bx, int by) {
-  if (pet.gymChallengeIdx() < 0) return;
+// the way to the next leader: a dial at the right edge whose gold arc fills as
+// she walks, the badge in the middle. A tap opens the steps panel.
+#define GYMDIAL_R 22
+bool drawGymDial(uint16_t ink) {
+  if (pet.gymChallengeIdx() < 0) return false;
   uint16_t pm = gymWalkPermille();
-  for (int k = 0; k < 12; k++) {
-    float a = -1.5708f + k * 0.5236f;
-    int x = bx + (int)(cosf(a) * 13), y = by + (int)(sinf(a) * 13);
-    bool on = k * 1000 / 12 < pm;
-    gfx->fillCircle(x, y, on ? 2 : 1, on ? UI_BAR_OK : UI_TRACK_TEXT);
+  const uint16_t gold = C565(0xff, 0xcb, 0x05);
+  gfx->fillCircle(GYMBTN_X, GYMBTN_Y, GYMDIAL_R + 3, gNight ? C565(0x1c, 0x26, 0x44) : UI_WHITE);
+  gfx->drawCircle(GYMBTN_X, GYMBTN_Y, GYMDIAL_R + 3, ink);
+  for (int k = 0; k < 40; k++) {                       // the track, then the walked part over it
+    float a = -1.5708f + k * 0.15708f;
+    int x = GYMBTN_X + (int)(cosf(a) * (GYMDIAL_R - 3)), y = GYMBTN_Y + (int)(sinf(a) * (GYMDIAL_R - 3));
+    bool on = k * 25 < pm;
+    gfx->fillCircle(x, y, 3, on ? gold : UI_TRACK_TEXT);
   }
+  int bx = GYMBTN_X, by = GYMBTN_Y;                     // the badge
+  gfx->fillTriangle(bx, by - 9, bx - 8, by, bx + 8, by, UI_BAR_WARN);
+  gfx->fillTriangle(bx, by + 9, bx - 8, by, bx + 8, by, UI_BAR_WARN);
+  gfx->drawLine(bx, by - 9, bx + 8, by, ink); gfx->drawLine(bx + 8, by, bx, by + 9, ink);
+  gfx->drawLine(bx, by + 9, bx - 8, by, ink); gfx->drawLine(bx - 8, by, bx, by - 9, ink);
+  if (pet.gymWalked() && pet.gymWaitDays()) {          // phase 36: walked, the week still running
+    int cx = GYMBTN_X + 16, cy = GYMBTN_Y - 16;
+    gfx->fillCircle(cx, cy, 9, UI_WHITE);
+    gfx->drawCircle(cx, cy, 9, ink);
+    gfx->drawLine(cx, cy, cx, cy - 6, ink);
+    gfx->drawLine(cx, cy, cx + 4, cy + 2, ink);
+  }
+  return true;
 }
+
+// "Steps done! The challenge comes in N days" -- or tomorrow
+void gymWaitText(char *b, size_t n) {
+  uint8_t d = pet.gymWaitDays();
+  if (d <= 1) snprintf(b, n, "%s", T(S_GYM_WAIT_1));
+  else snprintf(b, n, T(S_GYM_WAIT_FMT), (unsigned)d);
+}
+
+bool gymDialHit(int16_t x, int16_t y) {
+  if (pet.gymChallengeIdx() < 0) return false;
+  int dx = x - GYMBTN_X, dy = y - GYMBTN_Y;
+  return dx * dx + dy * dy <= (GYMBTN_R + 14) * (GYMBTN_R + 14);
+}
+
+// the step plate at the upper left, with room to spare for a small finger
+bool stepPlateHit(int16_t x, int16_t y) { return x < 100 && y > 90 && y < 215; }
 
 // the next leader is waiting: a big pulsing badge at the right edge, with a "!"
 bool drawGymEdge(uint16_t ink) {
@@ -7811,13 +7899,13 @@ static void drawSwipeHints() {
   gfx->drawFastHLine(lx - 1, cy + 24, 14, ink);
   gfx->fillCircle(lx + 6, cy + 24, 2, ink);
   if (drawGymEdge(ink)) return;              // phase 34: the next leader is ready
+  if (drawGymDial(ink)) return;              // phase 35: the way there, as a dial
   int rx = 454 - nudge;                      // gym: swipe LEFT, chevron points left
   for (int k = 0; k < 2; k++) {
     gfx->drawLine(rx - k, cy - 10, rx - 8 - k, cy, ink);
     gfx->drawLine(rx - 8 - k, cy, rx - k, cy + 10, ink);
   }
   int bx = rx - 6, by = cy + 24;                      // badge
-  drawGymRing(bx, by);
   gfx->fillTriangle(bx, by - 8, bx - 7, by, bx + 7, by, UI_BAR_WARN);
   gfx->fillTriangle(bx, by + 8, bx - 7, by, bx + 7, by, UI_BAR_WARN);
   gfx->drawLine(bx, by - 8, bx + 7, by, ink);
@@ -9811,6 +9899,98 @@ static void drawPanelBase() {
     gfx->drawFastHLine(0, y, 466, gNight ? 0x0000 : 0x2104);
   gfx->fillRoundRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 18, UI_WHITE);
   gfx->drawRoundRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 18, UI_INK);
+}
+
+// ---------- phase 35: the steps panel ----------
+
+static void drawPmBar(int x, int y, int w, int h, uint32_t num, uint32_t den, uint16_t col) {
+  gfx->fillRoundRect(x, y, w, h, h / 2, UI_TRACK_TEXT);
+  uint32_t fw = den ? (num >= den ? w : (uint32_t)w * num / den) : 0;
+  if (fw >= (uint32_t)h) gfx->fillRoundRect(x, y, fw, h, h / 2, col);
+}
+
+// the n-th character of a short UTF-8 string (the day letters; zh/ko are 3 bytes each)
+static void utf8Nth(const char *s, int n, char *out, size_t cap) {
+  int i = 0;
+  while (*s) {
+    int len = ((uint8_t)*s < 0x80) ? 1 : ((uint8_t)*s < 0xE0) ? 2 : ((uint8_t)*s < 0xF0) ? 3 : 4;
+    if (i == n) { size_t m = (size_t)len < cap - 1 ? len : cap - 1; memcpy(out, s, m); out[m] = 0; return; }
+    for (int k = 0; k < len && *s; k++) s++;
+    i++;
+  }
+  out[0] = 0;
+}
+
+#define STP_FIGHT_Y (PANEL_Y + 214)
+#define STP_FIGHT_H 30
+
+void renderSteps() {
+  drawPanelBase();
+  uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(S_STEPS_TITLE), UI_INK, 1, PANEL_W - 80);
+  const int L = PANEL_X + 24, W = PANEL_W - 48;
+  char b[48];
+  // today
+  uint32_t today = pet.stepsToday();
+  uiText(UIF_SMALL, L, PANEL_Y + 62, T(S_STEPS_TODAY), UI_INK, 0);
+  snprintf(b, sizeof(b), "%lu", (unsigned long)today);
+  uiText(UIF_MID, L + W, PANEL_Y + 66, b, UI_INK, 2);
+  drawPmBar(L, PANEL_Y + 72, W, 8, today, STEP_GOAL, today >= STEP_GOAL ? UI_BAR_WARN : UI_BAR_OK);
+  // the last 7 days: today on the right
+  uiText(UIF_TINY, L, PANEL_Y + 98, T(S_STEPS_WEEK), UI_TRACK_TEXT, 0);
+  uint16_t top = 1000;
+  for (uint8_t a = 0; a < 7; a++) if (pet.stepsDaysAgo(a) > top) top = pet.stepsDaysAgo(a);
+  uint32_t day = pet.lastSeenEpoch / 86400;
+  for (int k = 0; k < 7; k++) {
+    uint8_t ago = (uint8_t)(6 - k);
+    uint16_t v = pet.stepsDaysAgo(ago);
+    int x = L + 8 + k * (W - 16) / 7, bw = (W - 16) / 7 - 10, h = (int)((uint32_t)v * 44 / top);
+    gfx->fillRect(x, PANEL_Y + 150 - 44, bw, 44, lerp565(UI_TRACK_TEXT, UI_WHITE, 5, 8));
+    if (h) gfx->fillRect(x, PANEL_Y + 150 - h, bw, h, ago ? UI_BAR_OK : UI_BAR_WARN);
+    char d[8];
+    utf8Nth(T(S_DAY_LETTERS), (int)((day - ago + 3) % 7), d, sizeof(d));   // day 0 (1 Jan 1970) was a Thursday
+    uiText(UIF_TINY, x + bw / 2, PANEL_Y + 166, d, ago ? UI_TRACK_TEXT : UI_INK, 1);
+  }
+  // the road to the gym
+  uint8_t rg = pet.gymChallengeRegion();
+  int8_t gi = pet.gymChallengeIdx();
+  if (gi >= 0 && rg < GYM_REGIONS) {
+    snprintf(b, sizeof(b), T(S_ROAD_GYM_FMT), TRAINER_SETS[rg].list[gi].name);
+    uiTextFit(UIF_TINY, L, PANEL_Y + 188, b, UI_INK, 0, W);
+    uint16_t need = Pet::gymStepsNeed((uint8_t)gi);
+    drawPmBar(L, PANEL_Y + 196, W - 118, 10, pet.gymSteps, need, C565(0xff, 0xcb, 0x05));
+    snprintf(b, sizeof(b), "%u/%u", (unsigned)(pet.gymSteps < need ? pet.gymSteps : need), (unsigned)need);
+    uiText(UIF_TINY, L + W, PANEL_Y + 206, b, UI_INK, 2);
+    if (pet.gymChallengeReady()) {
+      gfx->fillRoundRect(L, STP_FIGHT_Y, W, STP_FIGHT_H, 12, UI_BAR_BAD);
+      gfx->drawRoundRect(L, STP_FIGHT_Y, W, STP_FIGHT_H, 12, UI_INK);
+      uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, STP_FIGHT_Y, STP_FIGHT_H), T(S_READY_FIGHT), UI_WHITE, 1, W - 20);
+    } else if (pet.gymWalked()) {                          // phase 36: the week is still running
+      gymWaitText(b, sizeof(b));
+      uiTextFit(UIF_TINY, CX, PANEL_Y + 232, b, UI_BAR_OK, 1, W);
+    } else {
+      snprintf(b, sizeof(b), T(S_STEPS_TO_FMT), (unsigned)(need - pet.gymSteps));
+      uiTextFit(UIF_TINY, CX, PANEL_Y + 232, b, UI_BAR_WARN, 1, W);
+    }
+  } else {
+    uiTextFit(UIF_TINY, CX, PANEL_Y + 206, T(S_ALL_GYMS_DONE), UI_BAR_OK, 1, W);
+  }
+  // the adventure route: the next stop
+  uiText(UIF_TINY, L, PANEL_Y + 262, T(S_ADV_ROUTE), UI_TRACK_TEXT, 0);
+  uint16_t an = Pet::advNeed(pet.advStop);
+  drawPmBar(L + 150, PANEL_Y + 253, W - 150, 10, pet.advSteps, an, C565(0x4f, 0x93, 0xc4));
+  // everything ever walked
+  snprintf(b, sizeof(b), T(S_STEPS_TOTAL_FMT), (unsigned)pet.stepTotal);
+  uiTextFit(UIF_TINY, CX, PANEL_Y + 290, b, UI_INK, 1, W);
+  drawFpToast();
+  gfx->flush();
+}
+
+void stepsTap(int16_t x, int16_t y) {
+  if (pet.gymChallengeReady() && y >= STP_FIGHT_Y && y <= STP_FIGHT_Y + STP_FIGHT_H &&
+      x >= PANEL_X + 24 && x <= PANEL_X + PANEL_W - 24) {   // ready: to the challenge
+    sfxPlay(SFX_TAP); stepsOpen = false; gymCardOpen = true; return;
+  }
+  stepsOpen = false;                                        // anywhere else closes it
 }
 
 // ---------- phase 34: the challenge card ----------

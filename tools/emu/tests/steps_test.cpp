@@ -57,6 +57,16 @@ int main(){
     ck(abs(got - want) <= 4, w);
   }
 
+  // 1b. phase 36: why the FIFO matters. 100 steps fed every sample (16 ms) are
+  //     counted; the same walk seen once every slow render frame (~280 ms, uneven)
+  //     loses peaks -- that was the board before, about 73 of 100.
+  { StepDetector d; int full = walk(d, 2.0f, 0.25f, 16, 50, 2);
+    StepDetector e; int sparse = walk(e, 2.0f, 0.25f, 280, 50, 2, 1000, 0.015f, 60);
+    char w[96];
+    snprintf(w, sizeof(w), "100 steps: every sample %d, one per slow frame %d", full, sparse);
+    ck(full >= 96 && full <= 104, w);
+    printf("      (sparse sampling counted %d of 100)\n", sparse); }
+
   // 2. a gentle walk still counts
   { StepDetector d; int got = walk(d, 1.8f, 0.16f, 20, 30, 2);
     ck(got >= 45, "a gentle walk (0.16 g) is still counted"); }

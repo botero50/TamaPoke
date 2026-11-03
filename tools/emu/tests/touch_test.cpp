@@ -1117,7 +1117,7 @@ int main(int argc, char **argv) {
     bool gymButtonHit(int16_t, int16_t);
     extern bool cardOpen;
     battleOpen = false; pickOpen = false; gymOpen = false; cardOpen = false;   // back to the pet
-    pet.badges = 0; pet.region = 0; pet.gymSteps = 0;
+    pet.badges = 0; pet.region = 0; pet.gymSteps = 0; pet.gymLastWinDay = 0;
     pump(4);
     if (gymButtonHit(424, 233)) { printf("FAIL: the gym button showed before any walking\n"); return 1; }
     gymOpen = true; gymHard = false; gymPage = 0; gymPick = false; gymRegion = 0;
@@ -1125,6 +1125,17 @@ int main(int argc, char **argv) {
     if (pickOpen || !gymOpen) { printf("FAIL: a leader not walked to was enterable\n"); return 1; }
     gymOpen = false; gymPick = false; pump(4);   // straight back to the pet
     { extern uint32_t lastInteract; extern uint8_t dimStage; lastInteract = millis(); dimStage = 0; pump(4); }   // awake: a dim screen only wakes on a tap
+    {                                   // phase 35: the dial and the plate open the steps panel
+      extern bool stepsOpen;
+      click(424, 233);
+      if (!stepsOpen || gymCardOpen) { printf("FAIL: the gym dial did not open the steps panel\n"); return 1; }
+      click(20, 233);
+      if (stepsOpen) { printf("FAIL: a tap outside did not close the steps panel\n"); return 1; }
+      click(50, 150);
+      if (!stepsOpen) { printf("FAIL: the step plate did not open the steps panel\n"); return 1; }
+      click(20, 233);
+      printf("PASS: steps panel: from the gym dial and the step plate, closed by a tap outside\n");
+    }
     pet.addSteps(Pet::gymStepsNeed(0));
     pump(4);
     if (!gymButtonHit(424, 233)) { printf("FAIL: 1000 steps did not bring the gym button\n"); return 1; }
@@ -1137,6 +1148,27 @@ int main(int argc, char **argv) {
     if (gymCardOpen || !pickOpen || pickTrainer != 0 || pickHard) { printf("FAIL: FIGHT did not open the team picker for Brock\n"); return 1; }
     pickOpen = false;
     printf("PASS: road to the gym: no button before walking, then button -> card -> LATER / FIGHT -> Brock's team picker\n");
+    {                                   // ready: the panel's own FIGHT row leads to the card
+      extern bool stepsOpen;
+      pump(4);
+      click(50, 150);
+      if (!stepsOpen) { printf("FAIL: the plate did not open the panel when ready\n"); return 1; }
+      click(233, 76 + 214 + 15);
+      if (stepsOpen || !gymCardOpen) { printf("FAIL: the panel's FIGHT row did not open the challenge card\n"); return 1; }
+      click(303, 327);                  // LATER
+      printf("PASS: steps panel -> READY! FIGHT! -> the challenge card\n");
+    }
+    {                                   // phase 36: walked, but the week is not up -- the dial opens the panel, not the card
+      extern bool stepsOpen;
+      pet.gymLastWinDay = pet.lastSeenEpoch / 86400;
+      pump(4);
+      if (gymButtonHit(424, 233)) { printf("FAIL: the challenge button showed during the waiting week\n"); return 1; }
+      click(424, 233);
+      if (!stepsOpen || gymCardOpen) { printf("FAIL: the dial during the week did not open the steps panel\n"); return 1; }
+      click(20, 233);
+      pet.gymLastWinDay = 0;
+      printf("PASS: steps done but the week running: no challenge button, the dial opens the panel\n");
+    }
   }
   // ---- the gym ladder is sequential: only the next one may be entered
   battleOpen = false; pickOpen = false;

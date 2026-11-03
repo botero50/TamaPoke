@@ -266,6 +266,9 @@ enum QuestKind : uint8_t { QK_PARK = 0, QK_BEACH, QK_READ, QK_FISH, QK_COOK, QK_
 #define QUEST_COUNT 12
 #define QUEST_STEPS 4
 #define QUEST_WALK_STEPS 3000    // the "long walk" step
+#define GYM_STEPS_BASE 10000     // phase 36: steps to the first leader ...
+#define GYM_STEPS_PER 2000       // ... and this much more for each one after
+#define GYM_WEEK_DAYS 7          // at most one new badge a week
 #define QUEST_COINS 30
 #define EASTER_EGGS_PER_DAY 5
 // Trophies: lifetime goals, each pays TROPHY_COINS once. Append at the END:
@@ -909,10 +912,18 @@ public:
   // Phase 34: the road to the gym. Walking fills gymSteps; the next leader not
   // yet beaten on an easy ladder needs gymStepsNeed(its place) of them, and the
   // first win spends them (the rest carries on). Rematches and hard are free.
+  // Phase 36: about a gym a week. More steps, a week between new badges, and the
+  // road stops filling at the leader it leads to -- nothing piles up for the next.
   uint16_t gymSteps = 0;
-  static uint16_t gymStepsNeed(uint8_t i) { return (uint16_t)(1000 + 500 * i); }
+  uint32_t gymLastWinDay = 0;                    // the day of the last NEW easy badge
+  static uint16_t gymStepsNeed(uint8_t i) { return (uint16_t)(GYM_STEPS_BASE + GYM_STEPS_PER * i); }
+  uint8_t gymWaitDays() const {                  // days until the week since the last new badge is up
+    if (!gymLastWinDay) return 0;
+    uint32_t d = today(), open = gymLastWinDay + GYM_WEEK_DAYS;
+    return d >= open ? 0 : (uint8_t)(open - d);
+  }
   bool gymStepsOk(uint8_t rg, uint8_t i, bool hard) const {
-    return hard || hasBadge(rg, i, false) || gymSteps >= gymStepsNeed(i);
+    return hard || hasBadge(rg, i, false) || (gymSteps >= gymStepsNeed(i) && !gymWaitDays());
   }
   int8_t gymNextIn(uint8_t rg) const {           // the first leader not beaten on easy, or -1
     for (uint8_t i = 0; i < 13; i++) if (!hasBadge(rg, i, false)) return (int8_t)i;
@@ -924,17 +935,18 @@ public:
     return 0xFF;
   }
   int8_t gymChallengeIdx() const { uint8_t r = gymChallengeRegion(); return r < GYM_REGIONS ? gymNextIn(r) : -1; }
-  bool gymChallengeReady() const {
+  bool gymWalked() const {                       // the steps are done (the week may still be running)
     int8_t i = gymChallengeIdx();
-    return i >= 0 && !isEgg() && gymSteps >= gymStepsNeed((uint8_t)i);
+    return i >= 0 && gymSteps >= gymStepsNeed((uint8_t)i);
   }
+  bool gymChallengeReady() const { return gymWalked() && !isEgg() && !gymWaitDays(); }
   void winBadge(uint8_t rg, uint8_t i, bool hard) {
     if (rg >= GYM_REGIONS) return;
     uint16_t bit = (uint16_t)1 << i;
     bool isNew = !hasBadge(rg, i, hard);
-    if (isNew && !hard) {                          // a first easy win spends the walk
-      uint16_t need = gymStepsNeed(i);
-      gymSteps = gymSteps > need ? gymSteps - need : 0;
+    if (isNew && !hard) {                          // a first easy win spends the walk, and starts the week
+      gymSteps = 0;
+      gymLastWinDay = today();
     }
     if (rg == 0) { if (hard) badgesHard |= bit; else badges |= bit; }
     else if (hard) badgesHardX[rg - 1] |= bit;
@@ -1120,6 +1132,13 @@ public:
   // which follows the RTC, so the turn happens within ~30 s of 00:00.
   uint32_t stepCount = 0;
   uint32_t stepDay = 0;
+  // Phase 35: the last 7 days (stepHist[0] is stepHistDay, [1] the day before...)
+  // and every step ever walked. stepCount is still "today" and resets at midnight.
+  uint16_t stepHist[7] = { 0 };
+  uint32_t stepHistDay = 0;
+  uint32_t stepTotal = 0;
+  void stepHistRoll(uint32_t d);              // move the history on to day d
+  uint16_t stepsDaysAgo(uint8_t ago) const;   // 0 = today .. 6
   uint16_t stepsUnsaved = 0;
   uint32_t stepsToday() const { return stepDay == today() ? stepCount : 0; }
   void addSteps(uint32_t n);

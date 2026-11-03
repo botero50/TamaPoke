@@ -134,6 +134,9 @@ bool pwrShortPressed() { return false; }
 // --- IMU: no sensor in the emulator; steps arrive through the STEPS console command ---
 bool imuBegin() { return true; }
 bool imuReadAccel(float &, float &, float &) { return false; }
+uint8_t imuReadBatch(float *, uint32_t *, uint8_t) { return 0; }
+bool imuFifoOn() { return false; }
+uint32_t imuDroppedCount() { return 0; }
 
 // --- audio (silent) ---
 void audioBegin() {}

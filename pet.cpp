@@ -576,6 +576,21 @@ int Pet::careBonus() const {
 // Every caller asks the day here, so a step is never added to yesterday's total.
 // Saving is throttled: the flush runs only while the screen is dim or off, so
 // marking it pending often is free, but it should not be every footfall.
+void Pet::stepHistRoll(uint32_t d) {
+  if (d == stepHistDay) return;
+  uint32_t shift = stepHistDay && d > stepHistDay ? d - stepHistDay : 7;   // the first day, or a clock gone back: start over
+  for (int k = 6; k >= 0; k--) stepHist[k] = (k >= (int)shift) ? stepHist[k - shift] : 0;
+  stepHistDay = d;
+  pendingSave = true;
+}
+
+uint16_t Pet::stepsDaysAgo(uint8_t ago) const {
+  uint32_t d = today();
+  if (!stepHistDay || d < stepHistDay) return 0;
+  uint32_t k = ago + stepHistDay - d;          // where that day sits in the history
+  return (d - stepHistDay <= ago && k < 7) ? stepHist[k] : 0;
+}
+
 void Pet::addSteps(uint32_t n) {
   if (!n) return;
   uint32_t d = today();
@@ -584,10 +599,18 @@ void Pet::addSteps(uint32_t n) {
     stepCount = 0;
     pendingSave = true;
   }
+  stepHistRoll(d);
   stepCount += n;
+  stepTotal = stepTotal + n > 0xFFFFFFF0UL ? 0xFFFFFFF0UL : stepTotal + n;
   if (stepCount > STEP_MAX) stepCount = STEP_MAX;
+  stepHist[0] = stepCount > 0xFFFF ? 0xFFFF : (uint16_t)stepCount;
   if (advSteps < 60000) advSteps += n;          // the adventure route moves too
-  gymSteps = gymSteps + n > 60000 ? 60000 : (uint16_t)(gymSteps + n);   // and the road to the gym
+  {                                             // and the road to the gym, which stops at its leader
+    int8_t gi = gymChallengeIdx();
+    uint32_t cap = gi >= 0 ? gymStepsNeed((uint8_t)gi) : 0;
+    uint32_t g = (uint32_t)gymSteps + n;
+    gymSteps = (uint16_t)(g > cap ? (gymSteps > cap ? gymSteps : cap) : g);
+  }
   stepsUnsaved += n;
   if (stepsUnsaved >= 20) {
     stepsUnsaved = 0;
@@ -609,6 +632,8 @@ void Pet::addSteps(uint32_t n) {
 void Pet::setStepsToday(uint32_t n) {
   stepDay = today();
   stepCount = n > STEP_MAX ? STEP_MAX : n;
+  stepHistRoll(stepDay);
+  stepHist[0] = stepCount > 0xFFFF ? 0xFFFF : (uint16_t)stepCount;
   stepsUnsaved = 0;
 }
 
@@ -3021,6 +3046,9 @@ void Pet::save() {
   prefs.putUShort("bstrk", bestStreak);
   prefs.putUInt("cday", lastCareDay);
   prefs.putUInt("stps", stepCount);
+  prefs.putBytes("sth7", stepHist, sizeof(stepHist));
+  prefs.putUInt("sthd", stepHistDay);
+  prefs.putUInt("stpT", stepTotal);
   prefs.putUInt("sday", stepDay);
   prefs.putUChar("bond", bond);
   prefs.putUShort("medal", medals);
@@ -3098,6 +3126,8 @@ void Pet::save() {
   prefs.putUChar("advN", advStop);
   prefs.putUInt("advS", advSteps);
   prefs.putUShort("gymS", gymSteps);
+  prefs.putUChar("gymV", 2);
+  prefs.putUInt("gymW", gymLastWinDay);
   prefs.putUInt("fshd", fishDay);
   prefs.putUChar("fshn", fishToday);
   prefs.putBool("alOn", alarmOn);
@@ -3214,6 +3244,9 @@ void Pet::load() {
   bestStreak = prefs.getUShort("bstrk", 0);
   lastCareDay = prefs.getUInt("cday", 0);
   stepCount = prefs.getUInt("stps", 0);
+  if (prefs.getBytesLength("sth7") == sizeof(stepHist)) prefs.getBytes("sth7", stepHist, sizeof(stepHist));
+  stepHistDay = prefs.getUInt("sthd", 0);
+  stepTotal = prefs.getUInt("stpT", 0);
   stepDay = prefs.getUInt("sday", 0);
   bond = prefs.getUChar("bond", 0);
   medals = prefs.getUShort("medal", 0);
@@ -3348,8 +3381,9 @@ void Pet::load() {
   advStop = prefs.getUChar("advN", 0);
   if (advStop > ROUTE_STOPS) advStop = 0;
   advSteps = prefs.getUInt("advS", 0);
-  if (prefs.isKey("gymS")) gymSteps = prefs.getUShort("gymS", 0);
-  else gymSteps = 0xFFFF;                        // before phase 34: settled below, once the badges are in
+  gymSteps = prefs.getUShort("gymS", 0);
+  if (!prefs.isKey("gymV")) gymSteps = 0;        // phase 35: the free first challenge of phase 34 is taken back
+  gymLastWinDay = prefs.getUInt("gymW", 0);      // phase 36: none in an older save, so no week to wait
   fishDay = prefs.getUInt("fshd", 0);
   fishToday = prefs.getUChar("fshn", 0);
   alarmOn = prefs.getBool("alOn", false);
@@ -3417,8 +3451,4 @@ void Pet::load() {
   }
   // seeding: the current pet counts as raised (old saves)
   if (speciesId >= 1) registerSpecies(speciesId);
-  if (gymSteps == 0xFFFF) {                      // a pet from before phase 34: its next leader is ready now
-    int8_t gi = gymChallengeIdx();
-    gymSteps = gi >= 0 ? gymStepsNeed((uint8_t)gi) : 0;
-  }
 }

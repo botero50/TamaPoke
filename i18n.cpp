@@ -129,7 +129,13 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 33
     "Borrar esta foto?", "BORRAR", "BORRAR TODAS", "Borrar todas menos las favoritas?", "Foto borrada", "Ya tienes %u favoritas",
     // phase 34
-    "%s te reta!", "Medalla %u de 8", "Alto Mando %u de 4", "La gran final: el Campeon", "LUCHAR!", "LUEGO", },
+    "%s te reta!", "Medalla %u de 8", "Alto Mando %u de 4", "La gran final: el Campeon", "LUCHAR!", "LUEGO",
+    // phase 35
+    "PASOS", "Hoy", "Ultimos 7 dias", "Camino al gimnasio: %s", "Ruta de aventura", "Total: %u pasos", "Listo! A luchar!", "LMXJVSD", "Todos los gimnasios ganados!",
+    // phase 36
+    "Pasos listos! El reto llega en %u dias", "Pasos listos! El reto llega manana",
+    // phase 36
+    "Reto en %u dias", "Reto manana", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -253,7 +259,13 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 33
     "Delete this photo?", "DELETE", "DELETE ALL", "Delete all but the favourites?", "Photo deleted", "You already have %u favourites",
     // phase 34
-    "%s challenges you!", "Badge %u of 8", "Elite Four %u of 4", "The final: the Champion", "FIGHT!", "LATER", },
+    "%s challenges you!", "Badge %u of 8", "Elite Four %u of 4", "The final: the Champion", "FIGHT!", "LATER",
+    // phase 35
+    "STEPS", "Today", "Last 7 days", "Road to the gym: %s", "Adventure route", "Total: %u steps", "Ready! Let's fight!", "MTWTFSS", "Every gym beaten!",
+    // phase 36
+    "Steps done! The challenge comes in %u days", "Steps done! The challenge comes tomorrow",
+    // phase 36
+    "Challenge in %u days", "Challenge tomorrow", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -376,7 +388,13 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 33
     "Effacer cette photo ?", "EFFACER", "TOUT EFFACER", "Tout effacer sauf les favorites ?", "Photo effacee", "Deja %u favorites",
     // phase 34
-    "%s te defie !", "Badge %u sur 8", "Conseil 4 : %u sur 4", "La finale : le Maitre", "COMBAT !", "PLUS TARD", },
+    "%s te defie !", "Badge %u sur 8", "Conseil 4 : %u sur 4", "La finale : le Maitre", "COMBAT !", "PLUS TARD",
+    // phase 35
+    "PAS", "Aujourd'hui", "Les 7 derniers jours", "Vers l'arene : %s", "Route d'aventure", "Total : %u pas", "Pret ! Au combat !", "LMMJVSD", "Toutes les arenes gagnees !",
+    // phase 36
+    "Pas faits ! Le defi arrive dans %u jours", "Pas faits ! Le defi arrive demain",
+    // phase 36
+    "Defi dans %u jours", "Defi demain", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -499,7 +517,13 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 33
     "Dieses Foto loeschen?", "LOESCHEN", "ALLE LOESCHEN", "Alle ausser Favoriten loeschen?", "Foto geloescht", "Schon %u Favoriten",
     // phase 34
-    "%s fordert dich!", "Orden %u von 8", "Top Vier %u von 4", "Das Finale: der Champion", "KAEMPFEN!", "SPAETER", },
+    "%s fordert dich!", "Orden %u von 8", "Top Vier %u von 4", "Das Finale: der Champion", "KAEMPFEN!", "SPAETER",
+    // phase 35
+    "SCHRITTE", "Heute", "Letzte 7 Tage", "Weg zur Arena: %s", "Abenteuerroute", "Gesamt: %u Schritte", "Bereit! Kampf!", "MDMDFSS", "Alle Arenen besiegt!",
+    // phase 36
+    "Schritte geschafft! Herausforderung in %u Tagen", "Schritte geschafft! Herausforderung morgen",
+    // phase 36
+    "Duell in %u Tagen", "Duell morgen", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -622,7 +646,13 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 33
     "Cancellare questa foto?", "CANCELLA", "CANCELLA TUTTE", "Cancellare tutte tranne le preferite?", "Foto cancellata", "Hai gia %u preferite",
     // phase 34
-    "%s ti sfida!", "Medaglia %u di 8", "Superquattro %u di 4", "La finale: il Campione", "LOTTA!", "DOPO", },
+    "%s ti sfida!", "Medaglia %u di 8", "Superquattro %u di 4", "La finale: il Campione", "LOTTA!", "DOPO",
+    // phase 35
+    "PASSI", "Oggi", "Ultimi 7 giorni", "Verso la palestra: %s", "Percorso avventura", "Totale: %u passi", "Pronto! Si lotta!", "LMMGVSD", "Tutte le palestre vinte!",
+    // phase 36
+    "Passi fatti! La sfida arriva tra %u giorni", "Passi fatti! La sfida arriva domani",
+    // phase 36
+    "Sfida tra %u giorni", "Sfida domani", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -745,7 +775,13 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 33
     "Apagar esta foto?", "APAGAR", "APAGAR TODAS", "Apagar todas menos as favoritas?", "Foto apagada", "Ja tem %u favoritas",
     // phase 34
-    "%s te desafia!", "Insignia %u de 8", "Elite Quatro %u de 4", "A final: o Campeao", "LUTAR!", "DEPOIS", },
+    "%s te desafia!", "Insignia %u de 8", "Elite Quatro %u de 4", "A final: o Campeao", "LUTAR!", "DEPOIS",
+    // phase 35
+    "PASSOS", "Hoje", "Ultimos 7 dias", "Rumo ao ginasio: %s", "Rota de aventura", "Total: %u passos", "Pronto! A lutar!", "STQQSSD", "Todos os ginasios vencidos!",
+    // phase 36
+    "Passos prontos! O desafio chega em %u dias", "Passos prontos! O desafio chega amanha",
+    // phase 36
+    "Desafio em %u dias", "Desafio amanha", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -870,7 +906,13 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 33
     "删除这张照片?", "删除", "全部删除", "删除除收藏外的所有照片?", "照片已删除", "已经有%u张收藏了",
     // phase 34
-    "%s向你挑战!", "徽章 %u/8", "四天王 %u/4", "决赛: 冠军", "战斗!", "稍后", },
+    "%s向你挑战!", "徽章 %u/8", "四天王 %u/4", "决赛: 冠军", "战斗!", "稍后",
+    // phase 35
+    "步数", "今天", "最近7天", "前往道馆: %s", "冒险路线", "总计: %u步", "准备好了! 开战!", "一二三四五六日", "所有道馆都赢了!",
+    // phase 36
+    "步数够了! %u天后迎来挑战", "步数够了! 明天迎来挑战",
+    // phase 36
+    "%u天后挑战", "明天挑战", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -994,7 +1036,13 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 33
     "이 사진을 지울까요?", "지우기", "모두 지우기", "즐겨찾기 빼고 모두 지울까요?", "사진을 지웠어요", "이미 즐겨찾기가 %u개예요",
     // phase 34
-    "%s의 도전!", "배지 %u/8", "사천왕 %u/4", "결승: 챔피언", "싸우자!", "나중에", },
+    "%s의 도전!", "배지 %u/8", "사천왕 %u/4", "결승: 챔피언", "싸우자!", "나중에",
+    // phase 35
+    "걸음", "오늘", "지난 7일", "체육관 가는 길: %s", "모험 루트", "총 %u걸음", "준비 완료! 싸우자!", "월화수목금토일", "모든 체육관 승리!",
+    // phase 36
+    "걸음 완료! %u일 후 도전이 와요", "걸음 완료! 내일 도전이 와요",
+    // phase 36
+    "%u일 후 도전", "내일 도전", },
 };
 
 // Medal names in their three lengths [language][medal].
