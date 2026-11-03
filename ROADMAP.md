@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 2 November 2026, with Phase 37._
+_Last updated: 2 November 2026, with Phase 38._
 
 ## Done
 | Phase | What | Release |
@@ -30,6 +30,7 @@ _Last updated: 2 November 2026, with Phase 37._
 | 36 | A gym a week: 10 000 + 2 000 steps per place, at most one new badge every 7 days, and the gym road stops at its leader (a win empties it); a clock on the dial and "challenge in N days" while the week runs. Steps from a background reader every 10 ms instead of one sample a frame: a counted walk went from 73 to 105 of 100, and 0 at rest | v1.20 |
 | 36b | One I2C lock for the step reader, touch, RTC and PMU (the task garbled the clock and USB reads, so "today" jumped and reset the step count); RTC reads that jump are double-checked; a clock glitch never resets today or wipes the 7 days; STATS shows clockjumps= and dropped= | v1.21 |
 | 37 | Menus that fit the round screen: chores and bath in pages with arrows, the adventure note and missions footer off the edge, DIARY / ALBUM tabs instead of a button over the title; the PASOS panel titles its gym section "Steps to reach the gym" | v1.22 |
+| 38 | Bigger page arrows (a near miss turns the page instead of closing the menu), the tasks bubble moved onto the glass, a Pokéball team button at the left edge, the bath as six tiles on one page; a README with two GIFs and the new features | v1.23 |
 
 ## Next
 | # | Item | Needs | Notes |

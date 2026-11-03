@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.39"
+#define FW_VERSION "3.14-funpack.40"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -241,7 +241,7 @@ bool hubOpen = false;
 bool trophyOpen = false;     // the trophies list (from the purse)
 uint8_t trophyPage = 0;
 bool choresOpen = false, piggyOpen = false, diaryOpen = false;   // more of the purse
-uint8_t chorePage = 0, bathPage = 0;   // phase 37: these two lists come in pages
+uint8_t chorePage = 0;   // phase 37: the chores come in pages
 uint8_t diaryPage = 0;
 bool alarmRinging = false;   // the alarm clock is going off
 bool questView = false;      // the missions panel shows the weekly quest
@@ -2037,6 +2037,7 @@ void onTap(int16_t x, int16_t y) {
   if (uiCurrentScreen() == SCR_MAIN && !pet.awaitingStarter() && !pet.ceremony) {
     if (gymButtonHit(x, y)) { sfxPlay(SFX_TAP); gymCardOpen = true; return; }   // phase 34: the next leader is waiting
     if (gymDialHit(x, y) || stepPlateHit(x, y)) { sfxPlay(SFX_TAP); stepsOpen = true; return; }   // phase 35: how far
+    if (!confirmUntil && teamButtonHit(x, y)) { sfxPlay(SFX_TAP); partyOpen = true; return; }      // phase 38: the team
   }
   if (pet.awaitingStarter()) {  // first game: region, then starter
     if (!starterRegionDone) {
@@ -2371,7 +2372,7 @@ void onTap(int16_t x, int16_t y) {
       sfxPlay(SFX_TAP);
       if (i == BTN_FOOD) { foodOpen = true; foodCat = -1; }
       else if (i == BTN_LIGHT) { if (pet.sleeping) pet.toggleLight(); else sleepOpen = true; }
-      else if (i == BTN_BATH) { bathOpen = true; bathPage = 0; }
+      else if (i == BTN_BATH) bathOpen = true;
       else if (i == BTN_MAP) mapOpen = true;
       else if (!fpBlockedBySick()) trainOpen = true;
       return;
@@ -7804,6 +7805,10 @@ void drawBattery() {
 // swipe is actually allowed -- onSwipe() refuses it during a ceremony, a
 // pending confirm and the starter choice -- and nudged back and forth so they
 // read as a gesture rather than decoration.
+#define TEAMBTN_X 40
+#define TEAMBTN_Y 224
+#define TEAMBTN_R 20
+
 // ---------- phase 34: the road to the gym ----------
 
 #define GYMBTN_X 424
@@ -7862,7 +7867,12 @@ bool gymDialHit(int16_t x, int16_t y) {
 }
 
 // the step plate at the upper left, with room to spare for a small finger
-bool stepPlateHit(int16_t x, int16_t y) { return x < 100 && y > 90 && y < 215; }
+bool stepPlateHit(int16_t x, int16_t y) { return x < 100 && y > 90 && y < 200; }   // the team button is below
+
+bool teamButtonHit(int16_t x, int16_t y) {
+  int dx = x - TEAMBTN_X, dy = y - TEAMBTN_Y;
+  return dx * dx + dy * dy <= (TEAMBTN_R + 12) * (TEAMBTN_R + 12);
+}
 
 // the next leader is waiting: a big pulsing badge at the right edge, with a "!"
 bool drawGymEdge(uint16_t ink) {
@@ -7907,15 +7917,17 @@ static void drawSwipeHints() {
   const int cy = 233;
   const int nudge = ((millis() / 500) % 2) ? 3 : 0;
   uint16_t ink = inkColor();
-  int lx = 12 + nudge;                       // party: swipe RIGHT, chevron points right
-  for (int k = 0; k < 2; k++) {              // two passes = a 2 px stroke
-    gfx->drawLine(lx + k, cy - 10, lx + 8 + k, cy, ink);
-    gfx->drawLine(lx + 8 + k, cy, lx + k, cy + 10, ink);
+  {                                          // phase 38: the team, a real button (the swipe still works)
+    const int r = TEAMBTN_R, bx = TEAMBTN_X, by = TEAMBTN_Y;
+    for (int dy = -r; dy <= r; dy++) {
+      int hw = (int)sqrtf((float)(r * r - dy * dy));
+      gfx->drawFastHLine(bx - hw, by + dy, 2 * hw + 1, dy < 0 ? UI_BAR_BAD : UI_WHITE);
+    }
+    gfx->fillRect(bx - r, by - 2, 2 * r + 1, 4, ink);
+    gfx->fillCircle(bx, by, 6, UI_WHITE);
+    gfx->drawCircle(bx, by, 6, ink);
+    gfx->drawCircle(bx, by, r, ink);
   }
-  gfx->fillCircle(lx + 6, cy + 24, 7, UI_WHITE);      // pokeball
-  gfx->drawCircle(lx + 6, cy + 24, 7, ink);
-  gfx->drawFastHLine(lx - 1, cy + 24, 14, ink);
-  gfx->fillCircle(lx + 6, cy + 24, 2, ink);
   if (drawGymEdge(ink)) return;              // phase 34: the next leader is ready
   if (drawGymDial(ink)) return;              // phase 35: the way there, as a dial
   int rx = 454 - nudge;                      // gym: swipe LEFT, chevron points left
@@ -9037,8 +9049,9 @@ void drawFpToast() {
 // After a wash: how much cleaner it is -- or, with poop still on the floor, the broom.
 void washToast(int gained) {
   if (pet.poops) { fpShowToast(S_SWEEP_TOO, UI_BAR_WARN); return; }
+  if (gained <= 0) return;                     // already spotless: nothing to report
   fpShowToast(S_CLEAN_GAIN_FMT, UI_BAR_OK);
-  fpToastNum = gained > 0 ? gained : 0;
+  fpToastNum = gained;
 }
 
 // the germ that floats beside a sick creature
@@ -9875,7 +9888,9 @@ void drawTopBar() {
   drawTopBtn(TOPBTN_LX, SPR_ICON_MISSION);
   uint8_t left = 0;
   for (uint8_t i = 0; i < MISSIONS_PER_DAY; i++) if (!pet.missionComplete(i)) left++;
-  int bx = TOPBTN_LX - 16, by = TOPBTN_Y - 16;   // outer side: clear of the name
+  // Lower outer corner: 208 px from the centre, on the glass. The top corner (231 px)
+  // sat on the very edge of the round screen, where the bezel hid it.
+  int bx = TOPBTN_LX - 16, by = TOPBTN_Y + 16;
   if (left) {                         // how many are still open today
     gfx->fillCircle(bx, by, 9, UI_BAR_BAD);
     char n[2] = { (char)('0' + left), 0 };
@@ -10202,9 +10217,10 @@ void renderWallet() {
 #define SHOP_PER_PAGE 4
 #define SHOP_ROW_Y(i) (PANEL_Y + 70 + (i) * 54)
 #define SHOP_ROW_H 48
-#define SHOP_NAV_Y (PANEL_Y + 300)
-#define SHOP_PREV_X (PANEL_X + 46)
-#define SHOP_NEXT_X (PANEL_X + PANEL_W - 46)
+#define SHOP_NAV_Y (PANEL_Y + 306)     // phase 38: big enough for a finger, just under the last row
+#define SHOP_NAV_R 26
+#define SHOP_PREV_X (PANEL_X + 52)
+#define SHOP_NEXT_X (PANEL_X + PANEL_W - 52)
 // the hat-moving pad, drawn over the lower panel of the main screen
 #define PAD_CX CX
 #define PAD_CY 372
@@ -10257,9 +10273,10 @@ static void drawPageNav(uint8_t page, uint8_t pages) {
   if (pages < 2) return;
   for (int k = 0; k < 2; k++) {
     int cx = k ? SHOP_NEXT_X : SHOP_PREV_X, d = k ? 1 : -1;
-    gfx->fillCircle(cx, SHOP_NAV_Y, 20, UI_BG_DAY);
-    gfx->drawCircle(cx, SHOP_NAV_Y, 20, UI_INK);
-    gfx->fillTriangle(cx + d * 8, SHOP_NAV_Y, cx - d * 6, SHOP_NAV_Y - 9, cx - d * 6, SHOP_NAV_Y + 9, UI_INK);
+    gfx->fillCircle(cx, SHOP_NAV_Y, SHOP_NAV_R, UI_BG_DAY);
+    gfx->drawCircle(cx, SHOP_NAV_Y, SHOP_NAV_R, UI_INK);
+    gfx->drawCircle(cx, SHOP_NAV_Y, SHOP_NAV_R - 1, UI_INK);
+    gfx->fillTriangle(cx + d * 11, SHOP_NAV_Y, cx - d * 8, SHOP_NAV_Y - 12, cx - d * 8, SHOP_NAV_Y + 12, UI_INK);
   }
   int x0 = CX - (pages - 1) * 9;
   for (int i = 0; i < pages; i++) {
@@ -10270,9 +10287,11 @@ static void drawPageNav(uint8_t page, uint8_t pages) {
 
 // -1 prev, +1 next, 0 neither
 static int pageNavHit(int16_t x, int16_t y, uint8_t pages) {
-  if (pages < 2 || abs(y - SHOP_NAV_Y) > 28) return 0;
-  if (abs(x - SHOP_PREV_X) <= 28) return -1;
-  if (abs(x - SHOP_NEXT_X) <= 28) return 1;
+  // Wide on purpose: up to the last row and down off the panel, so a near miss
+  // turns the page. Every paged screen asks this BEFORE "tap outside closes".
+  if (pages < 2 || y < SHOP_NAV_Y - SHOP_NAV_R) return 0;
+  if (abs(x - SHOP_PREV_X) <= 42) return -1;
+  if (abs(x - SHOP_NEXT_X) <= 42) return 1;
   return 0;
 }
 
@@ -10530,8 +10549,9 @@ void renderShop() {
 
 void shopTap(int16_t x, int16_t y) {
   if (shopCat < 0) {                     // the category list
+    int i = catListHit(x, y);            // the arrows first: a near miss turns the page
+    if (i == -2) return;
     if (!inPanel(x, y)) { shopOpen = false; return; }
-    int i = catListHit(x, y);
     if (i < 0) return;
     sfxPlay(SFX_TAP);
     shopCat = (int8_t)i; shopPage = 0; shopConfirm = -1;
@@ -10561,9 +10581,9 @@ void shopTap(int16_t x, int16_t y) {
     }
     return;                              // NO, or anywhere else: just close
   }
-  if (!inPanel(x, y)) { shopCat = -1; return; }   // outside: back to the categories
   int nav = pageNavHit(x, y, catPages(c));
   if (nav) { shopPage = (uint8_t)((shopPage + catPages(c) + nav) % catPages(c)); sfxPlay(SFX_TAP); return; }
+  if (!inPanel(x, y)) { shopCat = -1; return; }   // outside: back to the categories
   int i = shopRowHit(x, y);
   int k = shopPage * SHOP_PER_PAGE + i;
   if (i < 0 || k >= catCount(c)) return;
@@ -10624,20 +10644,21 @@ void renderBag() {
 
 void bagTap(int16_t x, int16_t y) {
   if (bagCat < 0) {
+    int i = catListHit(x, y);            // the arrows first: a near miss turns the page
+    if (i == -2) return;
     if (!inPanel(x, y)) { bagOpen = false; return; }
-    int i = catListHit(x, y);
     if (i < 0) return;
     sfxPlay(SFX_TAP);
     bagCat = (int8_t)i; bagPage = 0;
     return;
   }
   uint8_t c = (uint8_t)bagCat;
-  if (!inPanel(x, y)) { bagCat = -1; return; }
   int8_t e[BAG_MAX];
   uint8_t n = bagEntries(e, sizeof(e));
   uint8_t pages = n ? (n + SHOP_PER_PAGE - 1) / SHOP_PER_PAGE : 1;
   int nav = pageNavHit(x, y, pages);
   if (nav) { bagPage = (uint8_t)((bagPage + pages + nav) % pages); sfxPlay(SFX_TAP); return; }
+  if (!inPanel(x, y)) { bagCat = -1; return; }
   int i = shopRowHit(x, y);
   int k = bagPage * SHOP_PER_PAGE + i;
   if (i < 0 || k >= n) return;
@@ -10892,42 +10913,37 @@ static void drawMenuTitle(StrId t) {
 
 // ---------- the bath menu ----------
 
-// Phase 37: two pages of three large rows; the sweep stays first, one tap away.
-#define BATH_PER_PAGE 3
-#define BATH_PAGES 2
-#define BATH_ROW_Y(i) (PANEL_Y + 58 + (i) * 62)
-#define BATH_ROW_H 54
+// Phase 38: everything on one page, six big tiles like the hub.
+#define BATH_TILE_W ((PANEL_W - 34) / 2)
+#define BATH_TILE_H 72
+#define BATH_TILE_X(c) (PANEL_X + 14 + (c) * (BATH_TILE_W + 6))
+#define BATH_TILE_Y(r) (PANEL_Y + 50 + (r) * 78)
 enum { BR_SWEEP = 0, BR_SHOWER, BR_SCRUB, BR_BUBBLE, BR_BRUSH, BR_TEETH, BR_COUNT };
+static_assert(BATH_TILE_Y(2) + BATH_TILE_H <= PANEL_Y + 300, "the bath tiles must stay off the round edge");
 
-static_assert(BATH_ROW_Y(BATH_PER_PAGE - 1) + BATH_ROW_H <= PANEL_Y + 300, "the bath rows must clear the page arrows and the round edge");
-
-static void drawBathRow(int i, const char *const *icon, const char *label, const char *right, uint16_t fill) {
-  int y = BATH_ROW_Y(i);
-  gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, BATH_ROW_H, 12, fill);
-  gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, BATH_ROW_H, 12, UI_INK);
-  drawMap(icon, 16, PANEL_X + 24, y + (BATH_ROW_H - 32) / 2, 2, false);
-  uiTextFit(UIF_SMALL, PANEL_X + 66, uiMidY(UIF_SMALL, y, BATH_ROW_H), label, UI_INK, 0, 190);
-  if (right && *right) uiText(UIF_TINY, PANEL_X + PANEL_W - 26, uiMidY(UIF_TINY, y, BATH_ROW_H), right, UI_INK, 2);
+static void drawBathTile(int i, const char *const *icon, const char *label, const char *right, uint16_t fill) {
+  int x = BATH_TILE_X(i % 2), y = BATH_TILE_Y(i / 2);
+  gfx->fillRoundRect(x, y, BATH_TILE_W, BATH_TILE_H, 12, fill);
+  gfx->drawRoundRect(x, y, BATH_TILE_W, BATH_TILE_H, 12, UI_INK);
+  drawMap(icon, 16, x + BATH_TILE_W / 2 - 16, y + 4, 2, false);
+  uiTextFit(UIF_TINY, x + BATH_TILE_W / 2, y + BATH_TILE_H - 8, label, UI_INK, 1, BATH_TILE_W - 10);
+  if (right && *right) uiText(UIF_TINY, x + BATH_TILE_W - 8, y + 20, right, UI_INK, 2);
 }
 
 void renderBathMenu() {
   drawMenuTitle(S_BATH_TITLE);
   char n[12];
-  if (bathPage == 0) {
-    snprintf(n, sizeof(n), pet.poops ? T(S_COUNT_FMT) : "", (unsigned)pet.poops);
-    drawBathRow(0, SPR_CARE_BROOM, T(S_SWEEP), n, pet.poops ? UI_BG_DAY : UI_TRACK_TEXT);
-    snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SHOWER);
-    drawBathRow(1, SPR_ICON_CLEAN, T(S_QUICK_WASH), n, UI_BG_DAY);
-    snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SCRUB);
-    drawBathRow(2, SPR_CARE_SPONGE, T(S_SCRUB), n, UI_BG_DAY);
-  } else {
-    snprintf(n, sizeof(n), pet.soapCount ? T(S_COUNT_FMT) : "", (unsigned)pet.soapCount);
-    drawBathRow(0, SPR_CARE_SOAP, T(S_BUBBLE_BATH), n, pet.soapCount ? UI_BG_DAY : UI_TRACK_TEXT);
-    drawBathRow(1, SPR_CARE_BRUSH, T(S_BRUSH), "", pet.brushOwned ? UI_BG_DAY : UI_TRACK_TEXT);
-    snprintf(n, sizeof(n), pet.teethLeftToday() ? T(S_COUNT_FMT) : "", (unsigned)pet.teethLeftToday());
-    drawBathRow(2, SPR_ICON_CLEAN, T(S_TEETH), n, pet.teethLeftToday() ? UI_BG_DAY : UI_TRACK_TEXT);
-  }
-  drawPageNav(bathPage, BATH_PAGES);
+  snprintf(n, sizeof(n), pet.poops ? T(S_COUNT_FMT) : "", (unsigned)pet.poops);
+  drawBathTile(BR_SWEEP, SPR_CARE_BROOM, T(S_SWEEP), n, pet.poops ? UI_BG_DAY : UI_TRACK_TEXT);
+  snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SHOWER);
+  drawBathTile(BR_SHOWER, SPR_ICON_CLEAN, T(S_QUICK_WASH), n, UI_BG_DAY);
+  snprintf(n, sizeof(n), "+%u", (unsigned)WASH_SCRUB);
+  drawBathTile(BR_SCRUB, SPR_CARE_SPONGE, T(S_SCRUB), n, UI_BG_DAY);
+  snprintf(n, sizeof(n), pet.soapCount ? T(S_COUNT_FMT) : "", (unsigned)pet.soapCount);
+  drawBathTile(BR_BUBBLE, SPR_CARE_SOAP, T(S_BUBBLE_BATH), n, pet.soapCount ? UI_BG_DAY : UI_TRACK_TEXT);
+  drawBathTile(BR_BRUSH, SPR_CARE_BRUSH, T(S_BRUSH), "", pet.brushOwned ? UI_BG_DAY : UI_TRACK_TEXT);
+  snprintf(n, sizeof(n), pet.teethLeftToday() ? T(S_COUNT_FMT) : "", (unsigned)pet.teethLeftToday());
+  drawBathTile(BR_TEETH, SPR_ICON_CLEAN, T(S_TEETH), n, pet.teethLeftToday() ? UI_BG_DAY : UI_TRACK_TEXT);
   drawFpToast();
   gfx->flush();
 }
@@ -10935,16 +10951,15 @@ void renderBathMenu() {
 void startScrub();
 
 static int bathRowHit(int16_t x, int16_t y) {
-  if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14) return -1;
-  for (int r = 0; r < BATH_PER_PAGE; r++)
-    if (y >= BATH_ROW_Y(r) - 2 && y <= BATH_ROW_Y(r) + BATH_ROW_H + 2) return bathPage * BATH_PER_PAGE + r;
+  for (int i = 0; i < BR_COUNT; i++) {
+    int tx = BATH_TILE_X(i % 2), ty = BATH_TILE_Y(i / 2);
+    if (x >= tx && x <= tx + BATH_TILE_W && y >= ty - 2 && y <= ty + BATH_TILE_H + 2) return i;
+  }
   return -1;
 }
 
 void bathMenuTap(int16_t x, int16_t y) {
   if (!inPanel(x, y)) { bathOpen = false; return; }
-  int nav = pageNavHit(x, y, BATH_PAGES);
-  if (nav) { bathPage = (uint8_t)((bathPage + BATH_PAGES + nav) % BATH_PAGES); sfxPlay(SFX_TAP); return; }
   int i = bathRowHit(x, y);
   if (i < 0) return;
   if (i == BR_TEETH) { bathOpen = false; if (teethAllowed()) startTeeth(); return; }
@@ -12143,9 +12158,9 @@ void renderTrophies() {
 }
 
 void trophyTap(int16_t x, int16_t y) {
-  if (!inPanel(x, y)) { trophyOpen = false; return; }
   int a = pageNavHit(x, y, TRO_PAGES);
-  if (a) { trophyPage = (uint8_t)((trophyPage + TRO_PAGES + a) % TRO_PAGES); sfxPlay(SFX_TAP); }
+  if (a) { trophyPage = (uint8_t)((trophyPage + TRO_PAGES + a) % TRO_PAGES); sfxPlay(SFX_TAP); return; }
+  if (!inPanel(x, y)) { trophyOpen = false; return; }
 }
 
 // a trophy reached anywhere is announced on the main screen
@@ -12281,9 +12296,9 @@ void renderMapGrid() {
 
 // -1 outside the panel (close), -2 inside on nothing, else the PLACE_*
 int mapGridHit(int16_t x, int16_t y) {
-  if (!inPanel(x, y)) return -1;
   int nav = pageNavHit(x, y, 2);
   if (nav) { mapPage = (uint8_t)((mapPage + 2 + nav) % 2); sfxPlay(SFX_TAP); return -2; }
+  if (!inPanel(x, y)) return -1;
   int i = tileHit(x, y, MAP_TILES, false);
   if (i < 0 || MAP_PLACE[mapPage % 2][i] == PLACE_NONE) return -2;
   return MAP_PLACE[mapPage % 2][i];
@@ -12358,9 +12373,9 @@ void renderChores() {
 }
 
 void choresTap(int16_t x, int16_t y) {
-  if (!inPanel(x, y)) { choresOpen = false; return; }
   int nav = pageNavHit(x, y, CHORE_PAGES);
   if (nav) { chorePage = (uint8_t)((chorePage + CHORE_PAGES + nav) % CHORE_PAGES); sfxPlay(SFX_TAP); return; }
+  if (!inPanel(x, y)) { choresOpen = false; return; }
   if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14) return;
   for (int r = 0; r < CHORE_PER_PAGE; r++) {
     int i = chorePage * CHORE_PER_PAGE + r;
@@ -12466,11 +12481,11 @@ void renderDiary() {
 }
 
 void diaryTap(int16_t x, int16_t y) {
-  if (!inPanel(x, y)) { diaryOpen = false; return; }
-  if (missionTabHit(x, y) == 1) { sfxPlay(SFX_TAP); albumOpen = true; albumIdx = 0; albumShown = 255; albumDlg = 0; return; }
   uint8_t pages = diaryPages();
   int a = pageNavHit(x, y, pages);
-  if (a) { diaryPage = (uint8_t)((diaryPage + pages + a) % pages); sfxPlay(SFX_TAP); }
+  if (a) { diaryPage = (uint8_t)((diaryPage + pages + a) % pages); sfxPlay(SFX_TAP); return; }
+  if (!inPanel(x, y)) { diaryOpen = false; return; }
+  if (missionTabHit(x, y) == 1) { sfxPlay(SFX_TAP); albumOpen = true; albumIdx = 0; albumShown = 255; albumDlg = 0; return; }
 }
 
 // ---------- the lake: fishing ----------
@@ -13424,6 +13439,10 @@ static StrId prizeName(uint8_t p) {
        : p == PRIZE_CAPSULE ? S_CAPSULE : S_FOOD_CAKE;
 }
 #define BOARD_ROWS 4      // a fifth row would sit on the page arrows
+// five prizes under a title and the tickets: tighter rows, clear of the round edge
+#define PRIZE_ROW_Y(i) (PANEL_Y + 72 + (i) * 44)
+#define PRIZE_ROW_H 40
+static_assert(PRIZE_ROW_Y(PRIZE_COUNT - 1) + PRIZE_ROW_H <= PANEL_Y + 300, "the prizes must stay off the round edge");
 
 static void renderPrizes() {
   drawPanelBase();
@@ -13432,16 +13451,16 @@ static void renderPrizes() {
   snprintf(t, sizeof(t), "%u %s", (unsigned)pet.tickets, T(S_TICKETS));
   uiTextFit(UIF_SMALL, CX, PANEL_Y + 62, t, C565(0x4f, 0x93, 0xc4), 1, PANEL_W - 80);
   for (uint8_t p = 0; p < PRIZE_COUNT; p++) {
-    int y = GL_ROW_Y(p) + 14;
+    int y = PRIZE_ROW_Y(p);
     bool owned = pet.prizeOwned(p), can = pet.tickets >= Pet::prizePrice(p);
-    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, owned ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : UI_BG_DAY);
-    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_INK);
-    drawMap(prizeIcon(p), 16, PANEL_X + 22, y + 6, 2, false);
-    uiTextFit(UIF_SMALL, PANEL_X + 62, uiMidY(UIF_SMALL, y, GL_ROW_H), T(prizeName(p)), UI_INK, 0, 170);
+    gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, PRIZE_ROW_H, 12, owned ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : UI_BG_DAY);
+    gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, PRIZE_ROW_H, 12, UI_INK);
+    drawMap(prizeIcon(p), 16, PANEL_X + 22, y + 4, 2, false);
+    uiTextFit(UIF_SMALL, PANEL_X + 62, uiMidY(UIF_SMALL, y, PRIZE_ROW_H), T(prizeName(p)), UI_INK, 0, 170);
     char pr[12];
     if (owned) snprintf(pr, sizeof(pr), "%s", T(S_OWNED));
     else snprintf(pr, sizeof(pr), "%u", (unsigned)Pet::prizePrice(p));
-    uiTextFit(UIF_SMALL, PANEL_X + PANEL_W - 28, uiMidY(UIF_SMALL, y, GL_ROW_H), pr, owned ? UI_BAR_OK : can ? UI_INK : UI_BAR_BAD, 2, 90);
+    uiTextFit(UIF_SMALL, PANEL_X + PANEL_W - 28, uiMidY(UIF_SMALL, y, PRIZE_ROW_H), pr, owned ? UI_BAR_OK : can ? UI_INK : UI_BAR_BAD, 2, 90);
   }
   drawFpToast();
   gfx->flush();
@@ -13483,16 +13502,18 @@ static void renderBoard() {
 void renderArcade() { if (arcadeView == 1) renderPrizes(); else renderBoard(); }
 
 void arcadeTap(int16_t x, int16_t y) {
-  if (!inPanel(x, y)) { arcadeView = 0; fpMenuCat = FP_CAT_ARCADE + 1; return; }   // outside: back to the Arcade list
-  if (arcadeView == 2) {
+  if (arcadeView == 2) {                     // the arrows first: a near miss turns the page
     uint8_t pages = (MINI_COUNT + BOARD_ROWS - 1) / BOARD_ROWS;
     int nav = pageNavHit(x, y, pages);
-    if (nav) { boardPage = (uint8_t)((boardPage + pages + nav) % pages); sfxPlay(SFX_TAP); }
+    if (nav) { boardPage = (uint8_t)((boardPage + pages + nav) % pages); sfxPlay(SFX_TAP); return; }
+  }
+  if (!inPanel(x, y)) { arcadeView = 0; fpMenuCat = FP_CAT_ARCADE + 1; return; }   // outside: back to the Arcade list
+  if (arcadeView == 2) {
     return;
   }
   for (uint8_t p = 0; p < PRIZE_COUNT; p++) {
-    int ry = GL_ROW_Y(p) + 14;
-    if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14 || y < ry || y > ry + GL_ROW_H) continue;
+    int ry = PRIZE_ROW_Y(p);
+    if (x < PANEL_X + 14 || x > PANEL_X + PANEL_W - 14 || y < ry || y > ry + PRIZE_ROW_H) continue;
     uint8_t r = pet.winPrize(p);
     if (r == PRZ_OK) {
       sfxPlay(SFX_MEDAL);

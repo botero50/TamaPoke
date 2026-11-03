@@ -249,6 +249,13 @@ int main(int argc, char **argv) {
     printf("PASS: Arcade -> PRIZES wins the cap, no tickets refuses; RECORDS turns a page\n");
   }
 
+  // phase 38: the team button at the left edge
+  { extern bool partyOpen;
+    click(40, 224);
+    if (!partyOpen) { printf("FAIL: the team button did not open the team\n"); return 1; }
+    partyOpen = false; pump(4);
+    printf("PASS: the team button opens the team\n"); }
+
   // the two top buttons: missions on the left, the purse on the right
   click(100, 72);
   if (!missionsOpen) { printf("FAIL: the left top button did not open the missions\n"); return 1; }
@@ -391,7 +398,7 @@ int main(int argc, char **argv) {
     printf("PASS: food -> meals -> none left: one tap buys and eats; no coins refuses\n");
   }
 
-  // the bath menu (phase 37: 2 pages of 3 rows at 134 + 62 i, so +27 is mid-row; next page at 357,376) and the sleep menu (122 + 52 i)
+  // the bath menu (phase 38: six tiles, x 153 | 312, y 162 | 240 | 318) and the sleep menu (122 + 52 i)
   {
     pump(80);
     int bbx, bby; uiButtonAt(2, &bbx, &bby, nullptr);   // the bath button, 3rd of 4
@@ -399,11 +406,9 @@ int main(int argc, char **argv) {
     click(bbx, bby);
     if (!bathOpen) { printf("FAIL: the bath button did not open the bath menu\n"); return 1; }
     pet.soapCount = 0;
-    click(357, 376);                       // the next page
-    click(233, 134 + 27);                  // page 2, row 0: BUBBLE BATH without soap
+    click(312, 240);                       // BUBBLE BATH without soap
     if (!bathOpen) { printf("FAIL: a bubble bath without soap should be refused\n"); return 1; }
-    click(109, 376);                       // back to page 1
-    click(233, 134 + 62 + 27);             // row 1: QUICK WASH
+    click(312, 162);                       // QUICK WASH
     if (bathOpen) { printf("FAIL: QUICK WASH did not start the bath\n"); return 1; }
     pump(130);                             // the 3 s bath plays out
     if (pet.poops != 2 || pet.hygiene < 30 + WASH_SHOWER - 6 || pet.hygiene > 30 + WASH_SHOWER) {
@@ -413,14 +418,14 @@ int main(int argc, char **argv) {
       extern uint32_t sweepUntil;
       pump(80);
       click(bbx, bby);
-      click(233, 134 + 27);                // row 0: SWEEP THE POOP
+      click(153, 162);                     // SWEEP THE POOP
       if (bathOpen || !sweepUntil) { printf("FAIL: the sweep row did not start the broom\n"); return 1; }
       if (pet.poops != 2) { printf("FAIL: the poop went before the broom got there\n"); return 1; }
       for (int k = 0; k < 120 && sweepUntil; k++) pump(4);
       if (sweepUntil || pet.poops != 0) { printf("FAIL: the broom did not sweep the poop\n"); return 1; }
       pump(80);
       click(bbx, bby);
-      click(233, 134 + 27);                // nothing left to sweep
+      click(153, 162);                     // nothing left to sweep
       if (!bathOpen || sweepUntil) { printf("FAIL: the broom on a clean floor should be refused\n"); return 1; }
       click(20, 233);                      // close the menu
       printf("PASS: the broom sweeps the poop away, and refuses a clean floor\n");
@@ -519,8 +524,7 @@ int main(int argc, char **argv) {
     pet.teethDay = 0; pet.teethToday = 0;
     { int bbx, bby; uiButtonAt(2, &bbx, &bby, nullptr); click(bbx, bby); }
     if (!bathOpen) { printf("FAIL: the bath button did not open the bath menu\n"); return 1; }
-    click(357, 376);                       // the next page
-    click(233, 134 + 2 * 62 + 27);         // page 2, row 2: BRUSH TEETH
+    click(312, 318);                       // BRUSH TEETH
     if (placeScene != 6 || !teethEnd) { printf("FAIL: BRUSH TEETH did not start brushing\n"); return 1; }
     uint16_t teethBefore = pet.tally[TALLY_TEETH];
     teethEnd = 1;                          // two minutes later
@@ -668,6 +672,13 @@ int main(int argc, char **argv) {
     click(233, 136 + 54 + 24);             // its row 1: chore 5
     if (!pet.choreDoneToday(5) || pet.coins != c0 + 2 * CHORE_COINS) { printf("FAIL: a chore on page 2 did not pay\n"); return 1; }
     printf("PASS: chores in pages: page 1 and page 2 both tick and pay\n");
+    click(80, 400);                        // phase 38: a near miss, outside the panel by the arrow
+    if (!choresOpen) { printf("FAIL: a near miss on the arrow closed the menu\n"); return 1; }
+    click(233, 136 + 24);                  // back on page 1 (2 pages wrap): chore 0, already done
+    click(20, 233);                        // far outside
+    if (choresOpen) { printf("FAIL: a tap far outside did not close the chores\n"); return 1; }
+    choresOpen = true;
+    printf("PASS: big arrows: a near miss turns the page, a far tap still closes\n");
     click(20, 233);
     pet.coins = 100; pet.piggy = 0;
     click(366, 72);

@@ -3,17 +3,47 @@
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://botero50.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
-![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.39-8A2BE2)
+![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.40-8A2BE2)
 ![Code](https://img.shields.io/badge/code-MIT-blue)
 ![Languages](https://img.shields.io/badge/languages-8-FFCB05)
 [![Stars](https://img.shields.io/github/stars/botero50/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/botero50/TamaPoke/stargazers)
 
 A Pokémon virtual pet in a 3D-printed Pokéball: raise it, feed it, play 28 minigames,
-dress it up, visit places, and watch the real weather outside. Free and open source,
+dress it up, visit places, watch the real weather outside, and **walk with it to reach
+the next gym**. Free and open source,
 in 8 languages (Spanish, English, French, German, Italian, Portuguese, Chinese, Korean),
 and installed straight from your browser.
 
-<p align="center"><img src="docs/funpack/funpack-tour.gif" width="300" alt="A tour of the Fun Pack screens"></p>
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/funpack/tour-life.gif" width="300" alt="Life with your Pokémon: food, the bath, the broom, the shop, the room and the weather"></td>
+<td align="center" width="50%"><img src="docs/funpack/tour-adventure.gif" width="300" alt="Adventures: the map, places, games, missions, steps and gym challenges"></td>
+</tr>
+<tr>
+<td valign="top">
+
+**Life with your Pokémon**
+- Your Pokémon talks, gets hungry, sleepy and dirty
+- Meals you can buy right from the food menu
+- A quick shower, a sponge or a bubble bath, and a broom for the poop
+- A shop with food, hats, outfits and furniture
+- A room of its own
+- The real weather outside, snow included
+
+</td>
+<td valign="top">
+
+**Adventures**
+- A map of places: Center, garden, lake, beach, school and more
+- 28 minigames and an arcade with prizes
+- 6 daily missions and a weekly story quest
+- A steps panel with your week of walking
+- Walk to the next gym: the leader challenges you
+- A photo album with favourites
+
+</td>
+</tr>
+</table>
 
 ## 🛠️ Build your own
 
@@ -46,11 +76,13 @@ On the [installer page](https://botero50.github.io/TamaPoke/web/), press **💾 
 Built on crenberries428's 3.14, all in 8 languages:
 
 - **28 minigames** in six categories: Strength, Speed, Defence, Brain, Fun and Arcade.
-- **Care with real moods**: food (buy a meal right from the food menu), a quick shower or a bubble bath, brushing teeth, medicine, colds, stomachaches, boredom, wishes, a personality.
+- **Care with real moods**: food (buy a meal right from the food menu), three levels of clean (a quick shower, a sponge game, a bubble bath), **a broom for the poop**, brushing teeth, medicine, colds, stomachaches, boredom and wishes.
 - **Restful nights**: asleep, its needs hold, so nobody wakes up to a starving pet.
-- **Coins and daily missions**, a **shop** with food, toys, 20 hats and outfits, and a **try-on mirror**.
-- **A room of its own** with furniture and wallpapers, sceneries for the main screen, trophies and a photo album.
+- **6 daily missions** from 36 kinds, always ones you can do today, and **12 weekly story quests**. Coins for a **shop** with food, toys, 20 hats and outfits, and a **try-on mirror**.
+- **A room of its own** with furniture and wallpapers, sceneries for the main screen, trophies, and a **photo album**: star your favourites, delete the rest, and copy the pictures from the SD card to any computer (at most 24 photos, about 2.6 MB).
 - **Places to go**: park, store, Pokémon Center, garden, school, lake, kitchen, beach, library, music hall, contest and part-time jobs, each with its own animations (the Center heals with a machine and a jingle).
+- **The road to the gym**: walk with the ball and a dial fills at the edge of the screen. When you've walked far enough, the next leader challenges you, about one gym a week, across 7 regions.
+- **A steps panel**: today, your last 7 days, the road to the gym, the adventure route and every step you've ever walked.
 - **The Nursery**: two favourites from the party or box leave an egg for the next raising.
 - **Wi-Fi time and the real weather**: fog, rain, storms, settling snow, and snow from New York for places where it never snows.
 - **It talks**: about 150 things to say, picked by its needs, the weather, the time of day, events and things to do.
@@ -65,6 +97,14 @@ emulator (`tools/emu/tamapoke-emu --shot <name>`), so they are exactly what the
 hardware draws.
 
 ### The Fun Pack
+
+| The road to the gym | The leader challenges you | Your steps |
+|---|---|---|
+| <img src="docs/funpack/screens/dial.png" width="240"> | <img src="docs/funpack/screens/card.png" width="240"> | <img src="docs/funpack/screens/steps.png" width="240"> |
+
+| Everything in the bath | 6 missions a day | A weekly story |
+|---|---|---|
+| <img src="docs/funpack/screens/bath.png" width="240"> | <img src="docs/funpack/screens/missions.png" width="240"> | <img src="docs/funpack/screens/quest.png" width="240"> |
 
 | 28 games in six categories | The Nursery | Try outfits on in the mirror |
 |---|---|---|
@@ -104,11 +144,12 @@ Hoenn or all three. Switching keeps the rarity it was granted and remembers each
 region's answer, so it cannot be flipped to farm a legendary.
 
 **Steps.** The board's QMI8658 accelerometer counts your steps (`steps.cpp`, in
-any orientation, screen on or off) and the home screen shows today's total on a
-plate curved along the left edge, digits stacked down it. The arc on the rim fills
-toward 10,000 and turns gold when you get there. The count resets at midnight by
-the RTC. It is a counter only: it changes nothing in the game. The threshold is
-tuned against synthetic gait in `steps_test`, not yet against a person walking.
+any orientation, screen on or off, read about 60 times a second in the background)
+and the home screen shows today's total on a plate curved along the left edge. Tap it
+for the steps panel. Today's count resets at midnight; the 7-day history, the lifetime
+total, the adventure route and the road to the gym carry on, and all of them are saved,
+so they survive switching the ball off. A counted walk of 100 steps gave 105, and it
+counts nothing while the ball lies still.
 
 ### Day, dusk, night
 
@@ -129,21 +170,24 @@ edge. The boot title card is `docs/screens/splash.png`.
 Turn- and move-based, with the real type chart, ailments and STAB. Real Game Boy
 battle music plays throughout.
 
-### Five regions
+### Seven regions
 
 | Pick a ladder | Johto's gyms | LAN battle |
 |---|---|---|
 | <img src="docs/screens/gympick.png" width="240"> | <img src="docs/screens/gymsj.png" width="240"> | <img src="docs/screens/lanready.png" width="240"> |
 
-Kanto, Johto, Hoenn, Sinnoh and Unova each have eight leaders, an Elite 4 and a
-champion, on easy and hard. Four of the five are the games' own teams, checked
+Kanto, Johto, Hoenn, Sinnoh, Unova, Kalos and Alola each have eight leaders, an Elite 4
+and a champion, on easy and hard. A new leader takes real walking: 10 000 steps to the
+first, 2 000 more for each one after, and a week between new badges. Rematches and the
+hard ladder are always open. Kanto, Johto, Hoenn and Sinnoh are the games' own teams, checked
 against the pokecrystal, pokeemerald and pokeplatinum disassemblies -- **0
 differences across all 39 trainers**, re-checkable with
 `tools/verify_rosters.py`.
 
-**Unova is the exception and says so.** pret has no Gen 5 disassembly, so that
-ladder is written from knowledge rather than from the game's own tables;
-`verify_rosters.py` prints it as NOT VERIFIED rather than letting a clean run
+**Unova, Kalos and Alola are the exceptions and say so.** pret has no disassembly for
+them, so those ladders are written from knowledge rather than from the game's own tables
+(Alola has no gyms, so its slots are trial captains and kahunas);
+`verify_rosters.py` prints Unova as NOT VERIFIED rather than letting a clean run
 imply otherwise. It follows Black 2 / White 2, which unlike Black/White has no
 version- or starter-dependent leaders.
 
