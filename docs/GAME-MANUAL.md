@@ -249,6 +249,18 @@ All the steps ever walked earn a **rank**, shown beside the total: Beginner, Str
 (5 000), Walker (10 000), Hiker (25 000), Trekker (50 000), Route Guide (100 000),
 Globetrotter (250 000), Trail Ace (500 000) and Legend (1 000 000).
 
+### Wild encounters (phase 44)
+The **Tall Grass** tile, on page 2 of the map, shows how many encounters are waiting:
+one free each day, plus one per 500 steps walked, holding up to 3 from steps. Tapping it
+starts a fight with a random Pokemon from the region, within 5 levels. In a wild fight the
+top row is **FIGHT** and **BALLS**. A throw that misses costs the turn; a catch adds the
+Pokemon to the team, or the box if the team is full, and to the Pokedex. Catch chances for
+a Poke Ball at full health: common 30%, evolved 24%, rare 18%, legendary 5%, up to 1.8
+times that when the foe is nearly fainted, and 95% at most. A Great Ball is 1.5 times a
+Poke Ball and an Ultra Ball 2 times; they cost 5, 15 and 30 coins, and everyone starts
+with 5 Poke Balls. Each walking rank adds +1% to catching and makes a shiny more likely. A
+win can also find a Poke Ball. The foe never runs away, and running always works.
+
 ### Out and about (phase 10)
 The map is a grid of eight places now.
 - **Adventure**: steps walked with the ball move it along a route of five stops

@@ -28,6 +28,8 @@ Phase 42 adapts more work under the same MIT licence. The verified backup before
 
 Phase 43's three daily step goals are adapted from crenberries428 (MIT). Lifetime ranks are [ShadowEnemyx](https://github.com/ShadowEnemyx/TamaPoke)'s idea, with our own names and code.
 
+Phase 44's wild encounters follow the formulas in [eperdeme](https://github.com/eperdeme/TamaPoke)'s fork, whose design comes from [nzlov](https://github.com/nzlov/TamaPoke)'s, both MIT. The catch and shiny bonus for walking is ShadowEnemyx's idea.
+
 
 TamaPoke is a **non-commercial, personal-use** project. It does not sell or
 commercially redistribute any copyrighted material. Pokémon and all related

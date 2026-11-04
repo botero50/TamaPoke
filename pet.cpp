@@ -1,4 +1,5 @@
 #include "pet.h"
+#include "wild.h"
 #include "steps.h"
 #include "avatars.h"
 #include "dex.h"
@@ -645,6 +646,48 @@ void Pet::addSteps(uint32_t n) {
   noteMission(MIS_STEPS_BIG, 0);
   if (stepsToday() >= QUEST_WALK_STEPS) questNote(QK_STEPS);
   claimStepGoals();
+  uint32_t bank = (uint32_t)wildStepBank + n;   // and the tall grass
+  while (bank >= WILD_STEPS) {
+    bank -= WILD_STEPS;
+    if (wildCharges < WILD_CHARGES_MAX) { wildCharges++; wildEarned = true; pendingSave = true; }
+  }
+  wildStepBank = (uint16_t)bank;
+}
+
+bool Pet::wildSpend() {
+  if (wildFreeLeft()) wildFreeDay = today() + 1;
+  else if (wildCharges) wildCharges--;
+  else return false;
+  save();
+  return true;
+}
+
+bool Pet::buyBall(uint8_t kind) {
+  if (kind >= WILD_BALL_KINDS || wildBalls[kind] >= BALL_STACK_MAX || !spendCoins(WILD_BALL_PRICE[kind])) return false;
+  noteBought();
+  wildBalls[kind]++;
+  save();
+  return true;
+}
+
+bool Pet::useBall(uint8_t kind) {
+  if (kind >= WILD_BALL_KINDS || !wildBalls[kind]) return false;
+  wildBalls[kind]--;
+  save();
+  return true;
+}
+
+void Pet::addBall(uint8_t kind) {
+  if (kind >= WILD_BALL_KINDS || wildBalls[kind] >= BALL_STACK_MAX) return;
+  wildBalls[kind]++;
+  save();
+}
+
+void Pet::registerCaught(int16_t dex, bool isShiny) {
+  if (dex < 1 || dex > DEX_COUNT) return;
+  dexReg[(dex - 1) >> 3] |= (1 << ((dex - 1) & 7));
+  if (isShiny) dexShinyReg[(dex - 1) >> 3] |= (1 << ((dex - 1) & 7));
+  save();
 }
 
 uint32_t Pet::stepGoalAt(uint8_t i) {
@@ -698,6 +741,8 @@ void Pet::saveSteps() {
   prefs.putUShort("gymS", gymSteps);
   prefs.putUInt("advS", advSteps);
   prefs.putUChar("stpc", stepGoalsDone);
+  prefs.putUChar("wchg", wildCharges);
+  prefs.putUShort("wstp", wildStepBank);
 }
 
 uint32_t Pet::walkPrizeAt(uint8_t i) {
@@ -3148,6 +3193,11 @@ void Pet::save() {
   prefs.putUInt("stpT", stepTotal);
   prefs.putUChar("stpM", walkPrize);
   prefs.putUChar("stpc", stepGoalsDone);
+  prefs.putBytes("wbal", wildBalls, sizeof(wildBalls));
+  prefs.putUChar("wchg", wildCharges);
+  prefs.putUShort("wstp", wildStepBank);
+  prefs.putUInt("wfre", wildFreeDay);
+  prefs.putUChar("wkit", wildKit);
   prefs.putUInt("sday", stepDay);
   prefs.putUChar("bond", bond);
   prefs.putUShort("medal", medals);
@@ -3350,6 +3400,17 @@ void Pet::load() {
   stepTotal = prefs.getUInt("stpT", 0);
   walkPrize = prefs.getUChar("stpM", 0);
   stepGoalsDone = prefs.getUChar("stpc", 0);
+  memset(wildBalls, 0, sizeof(wildBalls));
+  prefs.getBytes("wbal", wildBalls, sizeof(wildBalls));
+  wildCharges = prefs.getUChar("wchg", 0);
+  wildStepBank = prefs.getUShort("wstp", 0);
+  wildFreeDay = prefs.getUInt("wfre", 0);
+  wildKit = prefs.getUChar("wkit", 0);
+  if (!wildKit) {                               // everyone starts with a few balls, once
+    wildKit = 1;
+    wildBalls[0] = (uint8_t)(wildBalls[0] + WILD_STARTER_BALLS);
+    pendingSave = true;
+  }
   stepDay = prefs.getUInt("sday", 0);
   bond = prefs.getUChar("bond", 0);
   medals = prefs.getUShort("medal", 0);

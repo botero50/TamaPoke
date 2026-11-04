@@ -23,6 +23,7 @@
 #include "link.h"
 #include "linknow.h"
 #include "backs.h"
+#include "wild.h"
 #include "badges.h"
 #include "avatars.h"
 #include "cjk.h"
@@ -44,7 +45,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.45"
+#define FW_VERSION "3.14-funpack.46"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -560,6 +561,8 @@ uint8_t gymPage = 0;
 #define GYM_ROWS 5
 #define GYM_ROW_Y(i) (110 + (i) * 50)
 int8_t btlTrainer = -1;      // index into TRAINERS, -1 = a one-off fight
+bool btlWild = false;        // a wild encounter: BALLS on the menu
+PartyMon btlWildMon;         // what a catch of this foe adds to the team
 bool btlHard = false;
 Combatant btlSquad[TRAINER_TEAM_MAX + 1];
 uint8_t btlSquadN = 0, btlSquadAt = 0;
@@ -1090,6 +1093,11 @@ void loop() {
       break;
     }
   }
+  if (pet.wildEarned && !pet.stepGoalNew && !screenOff && uiCurrentScreen() == SCR_MAIN && !timeOn(now, fpToastUntil)) {
+    pet.wildEarned = false;
+    sfxPlay(SFX_HEART);
+    fpShowToast(S_WILD_EARNED, UI_BAR_OK);
+  }
   if (pet.needBeepDue(now)) sfxPlay(SFX_NEED);
   // a trophy reached is announced on the main screen; homework ends on time
   static uint32_t lastTrophyCheck = 0;
@@ -1586,6 +1594,7 @@ void handleSerial() {
     Serial.printf("tickets=%u today=%u golds=%u\n", pet.tickets, pet.ticketsToday, pet.goldBadges());
     Serial.printf("imu fifo=%d dropped=%lu clockjumps=%lu\n", imuFifoOn(), (unsigned long)imuDroppedCount(), (unsigned long)gClockJumps);
     Serial.printf("steps=%lu hist=%u,%u,%u,%u,%u,%u,%u total=%lu adv=%u/%u goals=%u rank=%u\n", (unsigned long)pet.stepsToday(), pet.stepsDaysAgo(0), pet.stepsDaysAgo(1), pet.stepsDaysAgo(2), pet.stepsDaysAgo(3), pet.stepsDaysAgo(4), pet.stepsDaysAgo(5), pet.stepsDaysAgo(6), (unsigned long)pet.stepTotal, (unsigned)pet.advSteps, (unsigned)Pet::advNeed(pet.advStop), (unsigned)pet.stepGoalsDone, (unsigned)pet.walkRank());
+    Serial.printf("wild=%u balls=%u/%u/%u bank=%u\n", pet.wildCount(), pet.wildBalls[0], pet.wildBalls[1], pet.wildBalls[2], pet.wildStepBank);
     { int8_t gi = pet.gymChallengeIdx(); Serial.printf("gym=%u/%u next=%d region=%u ready=%d\n", pet.gymSteps, gi >= 0 ? Pet::gymStepsNeed((uint8_t)gi) : 0, gi, pet.gymChallengeRegion(), pet.gymChallengeReady()); }
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
                   (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
@@ -5867,6 +5876,7 @@ void startLinkBattle() {
   btlLink = true;
   btlLinkHost = lan.isHost;
   btlTrainer = -1;
+  btlWild = false;
   btlHard = false;
   btlFoeAt = 0;
   btlFoeSquadN = 0;
@@ -5904,6 +5914,7 @@ void startTrainerBattle(uint8_t idx, bool hard) {
   buildSquad(top, hard ? tr.count : TRAINER_TEAM_MAX, squadMask);
   if (!btlSquadN) return;
   btlTrainer = (int8_t)idx;
+  btlWild = false;
   btlHard = hard;
   btlFoeAt = 0;
   const Trainer &t = TRAINERS[idx];
@@ -5926,21 +5937,32 @@ void startTrainerBattle(uint8_t idx, bool hard) {
   battleOpen = true;
 }
 
-void startBattle(int16_t dex, uint8_t lvl) {
-  if (pet.isEgg() || pet.ceremony != CER_NONE) return;
-  if (dex < 1 || dex > DEX_COUNT) return;
+// ivs: the foe's, all four. shiny and ivs come from a wild roll; a plain fight uses 20.
+static bool startBattleAs(int16_t dex, uint8_t lvl, bool shiny, const uint8_t *ivs) {
+  if (pet.isEgg() || pet.ceremony != CER_NONE) return false;
+  if (dex < 1 || dex > DEX_COUNT) return false;
   buildSquad(0, TRAINER_TEAM_MAX, 0xFFFF);
-  if (!btlSquadN) return;
+  if (!btlSquadN) return false;
   btlTrainer = -1;    // not a gym fight, even straight after one
+  btlWild = false;
   // The opponent is built through Pet so it gets the same stat formula and the
   // same learnset-driven moveset the player's creature does -- no special-cased
   // "enemy" maths that could quietly diverge.
   Pet foe;
-  foe.dbgHatchAs(dex, false);
-  foe.ivAtk = foe.ivDef = foe.ivSpe = foe.ivHp = 20;
+  foe.dbgHatchAs(dex, shiny);
+  foe.ivAtk = ivs ? ivs[0] : 20;
+  foe.ivDef = ivs ? ivs[1] : 20;
+  foe.ivSpe = ivs ? ivs[2] : 20;
+  foe.ivHp = ivs ? ivs[3] : 20;
   foe.ageMinutes = (uint32_t)(lvl ? lvl - 1 : 0) * MINUTES_PER_LEVEL;
   foe.relearnFromLevel();
   combatantFromPet(btlFoe, foe);
+  btlWildMon = PartyMon();
+  btlWildMon.dex = dex;
+  btlWildMon.level = foe.level();
+  btlWildMon.ivAtk = foe.ivAtk; btlWildMon.ivDef = foe.ivDef; btlWildMon.ivSpe = foe.ivSpe; btlWildMon.ivHp = foe.ivHp;
+  btlWildMon.shiny = shiny ? 1 : 0;
+  for (int i = 0; i < MOVE_SLOTS; i++) btlWildMon.moves[i] = foe.moves[i];
   btlMsgCount = 0;
   btlOver = false;
   btlWon = false;
@@ -5957,6 +5979,80 @@ void startBattle(int16_t dex, uint8_t lvl) {
   btlLungeUntil[0] = btlLungeUntil[1] = 0;
   btlHitUntil[0] = btlHitUntil[1] = 0;
   battleOpen = true;
+  return true;
+}
+
+void startBattle(int16_t dex, uint8_t lvl) { startBattleAs(dex, lvl, false, nullptr); }
+
+// ---------- wild encounters (phase 44) ----------
+// The rules are in wild.h. Only a species with sprites on the card can appear.
+static bool wildSpeciesOk(int16_t d) {
+  return regionAvailable(regionOfDex(d)) && (!thumbs.loaded || thumbs.get(d));
+}
+
+// The Tall Grass tile. Says why and uses nothing if it cannot start.
+bool startWildBattle() {
+  if (pet.isEgg() || pet.ceremony != CER_NONE || pet.awaitingStarter()) { sfxPlay(SFX_DENY); return false; }
+  if (pet.sleeping) { sfxPlay(SFX_DENY); fpShowToast(S_WILD_ASLEEP, UI_BAR_WARN); return false; }
+  if (fpBlockedBySick()) return false;
+  if (!pet.wildCount()) {
+    sfxPlay(SFX_DENY);
+    fpShowToast(S_WILD_WALK_FMT, UI_BAR_WARN);
+    fpToastNum = (int16_t)pet.wildStepsLeft();
+    return false;
+  }
+  uint16_t lo = 1, hi = DEX_COUNT;
+  if (pet.region < REGION_COUNT && pet.region != REGION_ALL) { lo = REGIONS[pet.region].lo; hi = REGIONS[pet.region].hi; }
+  uint8_t tier = wildTierForRoll((uint8_t)random(100));
+  int16_t dex = wildPickSpecies(lo, hi, tier, (uint32_t)random(100000), wildSpeciesOk);
+  if (!dex) dex = wildPickSpecies(lo, hi, R_COMUN, (uint32_t)random(100000), wildSpeciesOk);
+  if (!dex) dex = wildPickSpecies(lo, hi, R_EVO, (uint32_t)random(100000), wildSpeciesOk);
+  if (!dex) { sfxPlay(SFX_DENY); fpShowToast(S_WILD_NONE, UI_BAR_WARN); return false; }
+  uint8_t lv = pet.level(), lmin = wildLevelMin(lv), lmax = wildLevelMax(lv, MAX_LEVEL);
+  uint8_t foeLv = (uint8_t)(lmin + random(lmax - lmin + 1));
+  bool shiny = wildShinyForRoll((uint32_t)random(WILD_SHINY_ODDS), pet.walkRank());
+  uint8_t ivs[4];
+  for (uint8_t &v : ivs) {
+    v = (uint8_t)(8 + random(17));              // 8..24
+    if (shiny && v < WILD_SHINY_FLOOR) v = WILD_SHINY_FLOOR;
+  }
+  if (!startBattleAs(dex, foeLv, shiny, ivs)) { sfxPlay(SFX_DENY); return false; }
+  pet.wildSpend();
+  btlWild = true;
+  btlSay(T(S_WILD_APPEARS), btlFoe.name);
+  return true;
+}
+
+// roll is 0..99: below the chance is a catch. Split out so the tests can choose it.
+void btlThrowWith(uint8_t kind, uint8_t roll) {
+  btlMenu = 0;
+  if (kind >= WILD_BALL_KINDS || !pet.wildBalls[kind]) {
+    sfxPlay(SFX_DENY);
+    btlSay("%s", T(S_WILD_NO_BALLS));
+    return;
+  }
+  if (party.isFull() && party.boxCount() >= BOX_SLOTS) {   // before a ball is spent
+    sfxPlay(SFX_DENY);
+    btlSay("%s", T(S_WILD_FULL));
+    return;
+  }
+  pet.useBall(kind);
+  uint8_t chance = wildCaptureChance(DEX_TBL[btlFoe.dex].rarity, btlFoe.hp, btlFoe.maxHp, WILD_BALL_PCT[kind], pet.walkRank());
+  if (roll >= chance) {                         // it costs the turn: the foe acts
+    sfxPlay(SFX_DENY);
+    btlSay(T(S_WILD_ESCAPED), btlFoe.name);
+    btlResolve(0);
+    return;
+  }
+  bool toTeam = party.add(btlWildMon);
+  if (!toTeam) party.boxAdd(btlWildMon);
+  pet.registerCaught(btlWildMon.dex, btlWildMon.shiny);
+  btlOver = true;
+  btlWon = true;
+  audioMusic(MUS_VICTORY);
+  sfxPlay(SFX_MEDAL);
+  btlSay(T(S_WILD_CAUGHT), btlFoe.name);
+  if (!toTeam) btlSay("%s", T(S_WILD_TO_BOX));
 }
 
 // The guest's whole turn: copy in what the host resolved and play the same
@@ -6167,7 +6263,11 @@ static void btlResolve(uint8_t yourMove) {
     if (btlLink && btlLinkHost) lan.sendEnd(btlWon);
     if (btlLink) { btlSay("%s", btlWon ? T(S_BTL_WIN) : T(S_BTL_LOSE)); return; }
     if (btlWon && btlTrainer >= 0) { btlWinUntil = millis() + 60000; return; }
-    btlSay("%s", T(S_BTL_LOSE));
+    btlSay("%s", btlWon ? T(S_BTL_WIN) : T(S_BTL_LOSE));
+    if (btlWon && btlWild && random(100) < WILD_DROP_PCT) {
+      pet.addBall(0);
+      btlSay("%s", T(S_WILD_DROP));
+    }
   }
 }
 
@@ -6358,15 +6458,39 @@ void renderBattle() {
     // rows do not fit: the panel is round, and at that depth the chord is only
     // ~250 px. The lower two reuse the move grid's cells, so they inherit its
     // padded hit areas -- which is what made POKEMON hard to press before.
-    gfx->fillRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H, 10, UI_BG_DAY);
-    gfx->drawRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H, 10, UI_INK);
-    uiText(UIF_SMALL, CX, BTL_GRID_Y + 28, T(S_FIGHT), UI_INK, 1);
+    if (btlWild) {                        // a wild fight: the top row is shared with the balls
+      const char *top[2] = { T(S_FIGHT), T(S_BTL_BALLS) };
+      for (int i = 0; i < 2; i++) {
+        int x = BTL_CELL_X(i), y = BTL_CELL_Y(i);
+        gfx->fillRoundRect(x, y, BTL_CELL_W, BTL_CELL_H, 10, UI_BG_DAY);
+        gfx->drawRoundRect(x, y, BTL_CELL_W, BTL_CELL_H, 10, UI_INK);
+        uiTextFit(UIF_SMALL, x + BTL_CELL_W / 2, y + 28, top[i], UI_INK, 1, BTL_CELL_W - 12);
+      }
+    } else {
+      gfx->fillRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H, 10, UI_BG_DAY);
+      gfx->drawRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H, 10, UI_INK);
+      uiText(UIF_SMALL, CX, BTL_GRID_Y + 28, T(S_FIGHT), UI_INK, 1);
+    }
     const char *low[2] = { T(S_BTL_SWITCH), T(S_BTL_RUN) };
     for (int i = 0; i < 2; i++) {
       int x = BTL_CELL_X(i + 2), y = BTL_CELL_Y(i + 2);
       gfx->fillRoundRect(x, y, BTL_CELL_W, BTL_CELL_H, 10, UI_TRACK_TEXT);
       gfx->drawRoundRect(x, y, BTL_CELL_W, BTL_CELL_H, 10, UI_INK);
       uiTextFit(UIF_SMALL, x + BTL_CELL_W / 2, y + 28, low[i], UI_INK, 1, BTL_CELL_W - 12);
+    }
+  } else if (btlMenu == 4) {             // which ball
+    drawBtlBack();
+    static const StrId BALL_NAME[WILD_BALL_KINDS] = { S_BALL_POKE, S_BALL_GREAT, S_BALL_ULTRA };
+    for (uint8_t i = 0; i < WILD_BALL_KINDS; i++) {
+      int x = BTL_CELL_X(i), y = BTL_CELL_Y(i);
+      bool have = pet.wildBalls[i] > 0;
+      gfx->fillRoundRect(x, y, BTL_CELL_W, BTL_CELL_H, 10, have ? UI_BG_DAY : UI_TRACK_TEXT);
+      gfx->drawRoundRect(x, y, BTL_CELL_W, BTL_CELL_H, 10, have ? UI_INK : 0x8410);
+      drawMap(SPR_BALLS[i], 16, x + 4, y + 6, 2, false);
+      char c[8];
+      snprintf(c, sizeof(c), "x%u", (unsigned)pet.wildBalls[i]);
+      uiTextFit(UIF_TINY, x + 40, y + 19, T(BALL_NAME[i]), have ? UI_INK : 0x8410, 0, BTL_CELL_W - 46);
+      uiText(UIF_TINY, x + 40, y + 37, c, have ? UI_INK : 0x8410, 0);
     }
   } else if (btlMenu == 3) {
     gfx->fillRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H, 10, UI_BG_DAY);
@@ -6537,6 +6661,7 @@ void battleTap(int16_t x, int16_t y) {
     return;
   }
   if (btlMenu == 0) {
+    if (btlWild && btlCellHit(1, x, y)) { sfxPlay(SFX_TAP); btlMenu = 4; return; }   // BALLS
     if (x >= BTL_GRID_X - BTL_HIT_PAD && x <= BTL_GRID_X + 328 + BTL_HIT_PAD &&
         y >= BTL_HIT_Y0(0) && y <= BTL_HIT_Y1(0)) {
       sfxPlay(SFX_TAP);
@@ -6545,6 +6670,18 @@ void battleTap(int16_t x, int16_t y) {
     }
     if (btlCellHit(2, x, y)) { sfxPlay(SFX_TAP); btlMenu = 2; return; }
     if (btlCellHit(3, x, y)) { sfxPlay(SFX_TAP); btlMenu = 3; return; }
+    return;
+  }
+  if (btlMenu == 4) {
+    if (btlBackTap(x, y)) return;
+    for (uint8_t i = 0; i < WILD_BALL_KINDS; i++) {
+      if (!btlCellHit(i, x, y)) continue;
+      if (!pet.wildBalls[i]) { sfxPlay(SFX_DENY); return; }
+      sfxPlay(SFX_TAP);
+      btlThrowWith(i, (uint8_t)random(100));
+      return;
+    }
+    btlMenu = 0;      // anywhere else backs out
     return;
   }
   if (btlMenu == 3) {
@@ -10534,10 +10671,10 @@ void hubTap(int16_t x, int16_t y) {
 // hats, or a run of DecorId.
 
 // CAT_GARDEN is the seeds' own aisle: care item 2, listed apart so it can be found
-enum : uint8_t { CAT_HATS = 0, CAT_TOYS, CAT_DECOR, CAT_FOOD, CAT_CARE, CAT_GARDEN, CAT_SCENE, CAT_FURN, CAT_COUNT };
+enum : uint8_t { CAT_HATS = 0, CAT_TOYS, CAT_DECOR, CAT_FOOD, CAT_CARE, CAT_GARDEN, CAT_SCENE, CAT_FURN, CAT_BALLS, CAT_COUNT };
 #define CARE_LIKE(c) ((c) == CAT_CARE || (c) == CAT_GARDEN)
 static StrId accName(uint8_t a);   // with the wardrobe code
-static const StrId CAT_NAME[CAT_COUNT] = { S_WARDROBE, S_TOYS, S_DECOR, S_FOOD_TITLE, S_CARE, S_PLACE_GARDEN, S_SCENERY, S_FURNITURE };
+static const StrId CAT_NAME[CAT_COUNT] = { S_WARDROBE, S_TOYS, S_DECOR, S_FOOD_TITLE, S_CARE, S_PLACE_GARDEN, S_SCENERY, S_FURNITURE, S_BTL_BALLS };
 static StrId furnName(uint8_t f) {
   static const StrId T_[FURN_COUNT] = {
     S_FURN_WINDOW, S_FURN_CLOCK, S_FURN_PAINTING, S_FURN_SHELF, S_FURN_SOFA, S_FURN_TV, S_FURN_AQUARIUM,
@@ -10556,12 +10693,12 @@ bool feedFromBag(uint8_t f);   // defined with the food menu
 // everything there is in a category (the bag) ...
 static uint8_t catCountAll(uint8_t c) {
   return c == CAT_HATS ? HAT_COUNT + ACC_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_COUNT - DEC_TOY_COUNT
-       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : c == CAT_GARDEN ? 1 : 2;
+       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : c == CAT_GARDEN ? 1 : c == CAT_BALLS ? WILD_BALL_KINDS : 2;
 }
 // ... and what the shop sells: the arcade prizes are won, never bought
 static uint8_t catCount(uint8_t c) {
   return c == CAT_HATS ? HAT_SHOP_COUNT + ACC_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_SHOP_COUNT - DEC_TOY_COUNT
-       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : c == CAT_GARDEN ? 1 : 2;   // CARE: soap, brush; GARDEN: seeds
+       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : c == CAT_GARDEN ? 1 : c == CAT_BALLS ? WILD_BALL_KINDS : 2;   // CARE: soap, brush; GARDEN: seeds
 }
 static uint8_t catPages(uint8_t c) { return (catCount(c) + SHOP_PER_PAGE - 1) / SHOP_PER_PAGE; }
 // the catalogue id (HatId or DecorId) of item i in category c
@@ -10582,6 +10719,7 @@ static StrId decorName(uint8_t d) {
 }
 static StrId foodName(uint8_t f);
 static const char *const *catIcon(uint8_t c, uint8_t id) {
+  if (c == CAT_BALLS) return SPR_BALLS[id % WILD_BALL_KINDS];
   if (CARE_LIKE(c)) return id == 0 ? SPR_CARE_SOAP : id == 1 ? SPR_CARE_BRUSH : SPR_PLACE_SEED;
   if (c == CAT_SCENE) return id == SCENERY_ROOM ? SPR_FURN_WINDOW : SPR_PLACE_TREE;
   if (c == CAT_FURN) return SPR_FURN[id];
@@ -10589,6 +10727,7 @@ static const char *const *catIcon(uint8_t c, uint8_t id) {
   return c == CAT_HATS ? SPR_HATS[id] : c == CAT_FOOD ? SPR_FOODS[id] : SPR_DECOR[id];
 }
 static StrId catName(uint8_t c, uint8_t id) {
+  if (c == CAT_BALLS) return id == 0 ? S_BALL_POKE : id == 1 ? S_BALL_GREAT : S_BALL_ULTRA;
   if (CARE_LIKE(c)) return id == 0 ? S_SOAP : id == 1 ? S_BRUSH_ITEM : S_SEED;
   if (c == CAT_SCENE) return sceneryName(id);
   if (c == CAT_FURN) return furnName(id);
@@ -10596,6 +10735,7 @@ static StrId catName(uint8_t c, uint8_t id) {
   return c == CAT_HATS ? hatName(id) : c == CAT_FOOD ? foodName(id) : decorName(id);
 }
 static uint16_t catPrice(uint8_t c, uint8_t id) {
+  if (c == CAT_BALLS) return WILD_BALL_PRICE[id % WILD_BALL_KINDS];
   if (CARE_LIKE(c)) return id == 0 ? SOAP_PRICE : id == 1 ? BRUSH_PRICE : SEED_PRICE;
   if (c == CAT_SCENE) return Pet::sceneryPrice(id);
   if (c == CAT_FURN) return Pet::furnPrice(id);
@@ -10603,8 +10743,9 @@ static uint16_t catPrice(uint8_t c, uint8_t id) {
   return c == CAT_HATS ? Pet::hatPrice(id) : c == CAT_FOOD ? Pet::foodInfo(id).price : Pet::decorPrice(id);
 }
 // Foods are bought by the serving: never "owned" in the shop, always buyable.
-static bool catConsumable(uint8_t c, uint8_t id) { return c == CAT_FOOD || (CARE_LIKE(c) && id != 1); }
+static bool catConsumable(uint8_t c, uint8_t id) { return c == CAT_FOOD || c == CAT_BALLS || (CARE_LIKE(c) && id != 1); }
 static bool catOwned(uint8_t c, uint8_t id) {
+  if (c == CAT_BALLS) return pet.wildBalls[id % WILD_BALL_KINDS] > 0;
   if (CARE_LIKE(c)) return id == 0 ? pet.soapCount > 0 : id == 1 ? pet.brushOwned : pet.seedCount > 0;
   if (c == CAT_SCENE) return pet.ownsScenery(id);
   if (c == CAT_FURN) return pet.ownsFurn(id);
@@ -10612,12 +10753,14 @@ static bool catOwned(uint8_t c, uint8_t id) {
   return c == CAT_HATS ? pet.ownsHat(id) : c == CAT_FOOD ? pet.foodCount[id] > 0 : pet.ownsDecor(id);
 }
 static bool catInUse(uint8_t c, uint8_t id) {
+  if (c == CAT_BALLS) return false;
   if (c == CAT_SCENE) return pet.sceneryPick == (int8_t)id;
   if (c == CAT_FURN) return pet.furnPlaced(id);
   if (c == CAT_HATS && id >= HAT_COUNT) return pet.wearingAcc(id - HAT_COUNT);
   return c == CAT_HATS ? pet.hatOn == (int8_t)id : (c == CAT_FOOD || CARE_LIKE(c)) ? false : pet.hasDecorOut(id);
 }
 static bool catBuy(uint8_t c, uint8_t id) {
+  if (c == CAT_BALLS) return pet.buyBall(id);
   if (CARE_LIKE(c)) return id == 0 ? pet.buySoap() : id == 1 ? pet.buyBrush() : pet.buySeed();
   if (c == CAT_SCENE) return pet.buyScenery(id);
   if (c == CAT_FURN) return pet.buyFurn(id);
@@ -10626,7 +10769,7 @@ static bool catBuy(uint8_t c, uint8_t id) {
 }
 // the row label: a food shows how many servings are in the bag
 static const char *catLabel(uint8_t c, uint8_t id, char *buf, size_t n) {
-  uint8_t have = c == CAT_FOOD ? pet.foodCount[id] : !CARE_LIKE(c) ? 0 : id == 0 ? pet.soapCount : id == 2 ? pet.seedCount : 0;
+  uint8_t have = c == CAT_BALLS ? pet.wildBalls[id % WILD_BALL_KINDS] : c == CAT_FOOD ? pet.foodCount[id] : !CARE_LIKE(c) ? 0 : id == 0 ? pet.soapCount : id == 2 ? pet.seedCount : 0;
   if (!have) return T(catName(c, id));
   char cnt[8];
   snprintf(cnt, sizeof(cnt), T(S_COUNT_FMT), (unsigned)have);
@@ -10635,6 +10778,7 @@ static const char *catLabel(uint8_t c, uint8_t id, char *buf, size_t n) {
 }
 // wear / take off a hat, put out / pick up a toy or decoration
 static void catUse(uint8_t c, uint8_t id) {
+  if (c == CAT_BALLS) { fpShowToast(S_BALL_USE, UI_BAR_OK); return; }
   if (c == CAT_HATS && id >= HAT_COUNT) pet.wearAcc(id - HAT_COUNT);
   else if (c == CAT_HATS) pet.wearHat(pet.hatOn == (int8_t)id ? -1 : (int8_t)id);
   else if (c == CAT_SCENE) pet.pickScenery((int8_t)id);   // again: back to its own
@@ -10655,7 +10799,7 @@ static void catUse(uint8_t c, uint8_t id) {
 static void drawCatList(StrId title) {
   drawPanelBase();
   uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(title), UI_INK, 1, PANEL_W - 80);
-  static const char *const *const ICON[CAT_COUNT] = { SPR_HAT_CAP, SPR_DEC_BALL, SPR_DEC_PLANT, SPR_FOOD_SANDWICH, SPR_CARE_SOAP, SPR_PLACE_SEED, SPR_PLACE_TREE, SPR_FURN_SOFA };
+  static const char *const *const ICON[CAT_COUNT] = { SPR_HAT_CAP, SPR_DEC_BALL, SPR_DEC_PLANT, SPR_FOOD_SANDWICH, SPR_CARE_SOAP, SPR_PLACE_SEED, SPR_PLACE_TREE, SPR_FURN_SOFA, SPR_BALL_POKE };
   if (catListPage >= CATL_PAGES) catListPage = 0;
   for (int r = 0; r < CATL_PER_PAGE; r++) {
     int c = catListPage * CATL_PER_PAGE + r;
@@ -11350,7 +11494,7 @@ void drawBathDuck() {
 #define DEX_CHANSEY 113           // the nurse
 enum : uint8_t { PLACE_NONE = 0, PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_TEETH,
                  PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN,
-                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY };
+                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS };
 
 uint32_t placeAnimUntil = 0;      // the park walk animation
 // An action's animation (phase 28): what is playing, when it began, where, and in
@@ -11390,6 +11534,7 @@ void mapMenuTap(int16_t x, int16_t y) {
   if (pl < 0) return;
   sfxPlay(SFX_TAP);
   mapOpen = false;
+  if (pl == PLACE_GRASS) { startWildBattle(); return; }
   if (pl == PLACE_ARCADE) { if (!fpBlockedBySick()) trainOpen = true; return; }   // the arcade is the games menu
   schoolReset();
   enterPlaceFamily();
@@ -12464,25 +12609,33 @@ static int tileHit(int16_t x, int16_t y, int n, bool hub) {
 
 static const uint8_t MAP_PLACE[2][MAP_TILES] = {
   { PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN },
-  { PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_NONE },
+  { PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS },
 };
 
 void renderMapGrid() {
   drawMenuTitle(S_MAP_TITLE);
   static const char *const *const ICON[2][MAP_TILES] = {
     { SPR_PLACE_TREE, SPR_ICON_COIN, SPR_PLACE_CROSS, SPR_PLACE_SPROUT, SPR_ICON_MISSION, SPR_PLACE_FISH, SPR_PLACE_FLAG, SPR_PLACE_POT },
-    { SPR_DEC_DUCK, SPR_ICON_DIARY, SPR_CARE_NOTE, SPR_ACC_MEDAL, SPR_CAT_ARCADE, SPR_FURN_CLOCK, SPR_PLACE_NURSERY, nullptr },
+    { SPR_DEC_DUCK, SPR_ICON_DIARY, SPR_CARE_NOTE, SPR_ACC_MEDAL, SPR_CAT_ARCADE, SPR_FURN_CLOCK, SPR_PLACE_NURSERY, SPR_PLACE_GRASS },
   };
   static const StrId NAME[2][MAP_TILES] = {
     { S_PLACE_PARK, S_SHOP, S_CENTER_SHORT, S_PLACE_GARDEN, S_PLACE_SCHOOL, S_PLACE_LAKE, S_PLACE_ADVENTURE, S_PLACE_KITCHEN },
-    { S_PLACE_BEACH, S_PLACE_LIBRARY, S_PLACE_MUSIC, S_PLACE_CONTEST, S_PLACE_ARCADE, S_PLACE_JOBS, S_PLACE_NURSERY, S_PLACE_JOBS },
+    { S_PLACE_BEACH, S_PLACE_LIBRARY, S_PLACE_MUSIC, S_PLACE_CONTEST, S_PLACE_ARCADE, S_PLACE_JOBS, S_PLACE_NURSERY, S_PLACE_GRASS },
   };
   uint16_t lit = lerp565(UI_BAR_OK, UI_WHITE, 4, 8);
   uint8_t pg = mapPage % 2;
   for (int i = 0; i < MAP_TILES; i++) {
     if (MAP_PLACE[pg][i] == PLACE_NONE) continue;
     bool hot = (pg == 0 && ((i == 3 && pet.gardenReady()) || (i == 6 && pet.advReady()))) || (pg == 1 && i == 6 && pet.nurseryReady());
+    if (MAP_PLACE[pg][i] == PLACE_GRASS) hot = pet.wildCount() > 0;
     drawTile(TILE_X(i % 2), MAP_TILE_Y(i / 2), ICON[pg][i], NAME[pg][i], hot ? lit : UI_BG_DAY);
+    if (MAP_PLACE[pg][i] == PLACE_GRASS && hot) {   // how many are waiting
+      int bx = TILE_X(i % 2) + TILE_W - 8, by = MAP_TILE_Y(i / 2) + 8;
+      gfx->fillCircle(bx, by, 10, UI_BAR_BAD);
+      char n[4];
+      snprintf(n, sizeof(n), "%u", (unsigned)pet.wildCount());
+      uiText(UIF_TINY, bx, by + 5, n, UI_WHITE, 1);
+    }
   }
   drawPageNav(pg, 2);
   gfx->flush();

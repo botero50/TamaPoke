@@ -139,7 +139,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 40
     "%s! +%u monedas", "Premio a los %u pasos",
     // phase 43
-    "2500 pasos! Un bocadillo", "5000 pasos! Gran paseo", "10000 pasos! Mas fuerte", "Aprendiz", "Paseante", "Caminante", "Excursionista", "Senderista", "Guia de ruta", "Trotamundos", "As del camino", "Leyenda", },
+    "2500 pasos! Un bocadillo", "5000 pasos! Gran paseo", "10000 pasos! Mas fuerte", "Aprendiz", "Paseante", "Caminante", "Excursionista", "Senderista", "Guia de ruta", "Trotamundos", "As del camino", "Leyenda",
+    // phase 44
+    "Hierba alta", "BALLS", "Poke Ball", "Super Ball", "Ultra Ball", "Un %s salvaje!", "Atrapaste a %s!", "Se fue a la caja.", "%s salio de la bola!", "Equipo y caja llenos", "Sin bolas: hay en la tienda", "Encontraste una Poke Ball!", "Algo se mueve en la hierba!", "Camina %u pasos mas", "Ahora esta durmiendo", "No hay nadie en la hierba", "Se usan en la hierba alta", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -273,7 +275,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 40
     "%s! +%u coins", "Next prize at %u steps",
     // phase 43
-    "2500 steps! A snack", "5000 steps! A great walk", "10000 steps! Stronger", "Beginner", "Stroller", "Walker", "Hiker", "Trekker", "Route Guide", "Globetrotter", "Trail Ace", "Legend", },
+    "2500 steps! A snack", "5000 steps! A great walk", "10000 steps! Stronger", "Beginner", "Stroller", "Walker", "Hiker", "Trekker", "Route Guide", "Globetrotter", "Trail Ace", "Legend",
+    // phase 44
+    "Tall Grass", "BALLS", "Poke Ball", "Great Ball", "Ultra Ball", "A wild %s!", "You caught %s!", "It went to the box.", "%s broke free!", "Team and box are full", "No balls: buy some in the shop", "You found a Poke Ball!", "Something stirs in the grass!", "Walk %u more steps", "It's asleep right now", "Nobody is in the grass", "Use them in the Tall Grass", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -406,7 +410,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 40
     "%s ! +%u pieces", "Prix suivant a %u pas",
     // phase 43
-    "2500 pas ! Un en-cas", "5000 pas ! Belle balade", "10000 pas ! Plus fort", "Novice", "Promeneur", "Marcheur", "Randonneur", "Trekkeur", "Guide", "Globe-trotteur", "As du sentier", "Legende", },
+    "2500 pas ! Un en-cas", "5000 pas ! Belle balade", "10000 pas ! Plus fort", "Novice", "Promeneur", "Marcheur", "Randonneur", "Trekkeur", "Guide", "Globe-trotteur", "As du sentier", "Legende",
+    // phase 44
+    "Hautes herbes", "BALLS", "Poke Ball", "Super Ball", "Hyper Ball", "Un %s sauvage !", "%s est capture !", "Il va dans la boite.", "%s s'est libere !", "Equipe et boite pleines", "Plus de balls: voir la boutique", "Tu trouves une Poke Ball !", "Ca bouge dans les herbes !", "Encore %u pas", "Il dort pour l'instant", "Personne dans les herbes", "A utiliser dans les herbes", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -539,7 +545,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 40
     "%s! +%u Muenzen", "Preis bei %u Schritten",
     // phase 43
-    "2500 Schritte! Ein Snack", "5000 Schritte! Tolle Runde", "10000 Schritte! Staerker", "Neuling", "Bummler", "Geher", "Wanderer", "Trekker", "Routenguide", "Weltenbummler", "Pfad-Ass", "Legende", },
+    "2500 Schritte! Ein Snack", "5000 Schritte! Tolle Runde", "10000 Schritte! Staerker", "Neuling", "Bummler", "Geher", "Wanderer", "Trekker", "Routenguide", "Weltenbummler", "Pfad-Ass", "Legende",
+    // phase 44
+    "Hohes Gras", "BAELLE", "Pokeball", "Superball", "Hyperball", "Ein wildes %s!", "%s gefangen!", "Es kommt in die Box.", "%s hat sich befreit!", "Team und Box sind voll", "Keine Baelle: im Laden kaufen", "Du findest einen Pokeball!", "Es raschelt im Gras!", "Noch %u Schritte", "Es schlaeft gerade", "Niemand ist im Gras", "Fuer das hohe Gras", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -672,7 +680,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 40
     "%s! +%u monete", "Premio a %u passi",
     // phase 43
-    "2500 passi! Uno spuntino", "5000 passi! Bella passeggiata", "10000 passi! Piu forte", "Principiante", "Passeggiatore", "Camminatore", "Escursionista", "Trekker", "Guida", "Giramondo", "Asso dei sentieri", "Leggenda", },
+    "2500 passi! Uno spuntino", "5000 passi! Bella passeggiata", "10000 passi! Piu forte", "Principiante", "Passeggiatore", "Camminatore", "Escursionista", "Trekker", "Guida", "Giramondo", "Asso dei sentieri", "Leggenda",
+    // phase 44
+    "Erba alta", "BALL", "Poke Ball", "Mega Ball", "Ultra Ball", "Un %s selvatico!", "Hai preso %s!", "Va nel box.", "%s si e liberato!", "Squadra e box pieni", "Niente ball: vai al negozio", "Hai trovato una Poke Ball!", "Qualcosa si muove nell'erba!", "Ancora %u passi", "Ora sta dormendo", "Nessuno nell'erba", "Da usare nell'erba alta", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -805,7 +815,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 40
     "%s! +%u moedas", "Premio aos %u passos",
     // phase 43
-    "2500 passos! Um lanche", "5000 passos! Belo passeio", "10000 passos! Mais forte", "Aprendiz", "Passeante", "Caminhante", "Excursionista", "Trilheiro", "Guia de rota", "Globetrotter", "As da trilha", "Lenda", },
+    "2500 passos! Um lanche", "5000 passos! Belo passeio", "10000 passos! Mais forte", "Aprendiz", "Passeante", "Caminhante", "Excursionista", "Trilheiro", "Guia de rota", "Globetrotter", "As da trilha", "Lenda",
+    // phase 44
+    "Mato alto", "BOLAS", "Poke Bola", "Grande Bola", "Ultra Bola", "Um %s selvagem!", "Pegou %s!", "Foi para a caixa.", "%s escapou!", "Equipe e caixa cheias", "Sem bolas: compre na loja", "Achou uma Poke Bola!", "Algo se mexe no mato!", "Ande mais %u passos", "Esta dormindo agora", "Ninguem no mato", "Use no mato alto", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -940,7 +952,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 40
     "%s! +%u 金币", "%u 步有奖励",
     // phase 43
-    "2500 步! 吃点心", "5000 步! 走得真棒", "10000 步! 变强了", "新手", "散步者", "步行者", "远足者", "徒步者", "领路人", "环球旅人", "步道高手", "传奇", },
+    "2500 步! 吃点心", "5000 步! 走得真棒", "10000 步! 变强了", "新手", "散步者", "步行者", "远足者", "徒步者", "领路人", "环球旅人", "步道高手", "传奇",
+    // phase 44
+    "草丛", "精灵球", "精灵球", "超级球", "高级球", "野生的 %s!", "抓到了 %s!", "送进了箱子.", "%s 挣脱了!", "队伍和箱子都满了", "没有球了: 去商店买", "找到了精灵球!", "草丛里有动静!", "再走 %u 步", "它正在睡觉", "草丛里没有人", "在草丛里使用", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -1074,7 +1088,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 40
     "%s! +%u 코인", "%u 걸음에 보상",
     // phase 43
-    "2500 걸음! 간식 시간", "5000 걸음! 멋진 산책", "10000 걸음! 더 강해졌어", "초보", "산책가", "걷기꾼", "등산가", "트레커", "길잡이", "세계 여행자", "길의 고수", "전설", },
+    "2500 걸음! 간식 시간", "5000 걸음! 멋진 산책", "10000 걸음! 더 강해졌어", "초보", "산책가", "걷기꾼", "등산가", "트레커", "길잡이", "세계 여행자", "길의 고수", "전설",
+    // phase 44
+    "풀숲", "볼", "몬스터볼", "수퍼볼", "하이퍼볼", "야생의 %s!", "%s 잡았다!", "상자로 보냈어.", "%s 빠져나왔어!", "팀과 상자가 꽉 찼어", "볼이 없어: 상점에서 사자", "몬스터볼을 찾았어!", "풀숲에서 뭔가 움직여!", "%u 걸음 더 걷자", "지금 자고 있어", "풀숲에 아무도 없어", "풀숲에서 쓰자", },
 };
 
 // Medal names in their three lengths [language][medal].

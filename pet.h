@@ -284,6 +284,10 @@ enum QuestKind : uint8_t { QK_PARK = 0, QK_BEACH, QK_READ, QK_FISH, QK_COOK, QK_
 #define WALK_PRIZES 8
 #define WALK_RANKS (WALK_PRIZES + 1)
 #define STEP_GOALS 3
+#define WILD_STEPS 500
+#define WILD_CHARGES_MAX 3
+#define WILD_STARTER_BALLS 5
+#define BALL_STACK_MAX 99
 #define QUEST_WALK_STEPS 3000    // the "long walk" step
 #define GYM_STEPS_BASE 10000     // phase 36: steps to the first leader ...
 #define GYM_STEPS_PER 2000       // ... and this much more for each one after
@@ -1196,6 +1200,22 @@ public:
   uint8_t stepGoalNew = 0;
   static uint32_t stepGoalAt(uint8_t i);      // 0 past the last one
   void claimStepGoals();                      // pays any reached, unless an egg or ceremony is waiting
+  // Wild encounters (phase 44): one free a day, plus one per WILD_STEPS walked,
+  // holding up to WILD_CHARGES_MAX from steps. Balls live here too, a count each.
+  uint8_t wildBalls[3] = { 0, 0, 0 };         // Poke, Great, Ultra (see wild.h)
+  uint8_t wildCharges = 0;
+  uint16_t wildStepBank = 0;                  // steps towards the next one
+  uint32_t wildFreeDay = 0;                   // today() + 1 on the day the free one went
+  uint8_t wildKit = 0;                        // the 5 starter balls have been given
+  bool wildEarned = false;                    // walking just earned one: to announce
+  bool wildFreeLeft() const { return wildFreeDay != today() + 1; }
+  uint8_t wildCount() const { return (uint8_t)(wildCharges + (wildFreeLeft() ? 1 : 0)); }
+  uint16_t wildStepsLeft() const { return (uint16_t)(WILD_STEPS - wildStepBank); }
+  bool wildSpend();                           // uses the free one first; false if none
+  bool buyBall(uint8_t kind);
+  bool useBall(uint8_t kind);                 // false if there are none of that kind
+  void addBall(uint8_t kind);
+  void registerCaught(int16_t dex, bool isShiny);
   // Sounds it makes by itself stay silent from 21:00 to 07:00 (phase 40).
   static bool isQuietAt(uint32_t epoch);
   bool quietHours() const { return lastSeenEpoch && isQuietAt(lastSeenEpoch); }
