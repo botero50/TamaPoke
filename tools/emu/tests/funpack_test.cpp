@@ -88,6 +88,18 @@ int main(){
     ck(!p.isSick() && p.overfeed == 0, "eating while hungry never counts");
   }
 
+  // --- each pile takes POOP_DRAIN_PER_PILE from CLEAN per tick, on top of the base 1
+  {
+    Pet p; fresh(p, 12);
+    p.fullness = 40;              // not over 40: no new pile can appear mid-test
+    p.hygiene = 80; p.poops = 0; p.dbgTick();
+    ck(p.hygiene == 79, "no poop: CLEAN falls by the base 1");
+    p.fullness = 40; p.hygiene = 80; p.poops = 1; p.dbgTick();
+    ck(p.hygiene == 77, "one pile takes 2 more");
+    p.fullness = 40; p.hygiene = 80; p.poops = 3; p.dbgTick();
+    ck(p.hygiene == 73, "three piles take 6 more");
+  }
+
   // --- dirt: 45 minutes with 3 poops gives a cold that needs 2 doses and a bath
   {
     Pet p; fresh(p, 12);

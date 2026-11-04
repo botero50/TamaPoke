@@ -22,6 +22,8 @@ The reliability work in Phase 39 takes its ideas, not its code, from other forks
 
 Phase 40 also takes only ideas: the low-need warning beep from [AlteSocke](https://github.com/AlteSocke/TamaPoke), quiet nights from [danielberndt](https://github.com/danielberndt/TamaPoke), and walking milestones from the cren and ShadowEnemyx forks.
 
+Phase 41 reuses code: the gym arenas (`tools/gen_arenas.py` and the `ARENA_OF_TYPE` table) are from [tubiana](https://github.com/tubiana/TamaPoke), under the MIT licence: Copyright (c) 2026 Quique Tortosa, Dylan Dao and Thibault Tubiana. The gentler poop drain and the idea of a marked exit in games come from [AlteSocke](https://github.com/AlteSocke/TamaPoke).
+
 
 TamaPoke is a **non-commercial, personal-use** project. It does not sell or
 commercially redistribute any copyrighted material. Pokémon and all related
@@ -111,6 +113,9 @@ packed into `backs.h` by `tools/gen_backs.py`.
 sourced by it. Before this repo goes public, confirm where they came from and
 under what licence, the same way the PMD sprites are accounted for above — and
 replace them if that cannot be answered.
+
+`tools/backs/ARENA *.png` are the eight gym arenas, drawn by code in
+`tools/gen_arenas.py` (from tubiana's fork, MIT, see above).
 
 ## Gym badge artwork
 

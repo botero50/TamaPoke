@@ -161,6 +161,7 @@ enum FoodId : uint8_t {
 #define WASH_SHOWER 35           // the quick shower adds this much CLEAN (the bubble bath fills it)
 #define WASH_SCRUB 65            // the sponge game
 #define SWEEP_PER_PILE 10        // the broom: CLEAN for each pile swept
+#define POOP_DRAIN_PER_PILE 2    // CLEAN each pile on the floor takes per tick
 #define BRUSH_PRICE 60           // bought once
 #define NAP_MINUTES 30
 #define SHINE_MS 60000UL         // sparkles after brushing

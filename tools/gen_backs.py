@@ -35,6 +35,9 @@ BIOMES = [
     ('SNOW',       'snow'),
 ]
 
+# Gym arenas (tools/gen_arenas.py), one scene each: they are indoors, so no night.
+ARENAS = ['ROCK', 'WATER', 'ELECTRIC', 'GRASS', 'FIRE', 'GHOST', 'ICE', 'DRAGON']
+
 
 def read_png(path):
     d = open(path, 'rb').read()
@@ -111,6 +114,21 @@ def main():
                 out.append('  ' + ','.join(str(v) for v in idx[r:r + 40]) + ',')
             out.append('};')
             out.append('')
+    arenas = []
+    for ai, name in enumerate(ARENAS):
+        w, h, ch, rows = read_png(os.path.join(SRC, 'ARENA %s.png' % name))
+        pal, idx = to_indexed(w, h, ch, rows)
+        nm = 'ARENA_%s' % name
+        arenas.append((nm, w, h, len(pal)))
+        total += len(idx) + len(pal) * 2
+        out.append('static const uint16_t %s_PAL[%d] = {' % (nm, len(pal)))
+        out.append('  ' + ', '.join('0x%04X' % c for c in pal))
+        out.append('};')
+        out.append('static const uint8_t %s_IDX[%d] = {' % (nm, len(idx)))
+        for r in range(0, len(idx), 40):
+            out.append('  ' + ','.join(str(v) for v in idx[r:r + 40]) + ',')
+        out.append('};')
+        out.append('')
     out.append('struct BackScene {')
     out.append('  const uint16_t *pal;')
     out.append('  const uint8_t *idx;')
@@ -124,6 +142,12 @@ def main():
             nm, w, h, pc = names[bi * 2 + ni]
             row.append('{ %s_PAL, %s_IDX, %d, %d, %d }' % (nm, nm, w, h, pc))
         out.append('  { %s },' % ', '.join(row))
+    out.append('};')
+    out.append('')
+    out.append('enum : uint8_t { %s, ARENA_COUNT };' % ', '.join(a[0] for a in arenas))
+    out.append('static const BackScene ARENAS[ARENA_COUNT] = {')
+    for nm, w, h, pc in arenas:
+        out.append('  { %s_PAL, %s_IDX, %d, %d, %d },' % (nm, nm, w, h, pc))
     out.append('};')
     open(OUT, 'w').write('\n'.join(out) + '\n')
     print('backgrounds: %d, %.1f KB of data -> %s'

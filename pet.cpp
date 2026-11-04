@@ -262,7 +262,7 @@ void Pet::tick() {
   energy = clamp100(energy - 1);
   if (fullness > 40 && poops < 3 && random(100) < 15) poops++;
 
-  hygiene = clamp100(hygiene - 1 - 4 * poops);
+  hygiene = clamp100(hygiene - 1 - POOP_DRAIN_PER_PILE * poops);
   // overweight makes it lazy: energy falls twice as fast
   if (weight > 50) energy = clamp100(energy - 1);
   if (weight > 0 && ageMinutes % 3 == 0) weight--;

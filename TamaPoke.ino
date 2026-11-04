@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.42"
+#define FW_VERSION "3.14-funpack.43"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -499,6 +499,18 @@ static_assert(PDET_R_X > PDET_L_X + PDET_L_W + 8,
 
 uint8_t gymRegion = 0;
 uint8_t btlRegion = 0;
+// The way out of a game: a marked X at the top centre, and nothing else. The touch
+// area is wider than the drawing so a child's finger finds it, and stays inside
+// the round edge.
+#define EXIT_BTN_Y 22
+#define EXIT_BTN_R 14
+#define EXIT_HIT_R 38
+bool exitHit(int16_t x, int16_t y) {
+  int dx = x - 233, dy = y - EXIT_BTN_Y;
+  return dx * dx + dy * dy <= EXIT_HIT_R * EXIT_HIT_R;
+}
+void drawExitBtn();
+
 #define TRAINERS (TRAINER_SETS[gymRegion % GYM_REGIONS].list)
 #define BTL_TRAINERS (TRAINER_SETS[btlRegion % GYM_REGIONS].list)
 bool gShowAllAvatars = false;  // emulator screenshot aid, never set on hardware
@@ -1593,8 +1605,8 @@ void handleTouch() {
   if (sackOpen) {
     if (pressed && !wasPressed) {
       lastInteract = millis();
-      if (y < 72) leaveSack();       // tap the top = quit, keeping what was earned
-      else sackTap();
+      if (exitHit(x, y)) leaveSack();   // the X quits, keeping what was earned
+      else if (y >= 72) sackTap();      // the rest of the top strip does nothing
     }
     wasPressed = pressed;
     return;
@@ -1602,7 +1614,7 @@ void handleTouch() {
   if (scrubOpen) {
     if (pressed) {
       lastInteract = millis();
-      if (!wasPressed && y < 72) scrubOpen = false;   // the top strip quits
+      if (!wasPressed && exitHit(x, y)) scrubOpen = false;   // the X quits
       else scrubRub(x, y);
     }
     wasPressed = pressed;
@@ -1707,13 +1719,8 @@ void onSwipeV(int dir) {
     partyOpen = false;
     return;
   }
-  // Either minigame exits on a swipe. A swipe cannot be confused with a ball
-  // hit -- the gesture resolver separates them -- which the header tap no
-  // longer can now that the ball is hittable up there.
-  if (gameOpen) { leaveGame(); return; }
-  if (sackOpen) { leaveSack(); return; }
-  if (spdOpen) { leaveSpeed(); return; }
-  if (fpOpen) { if (!fpUsesDrag(fpGame)) fpLeave(); return; }   // the drag games are steered by dragging
+  // The X is the only way out of a game: a child's quick swipe must not end it.
+  if (gameOpen || sackOpen || spdOpen || fpOpen) return;
   if (galleryOpen) {
     if (galleryDetail) { galleryDetail = 0; galleryPmd.unload(); galleryDirty = true; return; }
     galleryRegion = (uint8_t)((galleryRegion + (dir > 0 ? 1 : GAL_REGIONS - 1)) % GAL_REGIONS);
@@ -2081,9 +2088,7 @@ void onSwipe(int dir) {
     partyOpen = false;
     return;
   }
-  if (gameOpen) { leaveGame(); return; }   // swipe out, keeping what you earned
-  if (spdOpen) { leaveSpeed(); return; }
-  if (fpOpen) { if (!fpUsesDrag(fpGame)) fpLeave(); return; }   // the drag games are steered by dragging
+  if (gameOpen || spdOpen || fpOpen) return;   // the X is the only way out of a game
   if (kbOpen) return;
   if (clockOpen) {   // settings: horizontal pages, circular; OK/cancel close it
     int p = (int)settingsPage + (dir > 0 ? -1 : 1);
@@ -4591,6 +4596,15 @@ void respawnBall() {
 // game trained a stat you could grind back -- but it is now purely about
 // happiness, and a pet that just played should be happier for it. The
 // gameOver/over guards stop a swipe during the results screen paying twice.
+void drawExitBtn() {
+  gfx->fillCircle(CX, EXIT_BTN_Y, EXIT_BTN_R, UI_BAR_BAD);
+  gfx->drawCircle(CX, EXIT_BTN_Y, EXIT_BTN_R, UI_WHITE);
+  for (int t = -1; t <= 1; t++) {        // a thick X, 3 pixels wide
+    gfx->drawLine(CX - 6 + t, EXIT_BTN_Y - 6, CX + 6 + t, EXIT_BTN_Y + 6, UI_WHITE);
+    gfx->drawLine(CX - 6 + t, EXIT_BTN_Y + 6, CX + 6 + t, EXIT_BTN_Y - 6, UI_WHITE);
+  }
+}
+
 void leaveGame() {
   if (!gameOverUntil) pet.playResult(gameScore);
   gameOpen = false;
@@ -4606,13 +4620,12 @@ void leaveSpeed() {
 
 void gameTap(int16_t x, int16_t y) {
   if (gameOverUntil) return;
-  // The ball is checked BEFORE the quit strip. The ball bounces inside a circle
-  // of radius 205 about the centre, so it reaches y=28 -- well inside the y<72
-  // header. Reaching up to hit a high ball used to abandon the game instead,
-  // silently forfeiting the score, the speed training and the record.
+  // The ball is checked BEFORE the X. The ball bounces inside a circle of radius
+  // 205 about the centre, so it reaches y=28 -- right where the X sits. Reaching
+  // up to hit a high ball must count as a hit, never as leaving.
   float dx = ballX - x, dy = ballY - y;
   bool onBall = (dx * dx + dy * dy < 74 * 74);
-  if (!onBall && y < 72) {  // tap the header = quit, keeping what was earned
+  if (!onBall && exitHit(x, y)) {  // the X quits, keeping what was earned
     leaveGame();
     return;
   }
@@ -4755,6 +4768,7 @@ void renderSack() {
   gfx->fillRoundRect(CX - bw / 2, 350, bw, 16, 5, UI_TRACK_TEXT);
   if (fw > 2) gfx->fillRoundRect(CX - bw / 2, 350, fw, 16, 5, UI_BAR_OK);
 
+  drawExitBtn();
   gfx->flush();
 }
 
@@ -4813,7 +4827,7 @@ void renderGame() {
   // score, record and lives
   char buf[8];
   snprintf(buf, sizeof(buf), "%u", gameScore);
-  uiText(UIF_BIG, CX, 58, buf, ink, 1);
+  uiText(UIF_BIG, CX, 72, buf, ink, 1);
   char rec[12];
   snprintf(rec, sizeof(rec), T(S_REC_FMT), pet.gameHi);
   uiText(UIF_SMALL, CX, 90, rec, ink, 1);
@@ -4821,6 +4835,7 @@ void renderGame() {
     if (i < 3 - gameMisses) gfx->fillCircle(180 + i * 28, 104, 6, UI_BAR_BAD);
     else gfx->drawCircle(180 + i * 28, 104, 6, UI_TRACK_TEXT);
   }
+  drawExitBtn();
   // The clock, drawn like the bag's and the reaction test's so all three games
   // read the same way. Thin and near the rim: the middle belongs to the ball.
   if (!gameOverUntil) {
@@ -5673,9 +5688,42 @@ static void drawBack(const BackScene &b, int y0) {
   }
 }
 
-// Which scene: the FOE's biome, since a battle happens where it lives, and the
-// same day/night split the main screen already uses.
+// The arena for each trainer speciality (the design is from tubiana's fork).
+static const uint8_t ARENA_OF_TYPE[TYPE_COUNT] = {
+  ARENA_ROCK,     // normal
+  ARENA_FIRE,     // fire
+  ARENA_WATER,    // water
+  ARENA_ELECTRIC, // electric
+  ARENA_GRASS,    // grass
+  ARENA_ICE,      // ice
+  ARENA_ROCK,     // fighting
+  ARENA_GHOST,    // poison
+  ARENA_ROCK,     // ground
+  ARENA_GRASS,    // flying
+  ARENA_GHOST,    // psychic
+  ARENA_GRASS,    // bug
+  ARENA_ROCK,     // rock
+  ARENA_GHOST,    // ghost
+  ARENA_DRAGON,   // dragon
+  ARENA_GHOST,    // dark
+  ARENA_ELECTRIC, // steel
+  ARENA_GHOST,    // fairy
+};
+
+// Gym, Elite 4 and Champion fights happen in the trainer's own arena, and every
+// Champion in the grand hall. ARENA_COUNT means this fight has no arena.
+uint8_t battleArena() {
+  if (btlTrainer < 0 || btlTrainer >= TRAINER_COUNT) return ARENA_COUNT;
+  if (btlTrainer == TRAINER_COUNT - 1) return ARENA_DRAGON;
+  uint8_t t = BTL_TRAINERS[btlTrainer].type;
+  return t < TYPE_COUNT ? ARENA_OF_TYPE[t] : ARENA_ROCK;
+}
+
+// Which scene: a trainer's arena, otherwise the FOE's biome, since a battle
+// happens where it lives, with the same day/night split as the main screen.
 static void drawBattleBack() {
+  uint8_t arena = battleArena();
+  if (arena < ARENA_COUNT) { drawBack(ARENAS[arena], 30); return; }
   int16_t dex = btlFoe.dex;
   if (dex < 1 || dex > DEX_COUNT) { gfx->fillCircle(CX, CY, 231, UI_BG_DAY); return; }
   uint8_t bi = DEX_TBL[dex].biome;
@@ -5870,6 +5918,7 @@ void startBattle(int16_t dex, uint8_t lvl) {
   if (dex < 1 || dex > DEX_COUNT) return;
   buildSquad(0, TRAINER_TEAM_MAX, 0xFFFF);
   if (!btlSquadN) return;
+  btlTrainer = -1;    // not a gym fight, even straight after one
   // The opponent is built through Pet so it gets the same stat formula and the
   // same learnset-driven moveset the player's creature does -- no special-cased
   // "enemy" maths that could quietly diverge.
@@ -6698,7 +6747,9 @@ void spdTap(int16_t x, int16_t y) {
     spdHits++;
     sfxPlay(SFX_TAP);
     spdSpawn();
+    return;
   }
+  if (exitHit(x, y)) leaveSpeed();   // the target can reach up here, so it goes first
 }
 
 void renderSpeed() {
@@ -6752,11 +6803,12 @@ void renderSpeed() {
 
   char b[12];
   snprintf(b, sizeof(b), "%u", spdHits);
-  uiText(UIF_BIG, CX, 58, b, ink, 1);
+  uiText(UIF_BIG, CX, 72, b, ink, 1);
   // seconds left
   uint32_t left = (spdUntil > now) ? (spdUntil - now + 999) / 1000 : 0;
   snprintf(b, sizeof(b), "%us", (unsigned)left);
-  uiText(UIF_SMALL, CX, 90, b, ink, 1);
+  uiText(UIF_SMALL, CX, 94, b, ink, 1);
+  drawExitBtn();
   gfx->flush();
 }
 
@@ -9190,7 +9242,7 @@ static void fpPoint(uint8_t pts) {
 // common header: title, score, record, lives and the hint at the bottom
 static void fpHeader(uint8_t g, StrId hint) {
   uint16_t ink = fpInk();
-  uiTextFit(UIF_MID, CX, 52, T(fpTitle(g)), ink, 1, 250);
+  uiTextFit(UIF_MID, CX, 60, T(fpTitle(g)), ink, 1, 250);
   char score[16], rec[16];
   snprintf(score, sizeof(score), "%u", fpScore);
   snprintf(rec, sizeof(rec), T(S_REC_FMT), pet.miniHi[g]);
@@ -9202,6 +9254,7 @@ static void fpHeader(uint8_t g, StrId hint) {
     else gfx->drawCircle(lx + i * 28, 106, 6, UI_TRACK_TEXT);
   }
   uiTextFit(UIF_SMALL, CX, 412, T(hint), ink, 1, 280);
+  drawExitBtn();
 }
 
 static void fpTimeBar(uint32_t now, uint32_t until, uint32_t total, int y) {
@@ -9880,7 +9933,8 @@ void startFunPackGame(uint8_t g) {
 
 void fpTap(int16_t x, int16_t y) {
   if (fpOverUntil) return;
-  if (y < 72) { fpLeave(); return; }   // tap the top = quit, keeping what was earned
+  if (exitHit(x, y)) { fpLeave(); return; }   // the X quits, keeping what was earned
+  if (y < 72) return;                         // the rest of the top strip does nothing
   switch (fpGame) {
     case MINI_LR: lrTap(x, y); break;
     case MINI_HL: hlTap(x, y); break;
@@ -11149,7 +11203,7 @@ void renderScrub() {
   if (scrubDoneUntil && now > scrubDoneUntil) { scrubOpen = false; return; }
   drawGameScene();
   uint16_t ink = fpInk();
-  uiTextFit(UIF_MID, CX, 52, T(S_SCRUB), ink, 1, 250);
+  uiTextFit(UIF_MID, CX, 60, T(S_SCRUB), ink, 1, 250);
   if (pmd.loaded) {                 // big, so there is something to scrub
     drawPmdActZ(pmd, PMD_IDLE, CX, FP_GROUND, now, true, false, 5, 170, 250);
     if (!scrubPlaced && gSprTop.ok) {
@@ -11188,6 +11242,7 @@ void renderScrub() {
     }
   } else {
     uiTextFit(UIF_SMALL, CX, 412, T(S_SCRUB_HINT), ink, 1, 280);
+    drawExitBtn();
   }
   gfx->flush();
 }
@@ -14100,7 +14155,8 @@ static void drawRender(uint32_t) {
   gfx->fillRoundRect(DR_DONE_X - 10, DR_PAL_Y - 18, 80, 36, 12, UI_BAR_OK);
   gfx->drawRoundRect(DR_DONE_X - 10, DR_PAL_Y - 18, 80, 36, 12, UI_INK);
   uiTextFit(UIF_SMALL, DR_DONE_X + 30, uiMidY(UIF_SMALL, DR_PAL_Y - 18, 36), T(S_DRAW_DONE), UI_WHITE, 1, 72);
-  uiTextFit(UIF_MID, CX, 52, T(S_GAME_DRAW), fpInk(), 1, 250);
+  uiTextFit(UIF_MID, CX, 60, T(S_GAME_DRAW), fpInk(), 1, 250);
+  drawExitBtn();
   gfx->flush();
 }
 

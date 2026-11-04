@@ -58,8 +58,9 @@ and each opens a list of its games, the original trainer first: STRENGTH = bag,
 Mole Pop; SPEED = reaction test, Berry Drop, Jump Rope; DEFENCE = ball game,
 Who is it?; FUN = Dance, Hide & Seek, Left / Right, Higher / Lower. Each of the
 eight new games keeps its own record.
-Tapping the top strip quits and keeps what was earned (a swipe works too in
-the four guessing games). Every game cures **bored** and **grumpy**.
+The red **X** at the top centre quits and keeps what was earned; it is the only
+way out, so a stray tap or swipe can't end a game. Every game cures **bored** and
+**grumpy**.
 
 | Game | How it plays | Reward |
 |---|---|---|

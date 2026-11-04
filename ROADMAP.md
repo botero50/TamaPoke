@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 3 November 2026, with Phase 40._
+_Last updated: 4 November 2026, with Phase 41._
 
 ## Done
 | Phase | What | Release |
@@ -33,8 +33,23 @@ _Last updated: 3 November 2026, with Phase 40._
 | 38 | Bigger page arrows (a near miss turns the page instead of closing the menu), the tasks bubble moved onto the glass, a Pokéball team button at the left edge, the bath as six tiles on one page; a README with two GIFs and the new features | v1.23 |
 | 39 | A sturdier ball, from the fork review: the date never goes back after a power cut, safety copies of the save on the SD card to recover a save cut off midway, nothing drawn with the screen off, a sound task that cannot spin | v1.24 |
 | 40 | Steps that cannot be lost: a clock change never erases them, and they are saved every 20 steps. A warning beep when a need is very low, quiet nights from 21:00 to 07:00, and coins for lifetime steps | v1.25 |
+| 41 | Gym arenas from tubiana's fork: gym, Elite 4 and Champion fights in the leader's own arena (8 scenes). Each pile of poop takes 2 CLEAN per tick, not 4. A marked X at the top centre is the only way out of a game: taps elsewhere on the strip and swipes no longer quit | v1.26 |
 
 ## Next
+The order agreed from the fork review. Each phase still gets its own short plan.
+| Phase | What | Notes |
+|---|---|---|
+| 42 | Automatic verified backup in the installer, plus the fixes we're missing | LAN keepalive, firmware version in the installer, millis-wrap timers, sprite and `thumbs.bin` checks, harder uploads |
+| 43 | Walking rewards: 3 daily step goals and lifetime ranks | cren, ShadowEnemyx |
+| 44 | Wild encounters, catching and a bag | Large, maybe 2 phases. Steps earn encounters; recheck flash and save space first |
+| 45 | Pokémon trip: away 30-60 minutes, back with a story | Spocky2024 |
+| 46 | New games: number-merge, brick-breaker, a hidden Eevee runner | Check TamaDaci's licence first |
+| 47 | New training games | Replaces bag, speed and defence training, so compare first |
+| 48 | Jukebox | Prefer public-domain tunes; decide then |
+| 49 | Three save slots on the SD card | E1d0k4 |
+| 50 | Kids' manual to print | Last, so it describes the finished game |
+
+Also open:
 | # | Item | Needs | Notes |
 |---|---|---|---|
 | 1 | **Checks on the real ball** | the family | Nursery sprites and the next-day egg; SD photo (DIARY -> ALBUM -> PHOTO); tilt direction in the maze, Catch and Balance; how hard the shake race is; New York snow on its first snowy day; a hat in the mirror sits as it does once bought; the arcade prizes and hats on a Venusaur. (Wi-Fi sync and weather: confirmed working on 2 Nov.) |
@@ -45,7 +60,7 @@ _Last updated: 3 November 2026, with Phase 40._
 |---|---|---|
 | **Friend visits and trading** | a second ball | "Not for now" (2 Nov). Would use the existing ESP-NOW battle link |
 | **Battery saver** | a battery fitted | The ball reports no battery now (`bat=-1`) |
-| **SD content packs** | only if space runs out | Firmware at 74%; revisit near 90% |
+| **SD content packs** | only if space runs out | Firmware at 83%; revisit near 90% |
 | **Translations review** | native speakers | FR, DE, IT, PT, ZH and KO were machine-written |
 
 ## Decisions on record
