@@ -130,6 +130,37 @@ int main(){
     ck(!s.busy(), "and stops when it is over");
   }
 
+  // --- the sound task with no music wanted: every pass renders or waits
+  {
+    // the bad case: music stopped with a very long note still held
+    GbSynth s; s.note(0, 1500, 2, 15, 0, 0, 60000);
+    uint32_t tail = 0;
+    ck(s.busy(), "a held note keeps the synth busy");
+    ck(gbQuietStep(s, true, tail) == 0 && !s.busy(), "music that stops is silenced at once, nothing left to spin on");
+    ck(gbQuietStep(s, false, tail) == 0, "and the next pass just waits");
+  }
+  {
+    // a short effect still ringing plays out to its end
+    GbSynth s; s.note(0, 1500, 2, 15, 0, 0, 100);
+    uint32_t tail = 0, ms, played = 0;
+    std::vector<int16_t> buf(GB_RATE / 10);
+    int passes = 0;
+    while ((ms = gbQuietStep(s, false, tail)) != 0 && passes < 100) {
+      s.render(buf.data(), ms * GB_RATE / 1000, 100);
+      played += ms; passes++;
+    }
+    ck(played >= 100 && played <= 120, "a ringing effect plays out, no more and no less");
+    ck(!s.busy() && tail == 0, "and leaves the synth quiet");
+  }
+  {
+    // never rendered at all: the limit still ends it, with no pass spinning
+    GbSynth s; s.note(0, 1500, 2, 15, 0, 0, 60000);
+    uint32_t tail = 0, ms, passes = 0, total = 0;
+    while ((ms = gbQuietStep(s, false, tail)) != 0 && passes < 10000) { total += ms; passes++; }
+    ck(total <= GB_TAIL_MAX_MS && passes < 10000, "a stuck voice is cut off at the limit");
+    ck(!s.busy(), "and silenced");
+  }
+
   printf("%s\n", bad?"FAILURES":"all good");
   return bad?1:0;
 }

@@ -95,6 +95,12 @@ static inline int16_t sdRegionProbe(uint8_t r, uint8_t i) {
 // its output cannot interleave with the PUT transfer protocol the host is parsing.
 void sdScanRegionArt(bool verbose = true);
 bool sdSerialCommand(const String &line);  // PUT/LS over USB; true if it handles it
+// The safety copies of the save (phase 39): /save/safe0.tps and safe1.tps.
+bool sdCopyWrite(uint8_t slot, const uint8_t *data, size_t n);
+size_t sdCopyRead(uint8_t slot, uint8_t *out, size_t cap);   // 0 if absent or too big
+void sdCopyClear();
+// How full the save area is, in NVS entries. False if it cannot say.
+bool nvsUsage(uint16_t *used, uint16_t *total);
 extern bool sdReady;
 extern bool sdDirty;  // true after receiving files: reload the sprite
 // A region's pack can arrive AFTER the card was mounted -- the web installer

@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.40"
+#define FW_VERSION "3.14-funpack.41"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -778,6 +778,56 @@ void drawSplash() {
   gfx->flush();
 }
 
+// ---------- surviving a power cut (phase 39) ----------
+
+uint32_t copySeq = 0;      // the newest safety copy on the card
+uint8_t copySlot = 0;      // which file the next one goes to
+uint32_t copyDoneAt = 0;   // millis of the last copy, 0 for none this run
+uint32_t copySerial = 0;   // the save that copy holds
+uint16_t copyMs = 0;       // how long it took, shown in STATS
+
+// Reads both copies and works out where the next one goes. With cut set it also
+// restores the newest, which is why this runs before the pet is loaded.
+void copiesAtBoot(bool cut) {
+  uint8_t *a = (uint8_t *)malloc(SAVE_COPY_CAP), *b = (uint8_t *)malloc(SAVE_COPY_CAP);
+  if (!a || !b) { free(a); free(b); if (cut) saveCutClear(); return; }
+  size_t an = sdCopyRead(0, a, SAVE_COPY_CAP), bn = sdCopyRead(1, b, SAVE_COPY_CAP);
+  if (cut) {
+    bool back = saveCopyRestore(a, an, b, bn);
+    Serial.println(back ? "SAVE was cut off: restored the safety copy" : "SAVE was cut off: no usable safety copy, keeping it");
+    if (!back) saveCutClear();
+  }
+  uint32_t seq = 0;
+  int8_t newest = saveCopyNewest(a, an, b, bn, &seq);
+  if (newest >= 0) { copySeq = seq; copySlot = newest ? 0 : 1; }
+  free(a);
+  free(b);
+}
+
+// A copy goes to the card at most every 2 minutes, when something was saved, and
+// never in a game or a menu, where the pause could show.
+void copyTick(uint32_t now) {
+  static uint8_t buf[SAVE_COPY_CAP];
+  if (!sdReady || pet.saveSerial() == copySerial) return;
+  if (copyDoneAt && now - copyDoneAt < SAVE_COPY_EVERY_MS) return;
+  if (!screenOff && uiCurrentScreen() != SCR_MAIN) return;
+  copyDoneAt = now ? now : 1;
+  copySerial = pet.saveSerial();
+  size_t n = saveCopyPack(buf, sizeof(buf), copySeq + 1);
+  if (!n || !sdCopyWrite(copySlot, buf, n)) return;
+  copySeq++;
+  copySlot ^= 1;
+  copyMs = (uint16_t)(millis() - now);
+}
+
+// The save area is small and a full one loses data. A console warning only: a
+// child can't act on it, but the next STATS shows it long before it matters.
+void nvsWarn() {
+  uint16_t used = 0, total = 0;
+  if (nvsUsage(&used, &total) && total && used * 100UL / total >= 85)
+    Serial.printf("WARNING save area %u/%u entries\n", used, total);
+}
+
 void setup() {
   Serial.setRxBufferSize(8192);  // the SD transfer arrives in 2 KB blocks
   Serial.begin(115200);
@@ -835,9 +885,14 @@ void setup() {
   pinMode(TP_INT, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(TP_INT), touchIsr, FALLING);
 
+  // Before anything loads or saves: a save cut off last time is put right first.
+  const bool saveCut = saveWasCut();
+  if (saveCut) { sdBegin(); copiesAtBoot(true); }
   party.begin();
   pet.begin();
   sdBegin();
+  if (!saveCut) copiesAtBoot(false);
+  nvsWarn();
   albumMigrate();          // phase 33: the old photos become BMPs, once
   thumbs.load();
 
@@ -846,11 +901,11 @@ void setup() {
   batBegin();
   pwrSetup();
   imuBegin();
-  uint32_t e = rtcEpoch();
-  if (e == 0) {
-    rtcSetEpoch(1767225600UL);  // blank RTC: seed (the absolute time does not matter,
-    e = rtcEpoch();             // only the differences do)
-    Serial.println("RTC has no time: seeded, no offline progression this time");
+  const uint32_t rtcNow = rtcEpoch();
+  uint32_t e = Pet::bootEpoch(rtcNow, pet.savedEpoch());
+  if (e != rtcNow) {               // blank or behind: carry on from the last saved time
+    rtcSetEpoch(e);
+    Serial.println("RTC lost the time: resuming from the save, no offline progression this time");
   }
   pet.syncClock(e);
   wifiBegin();     // the real time comes back from the internet a little later
@@ -1026,6 +1081,7 @@ void loop() {
   if (pet.savePending() && (screenOff || dimStage >= 1 || pet.sleeping)) {
     pet.flushSave();
   }
+  copyTick(now);
 
   // records the real time every 30 s (persisted on every game save). A read that
   // does not match where the clock should be by now (one bad I2C read made
@@ -1055,15 +1111,20 @@ void loop() {
     lastHealth = now;
     Serial.printf("HEALTH up=%lus heap=%u min=%u\n", (unsigned long)(now / 1000),
                   ESP.getFreeHeap(), ESP.getMinFreeHeap());
+    nvsWarn();
   }
 
+  // Nothing is drawn with the screen off: redrawing a dark panel was most of the
+  // CPU time. lastRender stands still, so the first pass after waking draws at
+  // once, and whatever finishes on a frame (a bath, the broom) finishes then.
   // 85 ms in game/bag: safe margin so the redraw does not step on the DMA
   // send of the previous frame (at 40-65 ms it overlapped and caused black flashes; with
   // large sprites drawing takes longer, so a cushion is left)
-  if (now - lastRender >= (uint32_t)((gameOpen || sackOpen || spdOpen || fpOpen || scrubOpen || placeScene) ? 85 : 100)) {
+  if (!screenOff && now - lastRender >= (uint32_t)((gameOpen || sackOpen || spdOpen || fpOpen || scrubOpen || placeScene) ? 85 : 100)) {
     lastRender = now;
     render();
   }
+  delay(1);   // the other tasks get a turn on every pass
 }
 
 // brightness according to sleep + inactivity (AMOLED protection)
@@ -1394,8 +1455,21 @@ void handleSerial() {
     Serial.print("OWNER ");
     Serial.println(pet.ownerName);
     Serial.println("DONE");
+  } else if (line == "CUTTEST") {
+    // Acts as if the power went mid-save: raises the flag and restarts. The next
+    // boot should restore the newest safety copy; STATS then shows recovered=.
+    {
+      Preferences cp;
+      cp.begin("tamapoke", false);
+      cp.putBool(SAVE_CUT_KEY, true);
+      cp.end();
+    }
+    Serial.println("DONE");
+    delay(100);
+    ESP.restart();
   } else if (line == "WIPE") {
     pet.factoryReset();     // wipes NVS and reboots -> new game (starter choice)
+    sdCopyClear();          // or a cut in the new game could bring the old pet back
     Serial.println("DONE");
     delay(100);
     ESP.restart();
@@ -1447,6 +1521,12 @@ void handleSerial() {
                   pet.speciesId, pet.level(), pet.fullness, pet.joy, pet.energy,
                   pet.hygiene, pet.careMistakes, sdReady, mon.loaded,
                   batPercent(), usbPresent(), rtcEpoch());
+    {
+      uint16_t nvUsed = 0, nvTotal = 0;
+      nvsUsage(&nvUsed, &nvTotal);
+      Serial.printf("nvs=%u/%u recovered=%u copy=%lu slot=%u copyms=%u\n", nvUsed, nvTotal,
+                    saveRecoveredCount(), (unsigned long)copySeq, copySlot, copyMs);
+    }
     Serial.printf("weight=%u atk=%u def=%u spe=%u vit=%u berry=%d\n",
                   pet.weight, pet.atkStat(), pet.defStat(), pet.speStat(),
                   pet.vitStat(), pet.berryKnown);

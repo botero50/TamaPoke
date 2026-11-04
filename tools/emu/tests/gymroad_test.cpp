@@ -54,6 +54,12 @@ int main(){
     p.addSteps(12000);
     ck(p.gymWalked() && !p.gymChallengeReady() && p.gymWaitDays() == 7, "Misty walked to the same day: 7 days to wait");
     ck(!p.gymStepsOk(0, 1, false), "and the ladder agrees");
+    {                                    // the date falls behind the last win: still only a week
+      uint32_t keep = p.lastSeenEpoch;
+      p.lastSeenEpoch = 19950 * DAY + 9 * 3600;
+      ck(p.gymWaitDays() == 7, "a date before the last win never asks for more than 7 days");
+      p.lastSeenEpoch = keep;
+    }
     p.winBadge(0, 0, false);
     p.winBadge(0, 3, true);
     ck(p.gymSteps == 12000 && p.gymLastWinDay == 20000, "a rematch and a hard badge change nothing");

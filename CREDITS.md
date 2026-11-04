@@ -18,6 +18,8 @@ the party and box, the peer-to-peer link, the save backup, the Game Boy synth
 and the expansion to 386 species — sits on top of that foundation and would not
 exist without it.
 
+The reliability work in Phase 39 takes its ideas, not its code, from other forks: resuming the clock from the save and skipping drawing with the screen off from the original repository, a save that survives a power cut from [eperdeme](https://github.com/eperdeme/TamaPoke), and the sound task that cannot spin from [tubiana](https://github.com/tubiana/TamaPoke).
+
 
 TamaPoke is a **non-commercial, personal-use** project. It does not sell or
 commercially redistribute any copyrighted material. Pokémon and all related

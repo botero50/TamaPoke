@@ -47,3 +47,36 @@ bool saveImport(const uint8_t *in, size_t n);
 
 // Roughly what saveExport needs, for sizing a buffer.
 size_t saveExportSize();
+
+// ---------- surviving a power cut (phase 39) ----------
+//
+// The ball has no battery, so unplugging it stops everything at once, and a game
+// save is some 180 separate NVS writes. Pet::save() and saveImport() raise a flag
+// before they start and lower it when they finish: a board that boots with the
+// flag up was cut off in the middle, and its save may be part new and part old.
+//
+// The way back is a safety copy on the SD card: the same checksummed blob as a
+// backup, in two files written in turn, so a cut while writing one leaves the
+// other whole. A copy file is a 4-byte sequence number and then the blob.
+#define SAVE_CUT_KEY "svW"         // the flag: a save or restore is under way
+#define SAVE_RECOVERED_KEY "svR"   // how many times a copy has rescued this board
+#define SAVE_COPY_HDR 4
+#define SAVE_COPY_CAP (4096 + SAVE_COPY_HDR)
+#define SAVE_COPY_EVERY_MS 120000UL
+// A copy older than this is not a rescue: the card may have sat unwritten for
+// days, and a slightly mixed save beats losing all of that.
+#define SAVE_COPY_MAX_AGE 3600UL
+
+bool saveWasCut();                 // is the flag up? Read it before anything saves
+void saveCutClear();
+uint16_t saveRecoveredCount();
+
+// Builds a copy file. Returns its size, or 0 if it did not fit.
+size_t saveCopyPack(uint8_t *out, size_t cap, uint32_t seq);
+// Is this a complete, uncorrupted copy file? Reads nothing from NVS.
+bool saveCopyValid(const uint8_t *in, size_t n, uint32_t *seq);
+// Which of two copies to trust: 0, 1, or -1 if neither is valid.
+int8_t saveCopyNewest(const uint8_t *a, size_t an, const uint8_t *b, size_t bn, uint32_t *seq);
+// Restores the newest valid copy, unless it is too old. True if it did. The
+// caller must not have loaded the pet yet, or must reload afterwards.
+bool saveCopyRestore(const uint8_t *a, size_t an, const uint8_t *b, size_t bn);

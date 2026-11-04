@@ -30,6 +30,16 @@ public:
   static std::set<int> &closedSet() { static std::set<int> *s = new std::set<int>; return *s; }
   static int &nextHandle() { static int n = 0; return n; }
   bool dead() const { return h && closedSet().count(h); }
+  // A power cut: with a budget set, once it runs out every later write is lost,
+  // the way everything after the moment of unplugging is. -1 is no limit.
+  static long &writeBudget() { static long n = -1; return n; }
+  static bool spend() {
+    long &n = writeBudget();
+    if (n < 0) return true;
+    if (n == 0) return false;
+    n--;
+    return true;
+  }
   Preferences() = default;
   Preferences(const Preferences &) = default;      // shares h, like the real one
   Preferences &operator=(const Preferences &) = default;
@@ -40,9 +50,10 @@ public:
   void end() { if (started) { closedSet().insert(h); started = false; } }
   void clear() { kv.clear(); }
   bool isKey(const char *k) { return kv.count(k) != 0; }
+  bool remove(const char *k) { if (dead() || !spend()) return false; return kv.erase(k) != 0; }
 
   template <typename T> void putT(const char *k, T v) {
-    if (dead()) return;
+    if (dead() || !spend()) return;
     std::vector<uint8_t> b(sizeof(T));
     memcpy(b.data(), &v, sizeof(T));
     kv[k] = b;
@@ -66,7 +77,7 @@ public:
   void putUShort(const char *k, uint16_t v) { putT(k, v); }
   uint16_t getUShort(const char *k, uint16_t d = 0) { return getT(k, d); }
   void putBytes(const char *k, const void *p, size_t n) {
-    if (dead()) return;
+    if (dead() || !spend()) return;
     const uint8_t *b = (const uint8_t *)p;
     kv[k] = std::vector<uint8_t>(b, b + n);
   }
@@ -95,7 +106,7 @@ public:
     return it->second.size();
   }
   void putString(const char *k, const char *v) {
-    if (dead()) return;
+    if (dead() || !spend()) return;
     kv[k] = std::vector<uint8_t>(v, v + strlen(v) + 1);
   }
   size_t getString(const char *k, char *out, size_t n) {

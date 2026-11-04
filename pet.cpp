@@ -5,6 +5,7 @@
 #include "moves.h"
 #include "noart.h"   // speciesHasArt(): the egg pool skips what cannot be drawn
 #include "audio.h"
+#include "save.h"
 
 // Reads a blob that may be LONGER than the array we are reading it into.
 //
@@ -3005,6 +3006,7 @@ void Pet::save() {
   if (!opened) return;
   ticksSinceSave = 0;
   pendingSave = false;
+  prefs.putBool(SAVE_CUT_KEY, true);       // down again at the end: a cut in between shows at boot
   prefs.putUChar("full", fullness);
   prefs.putUChar("joy", joy);
   prefs.putUChar("ene", energy);
@@ -3190,6 +3192,8 @@ void Pet::save() {
   prefs.putChar("acF", accOn[0]);
   prefs.putChar("acN", accOn[1]);
   prefs.putChar("acB", accOn[2]);
+  prefs.putBool(SAVE_CUT_KEY, false);
+  savesDone++;
 }
 
 void Pet::load() {

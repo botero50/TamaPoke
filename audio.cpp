@@ -248,6 +248,7 @@ static void audioTask(void *) {
   uint32_t at1 = 0, at2 = 0, clock = 0;
   uint8_t playing = MUS_NONE;
   bool ampOn = false;
+  uint32_t tailMs = 0;
 
   for (;;) {
     uint8_t m = gMusic;
@@ -295,11 +296,16 @@ static void audioTask(void *) {
     }
 
     if (m == MUS_NONE) {
-      if (ampOn && !gSyn.busy()) { digitalWrite(PA, LOW); ampOn = false; }
+      // Every pass here renders or leads to a wait: with the synth quiet, the
+      // queue read above blocks for 40 ms on the next pass.
+      uint32_t tail = gbQuietStep(gSyn, playing != MUS_NONE, tailMs);
       playing = MUS_NONE; mi1 = mi2 = 0; at1 = at2 = clock = 0;
+      if (tail) { pump(tail); continue; }
+      if (ampOn) { digitalWrite(PA, LOW); ampOn = false; }
       continue;
     }
 
+    tailMs = 0;
     if (m != playing) { playing = m; mi1 = mi2 = 0; at1 = at2 = clock = 0; }
     if (!ampOn) { digitalWrite(PA, HIGH); delay(6); ampOn = true; }
 

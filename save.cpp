@@ -87,10 +87,17 @@ const SaveField SAVE_FIELDS[] = {
   { "lang", SK_U8 },    { "snd", SK_BOOL },   { "vol", SK_U8 },
   { "vol2", SK_U8 },
   { "bri", SK_U8 },
+  // this board's own bookkeeping: listed so the table stays complete, but never
+  // carried in a backup (see isLocalKey)
+  { SAVE_CUT_KEY, SK_BOOL }, { SAVE_RECOVERED_KEY, SK_U16 },
 };
 const uint16_t SAVE_FIELD_COUNT = sizeof(SAVE_FIELDS) / sizeof(SAVE_FIELDS[0]);
 
 #define MAX_VAL 768        // the box is the largest, at 18 records
+
+static bool isLocalKey(const char *k) {
+  return !strcmp(k, SAVE_CUT_KEY) || !strcmp(k, SAVE_RECOVERED_KEY);
+}
 
 static uint16_t crc16(const uint8_t *p, size_t n) {
   uint16_t c = 0xFFFF;
@@ -176,6 +183,7 @@ size_t saveExport(uint8_t *out, size_t cap) {
   uint8_t val[MAX_VAL];
   for (uint16_t i = 0; i < SAVE_FIELD_COUNT; i++) {
     const SaveField &f = SAVE_FIELDS[i];
+    if (isLocalKey(f.key)) continue;
     int n = readField(p, f, val);
     if (n < 0) continue;             // absent: nothing to back up
     size_t klen = strlen(f.key);
@@ -211,7 +219,9 @@ static const SaveField *fieldFor(const char *key, uint8_t kind) {
   return nullptr;
 }
 
-bool saveImport(const uint8_t *in, size_t n) {
+// PASS ONE of a restore, and all of what checking a copy needs: proves the whole
+// blob parses without touching anything.
+static bool blobValid(const uint8_t *in, size_t n) {
   if (n < SAVE_HDR + 2) return false;
   if (in[0] != SAVE_MAGIC0 || in[1] != SAVE_MAGIC1 ||
       in[2] != SAVE_MAGIC2 || in[3] != SAVE_MAGIC3) return false;
@@ -220,9 +230,9 @@ bool saveImport(const uint8_t *in, size_t n) {
   uint16_t want = (uint16_t)in[n - 2] | ((uint16_t)in[n - 1] << 8);
   if (crc16(in, n - 2) != want) return false;
 
-  // PASS ONE: walk the whole thing and prove it parses. Nothing is written
-  // yet -- a restore that fell over halfway would leave a save that is neither
-  // the old one nor the new one, which is the one outcome worse than no backup.
+  // Walk the whole thing and prove it parses. Nothing is written yet -- a restore
+  // that fell over halfway would leave a save that is neither the old one nor the
+  // new one, which is the one outcome worse than no backup.
   size_t at = SAVE_HDR;
   uint16_t seen = 0;
   while (at + 4 <= n - 2) {
@@ -238,14 +248,33 @@ bool saveImport(const uint8_t *in, size_t n) {
     at = vat + 3 + vlen;
     seen++;
   }
-  if (at != n - 2 || seen != count) return false;
+  return at == n - 2 && seen == count;
+}
 
-  // PASS TWO: it parses, so commit. Cleared first, or keys the backup does not
-  // contain would survive from whatever save happened to be on the device.
+// Finds a key in a blob already proved valid. Null if it is not there.
+static const uint8_t *blobFind(const uint8_t *in, size_t n, const char *key, uint16_t *vlen) {
+  size_t klen = strlen(key), at = SAVE_HDR;
+  while (at + 4 <= n - 2) {
+    uint8_t kl = in[at];
+    size_t vat = at + 1 + kl;
+    uint16_t len = (uint16_t)in[vat + 1] | ((uint16_t)in[vat + 2] << 8);
+    if (kl == klen && !memcmp(in + at + 1, key, kl)) { *vlen = len; return in + vat + 3; }
+    at = vat + 3 + len;
+  }
+  return nullptr;
+}
+
+bool saveImport(const uint8_t *in, size_t n) {
+  if (!blobValid(in, n)) return false;
+
+  // PASS TWO: it parses, so commit. The flag goes up first and comes down last:
+  // a cut anywhere in here is seen at the next boot and the restore runs again.
+  // Nothing is cleared first, because a cut just after a clear would be an empty
+  // board with no flag left to say so; what the blob lacks is removed at the end.
   Preferences p;
   p.begin("tamapoke", false);
-  p.clear();
-  at = SAVE_HDR;
+  p.putBool(SAVE_CUT_KEY, true);
+  size_t at = SAVE_HDR;
   while (at + 4 <= n - 2) {
     uint8_t klen = in[at];
     char key[16] = {0};
@@ -254,9 +283,91 @@ bool saveImport(const uint8_t *in, size_t n) {
     uint8_t kind = in[vat];
     uint16_t vlen = (uint16_t)in[vat + 1] | ((uint16_t)in[vat + 2] << 8);
     const SaveField *f = fieldFor(key, kind);
-    if (f) writeField(p, *f, in + vat + 3, vlen);
+    if (f && !isLocalKey(key)) writeField(p, *f, in + vat + 3, vlen);
     at = vat + 3 + vlen;
   }
+  // Keys the backup does not contain must not survive from whatever save happened
+  // to be on the device. An empty blob counts as absent: writeField cannot store one.
+  for (uint16_t i = 0; i < SAVE_FIELD_COUNT; i++) {
+    const SaveField &f = SAVE_FIELDS[i];
+    if (isLocalKey(f.key) || !p.isKey(f.key)) continue;
+    uint16_t vlen = 0;
+    if (!blobFind(in, n, f.key, &vlen) || (f.kind == SK_BYTES && !vlen)) p.remove(f.key);
+  }
+  p.putBool(SAVE_CUT_KEY, false);
   p.end();
+  return true;
+}
+
+// ---------- surviving a power cut ----------
+
+bool saveWasCut() {
+  Preferences p;
+  p.begin("tamapoke", true);
+  bool cut = p.getBool(SAVE_CUT_KEY, false);
+  p.end();
+  return cut;
+}
+
+void saveCutClear() {
+  Preferences p;
+  p.begin("tamapoke", false);
+  p.putBool(SAVE_CUT_KEY, false);
+  p.end();
+}
+
+uint16_t saveRecoveredCount() {
+  Preferences p;
+  p.begin("tamapoke", true);
+  uint16_t c = p.getUShort(SAVE_RECOVERED_KEY, 0);
+  p.end();
+  return c;
+}
+
+size_t saveCopyPack(uint8_t *out, size_t cap, uint32_t seq) {
+  if (cap <= SAVE_COPY_HDR) return 0;
+  size_t n = saveExport(out + SAVE_COPY_HDR, cap - SAVE_COPY_HDR);
+  if (!n) return 0;
+  memcpy(out, &seq, SAVE_COPY_HDR);
+  return n + SAVE_COPY_HDR;
+}
+
+bool saveCopyValid(const uint8_t *in, size_t n, uint32_t *seq) {
+  if (!in || n <= SAVE_COPY_HDR || !blobValid(in + SAVE_COPY_HDR, n - SAVE_COPY_HDR)) return false;
+  if (seq) memcpy(seq, in, SAVE_COPY_HDR);
+  return true;
+}
+
+int8_t saveCopyNewest(const uint8_t *a, size_t an, const uint8_t *b, size_t bn, uint32_t *seq) {
+  uint32_t sa = 0, sb = 0;
+  bool va = saveCopyValid(a, an, &sa), vb = saveCopyValid(b, bn, &sb);
+  if (!va && !vb) return -1;
+  int8_t pick = (va && (!vb || sa >= sb)) ? 0 : 1;
+  if (seq) *seq = pick ? sb : sa;
+  return pick;
+}
+
+bool saveCopyRestore(const uint8_t *a, size_t an, const uint8_t *b, size_t bn) {
+  int8_t w = saveCopyNewest(a, an, b, bn, nullptr);
+  if (w < 0) return false;
+  const uint8_t *blob = (w ? b : a) + SAVE_COPY_HDR;
+  size_t n = (w ? bn : an) - SAVE_COPY_HDR;
+
+  Preferences p;
+  p.begin("tamapoke", true);
+  uint32_t liveSeen = p.getUInt("seen", 0);
+  uint16_t rescues = p.getUShort(SAVE_RECOVERED_KEY, 0);
+  p.end();
+  uint32_t copySeen = 0;
+  uint16_t vlen = 0;
+  const uint8_t *v = blobFind(blob, n, "seen", &vlen);
+  if (v && vlen == 4) memcpy(&copySeen, v, 4);
+  if (liveSeen && copySeen + SAVE_COPY_MAX_AGE < liveSeen) return false;
+
+  if (!saveImport(blob, n)) return false;
+  Preferences w2;
+  w2.begin("tamapoke", false);
+  w2.putUShort(SAVE_RECOVERED_KEY, (uint16_t)(rescues + 1));
+  w2.end();
   return true;
 }

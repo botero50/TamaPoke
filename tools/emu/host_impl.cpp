@@ -118,6 +118,19 @@ bool sdBegin() {
 }
 bool sdSerialCommand(const String &) { return false; }
 
+// the save's safety copies: no card here, so they stay in memory
+#include <vector>
+std::vector<uint8_t> g_emuCopy[2];
+bool sdCopyWrite(uint8_t slot, const uint8_t *data, size_t n) { g_emuCopy[slot & 1].assign(data, data + n); return true; }
+size_t sdCopyRead(uint8_t slot, uint8_t *out, size_t cap) {
+  const std::vector<uint8_t> &c = g_emuCopy[slot & 1];
+  if (c.empty() || c.size() > cap) return 0;
+  memcpy(out, c.data(), c.size());
+  return c.size();
+}
+void sdCopyClear() { g_emuCopy[0].clear(); g_emuCopy[1].clear(); }
+bool nvsUsage(uint16_t *, uint16_t *) { return false; }
+
 // --- RTC / battery / PMU ---
 static uint32_t g_epoch = 0;
 bool rtcBegin() { return true; }

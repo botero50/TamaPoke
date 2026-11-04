@@ -1264,5 +1264,30 @@ int main(int argc, char **argv) {
   startTrainerBattle(0, false);
   if (btlYou.level != 14) { printf("FAIL: easy mode did not cap the level\n"); return 1; }
   printf("PASS: easy mode caps the level as well\n");
+  battleOpen = false; pickOpen = false;
+
+  // Phase 39: with the screen off nothing is drawn, and what finishes on a frame
+  // finishes on the first one after waking.
+  {
+    extern bool screenOff; extern uint32_t lastRender, sweepUntil; void startSweep();
+    pump(5);
+    pet.poops = 2; pet.hygiene = 50;
+    startSweep();
+    if (!sweepUntil) { printf("FAIL: the broom did not start\n"); return 1; }
+    pump(2);
+    screenOff = true;
+    uint32_t frozen = (pump(1), lastRender);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2100));   // the broom's time runs out, screen off
+    pump(8);
+    if (lastRender != frozen) { printf("FAIL: drew with the screen off\n"); return 1; }
+    printf("PASS: nothing is drawn with the screen off\n");
+    if (!sweepUntil || pet.poops != 2) { printf("FAIL: the broom finished without a frame\n"); return 1; }
+    screenOff = false;
+    loop();
+    if (lastRender == frozen) { printf("FAIL: waking did not draw at once\n"); return 1; }
+    printf("PASS: waking draws on the very next pass\n");
+    if (sweepUntil || pet.poops != 0) { printf("FAIL: the broom never finished after waking\n"); return 1; }
+    printf("PASS: a broom left running finishes on that frame\n");
+  }
   return 0;
 }

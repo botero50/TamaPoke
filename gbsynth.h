@@ -65,3 +65,19 @@ class GbSynth {
  private:
   GbVoice v[GB_VOICES];
 };
+
+// One pass of the sound task with no music wanted. Returns how many ms to render,
+// or 0 when all is quiet and the task should wait.
+//
+// A note cut off when its music stopped would otherwise keep the synth "busy"
+// forever, and the task would go round without ever rendering or waiting, starving
+// everything else on that core. So music that was playing is silenced at once, an
+// effect still ringing plays out, and even that has a limit.
+#define GB_TAIL_STEP_MS 20
+#define GB_TAIL_MAX_MS 1500
+static inline uint32_t gbQuietStep(GbSynth &s, bool musicWasOn, uint32_t &tailMs) {
+  if (musicWasOn) s.allOff();
+  if (!s.busy() || tailMs >= GB_TAIL_MAX_MS) { s.allOff(); tailMs = 0; return 0; }
+  tailMs += GB_TAIL_STEP_MS;
+  return GB_TAIL_STEP_MS;
+}

@@ -5,6 +5,7 @@
 #include "pet.h"   // gRegionArt, REGIONS -- the mask this narrows
 #include <FS.h>
 #include <SD_MMC.h>
+#include <nvs.h>
 
 bool sdReady = false;
 bool sdDirty = false;
@@ -165,6 +166,53 @@ bool sdBegin() {
     Serial.println("SD not detected (the game uses the flash sprites)");
   }
   return sdReady;
+}
+
+// ---------- the safety copies of the save (phase 39) ----------
+
+static void copyPath(char *out, size_t n, uint8_t slot) {
+  snprintf(out, n, "/save/safe%u.tps", (unsigned)(slot & 1));
+}
+
+bool sdCopyWrite(uint8_t slot, const uint8_t *data, size_t n) {
+  if (!sdReady) return false;
+  SD_MMC.mkdir("/save");
+  char path[24];
+  copyPath(path, sizeof(path), slot);
+  File f = SD_MMC.open(path, FILE_WRITE);
+  if (!f) return false;
+  bool ok = f.write(data, n) == n;
+  f.close();
+  return ok;
+}
+
+size_t sdCopyRead(uint8_t slot, uint8_t *out, size_t cap) {
+  if (!sdReady) return 0;
+  char path[24];
+  copyPath(path, sizeof(path), slot);
+  File f = SD_MMC.open(path, FILE_READ);
+  if (!f) return 0;
+  size_t size = f.size(), got = 0;
+  if (size && size <= cap) got = f.read(out, size);
+  f.close();
+  return got == size ? got : 0;
+}
+
+void sdCopyClear() {
+  if (!sdReady) return;
+  for (uint8_t k = 0; k < 2; k++) {
+    char path[24];
+    copyPath(path, sizeof(path), k);
+    if (SD_MMC.exists(path)) SD_MMC.remove(path);
+  }
+}
+
+bool nvsUsage(uint16_t *used, uint16_t *total) {
+  nvs_stats_t st;
+  if (nvs_get_stats(NULL, &st) != ESP_OK) return false;
+  *used = (uint16_t)st.used_entries;
+  *total = (uint16_t)st.total_entries;
+  return true;
 }
 
 bool SdMon::load(int16_t dexNum, bool shiny) {

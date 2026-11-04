@@ -920,7 +920,9 @@ public:
   uint8_t gymWaitDays() const {                  // days until the week since the last new badge is up
     if (!gymLastWinDay) return 0;
     uint32_t d = today(), open = gymLastWinDay + GYM_WEEK_DAYS;
-    return d >= open ? 0 : (uint8_t)(open - d);
+    if (d >= open) return 0;
+    uint32_t wait = open - d;                 // a date before the last win: still only a week
+    return wait > GYM_WEEK_DAYS ? GYM_WEEK_DAYS : (uint8_t)wait;
   }
   bool gymStepsOk(uint8_t rg, uint8_t i, bool hard) const {
     return hard || hasBadge(rg, i, false) || (gymSteps >= gymStepsNeed(i) && !gymWaitDays());
@@ -1118,6 +1120,16 @@ public:
   // when the screen is dimmed/off (the flash write freezes
   // ~1s on both cores: so it is neither seen nor cuts off the touch)
   bool savePending() const { return pendingSave; }
+  uint32_t saveSerial() const { return savesDone; }   // moves on every finished save
+  uint32_t savedEpoch() { return prefs.getUInt("seen", 0); }
+  // The time to start from at boot. With no battery the clock chip forgets the
+  // time when unplugged, so a blank or earlier reading gives way to the last time
+  // the save recorded: the minutes unplugged are lost, but the date never goes back.
+  static uint32_t bootEpoch(uint32_t rtc, uint32_t seen) {
+    if (rtc && rtc >= seen) return rtc;
+    const uint32_t floor = 1767225600UL;      // 1 Jan 2026, for a save that has no time at all
+    return seen > floor ? seen : floor;
+  }
   void flushSave();
   // Writes NOW, whatever pendingSave says. flushSave() is `if (pendingSave)
   // save()`, so a console command that changed something the game had not
@@ -1171,6 +1183,7 @@ private:
   uint8_t mistakeCooldown = 0;
   uint8_t ticksSinceSave = 0;
   bool pendingSave = false;     // periodic save pending flush
+  uint32_t savesDone = 0;
   uint8_t evoDeclinedLv = 0;    // "keep form": do not offer evolution until the next level up
   uint32_t farDeclinedAge = 0;  // "stay together": do not offer farewell until this age
   bool starterPick = false;     // first game: waiting for the player to pick a starter
