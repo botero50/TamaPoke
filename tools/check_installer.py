@@ -28,6 +28,8 @@ partition scheme change moves the check with it.
 
 Run by build_web.sh on every build, so neither cause can come back.
 """
+import re
+import subprocess
 import json
 import os
 import struct
@@ -117,6 +119,25 @@ def main():
         print("\nFAIL: new_install_prompt_erase is false, which in the "
               "no-Improv path means a SILENT full chip erase -- it must be "
               "true, which offers an unchecked 'Erase device' box instead")
+        bad += 1
+
+    # The page shows these two straight from the manifest, so they must be right.
+    root = os.path.join(WEB, "..")
+    ino = open(os.path.join(root, "TamaPoke.ino"), encoding="utf-8").read()
+    fw = re.search(r'#define FW_VERSION "([^"]+)"', ino).group(1)
+    if manifest.get("version") != fw:
+        print("\nFAIL: the manifest says %s, the firmware says %s" % (manifest.get("version"), fw))
+        bad += 1
+    dex = int(re.search(r"#define DEX_COUNT (\d+)", open(os.path.join(root, "dex.h"), encoding="utf-8").read()).group(1))
+    if manifest.get("dex_count") != dex:
+        print("\nFAIL: the manifest says %s Pokemon, dex.h says %d" % (manifest.get("dex_count"), dex))
+        bad += 1
+    page = open(os.path.join(WEB, "index.html"), encoding="utf-8").read()
+    if not re.search(r"esp-web-tools@\d+\.\d+\.\d+/", page):
+        print("\nFAIL: the installer library must be pinned to one exact version")
+        bad += 1
+    if subprocess.call(["node", os.path.join(root, "tools", "check_savefile.mjs")]):
+        print("\nFAIL: the backup check does not work")
         bad += 1
 
     print("\n%s" % ("FAILURES" if bad else "the save is out of the blast radius"))

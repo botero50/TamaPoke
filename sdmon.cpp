@@ -60,7 +60,7 @@ bool PmdMon::load(int16_t dexNum, bool shiny) {
     a.h = h;
     a.frames = nf;
     for (uint8_t k = 0; k < nf; k++) {
-      a.ms[k] = p[0] | (p[1] << 8);
+      a.ms[k] = pmdFrameMs(p[0] | (p[1] << 8));
       p += 2;
     }
     a.data = p;
@@ -102,9 +102,14 @@ bool SdThumbs::load() {
     Serial.println("no thumbs.bin (gallery without thumbnails)");
     return false;
   }
-  uint32_t size = f.size();
-  data = (uint8_t *)ps_malloc(size);
-  if (!data || f.read(data, size) != size || memcmp(data, "TPTH", 4) != 0) {
+  uint32_t sz = f.size();
+  if (sz < 10 || sz > 4UL * 1024 * 1024) {   // a real one is under 1 MB
+    Serial.println("thumbs.bin invalido");
+    f.close();
+    return false;
+  }
+  data = (uint8_t *)ps_malloc(sz);
+  if (!data || f.read(data, sz) != sz || memcmp(data, "TPTH", 4) != 0) {
     Serial.println("thumbs.bin invalido");
     if (data) { free(data); data = nullptr; }
     f.close();
@@ -112,16 +117,19 @@ bool SdThumbs::load() {
   }
   f.close();
   memcpy(&count, data + 4, 2);
+  if (6UL + 4UL * count > sz) {              // the offset table must fit
+    Serial.println("thumbs.bin invalido");
+    free(data); data = nullptr; count = 0;
+    return false;
+  }
+  size = sz;
   loaded = true;
-  Serial.printf("thumbnails loaded: %u (%u KB)\n", count, size / 1024);
+  Serial.printf("thumbnails loaded: %u (%u KB)\n", count, sz / 1024);
   return true;
 }
 
 const uint8_t *SdThumbs::get(int16_t dex) const {
-  if (!loaded || dex < 1 || dex > count) return nullptr;
-  uint32_t off;
-  memcpy(&off, data + 6 + 4 * (dex - 1), 4);
-  return data + off;
+  return loaded ? thumbAt(data, size, count, dex) : nullptr;
 }
 
 // Which regions actually have their sprite pack on the card.
@@ -305,6 +313,13 @@ bool sdSerialCommand(const String &line) {
       return true;
     }
     if (!path.startsWith("/")) path = "/" + path;
+    // Sprites only: this path arrives straight from the serial line, and the save's
+    // safety copies live on this same card.
+    if (!path.startsWith("/mons/") || path.indexOf("..") >= 0) {
+      Serial.println("ERR");
+      return true;
+    }
+    SD_MMC.remove(path);    // a retry replaces a half-sent file, never adds to it
     File f = SD_MMC.open(path, FILE_WRITE);
     if (!f) {
       Serial.println("ERR");
@@ -318,11 +333,12 @@ bool sdSerialCommand(const String &line) {
       size_t want = remaining > sizeof(buf) ? sizeof(buf) : remaining;
       size_t n = Serial.readBytes(buf, want);
       if (n == 0) break;  // timeout
-      f.write(buf, n);
+      if (f.write(buf, n) != n) break;   // a full or failing card must not report DONE
       remaining -= n;
       Serial.println("#");  // ack: ready for the next block
     }
     f.close();
+    if (remaining) SD_MMC.remove(path);  // never leave a cut file behind to load later
     Serial.setTimeout(1000);
     sdDirty = (remaining == 0);
     // A pack file just landed, so which regions are playable may have changed.

@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.43"
+#define FW_VERSION "3.14-funpack.44"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -1149,6 +1149,8 @@ void loop() {
   // 85 ms in game/bag: safe margin so the redraw does not step on the DMA
   // send of the previous frame (at 40-65 ms it overlapped and caused black flashes; with
   // large sprites drawing takes longer, so a cushion is left)
+  static uint32_t lastTimerSweep = 0;
+  if (now - lastTimerSweep >= 60000) { lastTimerSweep = now; sweepOldTimers(now); }
   if (!screenOff && now - lastRender >= (uint32_t)((gameOpen || sackOpen || spdOpen || fpOpen || scrubOpen || placeScene) ? 85 : 100)) {
     lastRender = now;
     render();
@@ -2391,7 +2393,7 @@ void onTap(int16_t x, int16_t y) {
     return;
   }
   if (confirmUntil) {        // "release?" dialog: YES / NO
-    if (millis() < confirmUntil && x >= 118 && x <= 218 && y >= 252 && y <= 304) {
+    if (timeOn(millis(), confirmUntil) && x >= 118 && x <= 218 && y >= 252 && y <= 304) {
       pet.release();
     }
     confirmUntil = 0;
@@ -2421,7 +2423,7 @@ void onTap(int16_t x, int16_t y) {
   if (missionsOpen || walletOpen) { missionsOpen = walletOpen = false; return; }
   if (hatPadTap(x, y)) return;
   if (feedMenuUntil) {       // food picker
-    if (millis() < feedMenuUntil && y >= 288 && y <= 352 && x >= 68 && x <= 398) {
+    if (timeOn(millis(), feedMenuUntil) && y >= 288 && y <= 352 && x >= 68 && x <= 398) {
       int item = (x - 68) / 66;
       if (item >= 4) {
         giveMedicineFeedback(pet.giveMedicine());   // Fun Pack: the pill
@@ -4507,7 +4509,7 @@ void render() {
 
   // food picker
   if (feedMenuUntil) {
-    if (millis() > feedMenuUntil) {
+    if (timeUp(millis(), feedMenuUntil)) {
       feedMenuUntil = 0;
     } else {
       gfx->fillRoundRect(68, 288, 330, 64, 14, UI_WHITE);
@@ -4522,7 +4524,7 @@ void render() {
 
   // "release?" dialog (long press on the creature)
   if (confirmUntil) {
-    if (millis() > confirmUntil) {
+    if (timeUp(millis(), confirmUntil)) {
       confirmUntil = 0;
     } else {
       gfx->fillRoundRect(94, 168, 278, 152, 16, UI_WHITE);
@@ -4539,13 +4541,13 @@ void render() {
 
   // decision dialog (evolve/keep, farewell/stay together)
   if (choiceKind) {
-    if (millis() > choiceUntil) choiceKind = 0;
+    if (timeUp(millis(), choiceUntil)) choiceKind = 0;
     else drawChoiceDialog();
   }
 
   // "<name> joined the party!" after a farewell or release
   if (partyBannerUntil) {
-    if (millis() > partyBannerUntil) {
+    if (timeUp(millis(), partyBannerUntil)) {
       partyBannerUntil = 0;
     } else {
       char b[40];
@@ -4664,7 +4666,7 @@ void stepGame() {
     ballY = CY + ny * 205;
   }
   // the clock, or three misses, whichever lands first
-  if (gameUntil && millis() >= gameUntil && !gameOverUntil) {
+  if (gameUntil && timeUp(millis(), gameUntil) && !gameOverUntil) {
     gameNewHi = (gameScore > pet.gameHi);
     pet.playResult(gameScore);
     sfxPlay(gameNewHi && gameScore > 0 ? SFX_MEDAL : SFX_LEVEL);
@@ -4701,7 +4703,7 @@ void startSack() {
 }
 
 void sackTap() {
-  if (millis() >= sackUntil) return;  // time is already up
+  if (timeUp(millis(), sackUntil)) return;  // time is already up
   sackHits++;
   sackShake = 16;  // shakes the bag
 }
@@ -4716,7 +4718,7 @@ void renderSack() {
 
   // result screen
   if (sackOverUntil) {
-    if (now > sackOverUntil) { sackOpen = false; return; }
+    if (timeUp(now, sackOverUntil)) { sackOpen = false; return; }
     char b[20];
     snprintf(b, sizeof(b), T(S_HITS_FMT), sackHits);
     uiTextFit(UIF_BIG, CX, 178, b, ink, 1, 340);
@@ -4735,7 +4737,7 @@ void renderSack() {
   }
 
   // the 10 s are over: apply the training
-  if (now >= sackUntil) {
+  if (timeUp(now, sackUntil)) {
     sackNewHi = (sackHits > pet.strHi);
     sackGain = pet.trainStrength(sackHits);
     sfxPlay(sackNewHi ? SFX_MEDAL : SFX_PLAY);
@@ -4801,7 +4803,7 @@ void renderGame() {
 
   if (gameOverUntil) {
     drawGameScene();
-    if (millis() > gameOverUntil) {
+    if (timeUp(millis(), gameOverUntil)) {
       gameOpen = false;
       return;
     }
@@ -4840,7 +4842,7 @@ void renderGame() {
   // read the same way. Thin and near the rim: the middle belongs to the ball.
   if (!gameOverUntil) {
     uint32_t now2 = millis();
-    uint32_t left = (gameUntil > now2) ? gameUntil - now2 : 0;
+    uint32_t left = (timeOn(now2, gameUntil)) ? gameUntil - now2 : 0;
     int bw = 200, fw = (int)((uint32_t)bw * left / GAME_MS);
     gfx->fillRoundRect(CX - bw / 2, 124, bw, 10, 4, UI_TRACK_TEXT);
     if (fw > 2)
@@ -6193,23 +6195,23 @@ static void btlSide(int tx, int ty, int sx, int sy, const Combatant &c, uint8_t 
   uint32_t now = millis();
   int ox = 0, oy = 0;
   bool flash = false;
-  if (now < btlFaintUntil[who]) {          // sinks out of frame as it faints
+  if (timeOn(now, btlFaintUntil[who])) {          // sinks out of frame as it faints
     uint32_t left = btlFaintUntil[who] - now;
     oy += (int)((BTL_FAINT_MS - left) * 70 / BTL_FAINT_MS);
   } else if (c.fainted() && btlSwapWho == (int8_t)who) {
     return;                                // gone, waiting to be replaced
   }
-  if (now < btlEnterUntil[who]) {          // and the next one rises into place
+  if (timeOn(now, btlEnterUntil[who])) {          // and the next one rises into place
     uint32_t left = btlEnterUntil[who] - now;
     oy += (int)(left * 70 / BTL_ENTER_MS);
   }
-  if (now < btlLungeUntil[who]) {          // lean in, then back out
+  if (timeOn(now, btlLungeUntil[who])) {          // lean in, then back out
     uint32_t left = btlLungeUntil[who] - now;
     int amt = (int)(left > BTL_LUNGE_MS / 2 ? BTL_LUNGE_MS - left : left) * 22 / (BTL_LUNGE_MS / 2);
     ox = who == 0 ? amt : -amt;            // you lunge right, the foe lunges left
     oy = who == 0 ? -amt / 2 : amt / 2;
   }
-  if (now < btlHitUntil[who]) {
+  if (timeOn(now, btlHitUntil[who])) {
     uint32_t left = btlHitUntil[who] - now;
     ox += ((left / 50) % 2) ? 5 : -5;      // jitter
   }
@@ -6222,9 +6224,9 @@ static void btlSide(int tx, int ty, int sx, int sy, const Combatant &c, uint8_t 
     uint8_t act = PMD_IDLE;
     bool loop = true;
     uint32_t t = now;
-    if (now < btlHitUntil[who] && btlPmd[who].has(PMD_HURT)) {
+    if (timeOn(now, btlHitUntil[who]) && btlPmd[who].has(PMD_HURT)) {
       act = PMD_HURT; loop = false; t = now - (btlHitUntil[who] - BTL_HIT_MS);
-    } else if (now < btlLungeUntil[who] && btlPmd[who].has(PMD_ATTACK)) {
+    } else if (timeOn(now, btlLungeUntil[who]) && btlPmd[who].has(PMD_ATTACK)) {
       act = PMD_ATTACK; loop = false; t = now - (btlLungeUntil[who] - BTL_LUNGE_MS);
     }
     drawPmdActM(btlPmd[who], act, sx + 24 + ox, sy + 78 + oy, t, loop, false, 4);
@@ -6232,7 +6234,7 @@ static void btlSide(int tx, int ty, int sx, int sy, const Combatant &c, uint8_t 
   }
   const uint8_t *th = thumbs.get(c.dex);
   if (!th) return;
-  if (now < btlHitUntil[who]) flash = ((btlHitUntil[who] - now) / 60) % 2 == 0;
+  if (timeOn(now, btlHitUntil[who])) flash = ((btlHitUntil[who] - now) / 60) % 2 == 0;
   drawThumb(th, sx + ox, sy + oy, 3, flash);
 }
 
@@ -6759,7 +6761,7 @@ void renderSpeed() {
   uint16_t ink = night ? UI_INK_NIGHT : UI_INK;
 
   if (spdOverUntil) {
-    if (now > spdOverUntil) { spdOpen = false; return; }
+    if (timeUp(now, spdOverUntil)) { spdOpen = false; return; }
     char b[24];
     snprintf(b, sizeof(b), T(S_SCORE_FMT), spdHits);
     uiTextFit(UIF_BIG, CX, 178, b, ink, 1, 340);
@@ -6778,7 +6780,7 @@ void renderSpeed() {
   }
 
   // session over?
-  if (now >= spdUntil) {
+  if (timeUp(now, spdUntil)) {
     spdNewHi = (spdHits > pet.spdHi);
     spdGain = pet.trainSpeed(spdHits);
     sfxPlay(spdNewHi ? SFX_MEDAL : SFX_PLAY);
@@ -6805,7 +6807,7 @@ void renderSpeed() {
   snprintf(b, sizeof(b), "%u", spdHits);
   uiText(UIF_BIG, CX, 72, b, ink, 1);
   // seconds left
-  uint32_t left = (spdUntil > now) ? (spdUntil - now + 999) / 1000 : 0;
+  uint32_t left = (timeOn(now, spdUntil)) ? (spdUntil - now + 999) / 1000 : 0;
   snprintf(b, sizeof(b), "%us", (unsigned)left);
   uiText(UIF_SMALL, CX, 94, b, ink, 1);
   drawExitBtn();
@@ -7774,8 +7776,10 @@ void renderKeyboard() {
 }
 
 void keyboardTap(int16_t x, int16_t y) {
+  // Filter before dividing: a tap just left of the grid would round to column 0.
+  if (x < KB_X || y < KB_Y) return;
   int col = (x - KB_X) / KB_W, row = (y - KB_Y) / KB_H;
-  if (col < 0 || col >= KB_COLS || row < 0 || row >= 5) return;
+  if (col >= KB_COLS || row >= 5) return;
   int i = row * KB_COLS + col;
   if (i >= 30) return;
   if (i == 28) {  // delete
@@ -7887,8 +7891,10 @@ void galleryTap(int16_t x, int16_t y) {
     galleryPmd.unload();
     return;
   }
+  // Filter before dividing: a tap just outside the grid would round to cell 0.
+  if (x < GAL_X || y < GAL_Y) return;
   int c = (x - GAL_X) / GAL_CELL, r = (y - GAL_Y) / GAL_CELL;
-  if (c < 0 || c > 3 || r < 0 || r > 3) return;
+  if (c > 3 || r > 3) return;
   int16_t dex = GAL_LO + galleryPage * GAL_PER_PAGE + r * 4 + c;
   if (dex > GAL_HI || dex > DEX_COUNT) return;
   galleryDetail = dex;
@@ -8439,7 +8445,7 @@ static void bathBurst(int bx, int by, int r, float p, uint8_t ph, uint16_t rim, 
 
 void drawBath() {
   uint32_t now = millis();
-  if (now > bathUntil) {
+  if (timeUp(now, bathUntil)) {
     bathUntil = 0;
     if (bathPending) {
       bathPending = false;
@@ -8524,7 +8530,9 @@ uint8_t pmdFrameAt(const PmdAct &a, uint32_t t, bool loop) {
   if (!loop && t >= total) return a.frames - 1;
   t %= total;
   uint8_t i = 0;
-  while (t >= a.ms[i]) {
+  // At most one step per frame: with every duration 0 this used to spin forever
+  // and freeze the game. The loader rejects zeros too; this is the second guard.
+  for (uint8_t n = 0; n < a.frames && t >= a.ms[i]; n++) {
     t -= a.ms[i];
     i = (i + 1) % a.frames;
   }
@@ -8645,7 +8653,7 @@ void drawPetPMD() {
   } else {
     // content: the planner decides (idle / walk / gesture)
     if (hatAdjust) { beh.mode = 0; beh.until = now + 1000; }   // hold still for the hat
-    if (now > beh.until) behNext();
+    if (timeUp(now, beh.until)) behNext();
     if (beh.mode == 1) {
       float d = beh.targetX - beh.x;
       if (fabsf(d) < 4) {
@@ -8760,7 +8768,7 @@ void startSweep() {
 void drawSweep() {
   if (!sweepUntil) return;
   uint32_t now = millis();
-  if (now >= sweepUntil) {
+  if (timeUp(now, sweepUntil)) {
     sweepUntil = 0;
     uint8_t h0 = pet.hygiene;
     if (pet.sweep()) {
@@ -9186,7 +9194,7 @@ void giveMedicineFeedback(uint8_t r) {
 
 void drawFpToast() {
   if (!fpToastUntil) return;
-  if (millis() > fpToastUntil) { fpToastUntil = 0; return; }
+  if (timeUp(millis(), fpToastUntil)) { fpToastUntil = 0; return; }
   gfx->fillRoundRect(63, 186, 340, 60, 16, fpToastColor);
   gfx->drawRoundRect(63, 186, 340, 60, 16, UI_INK);
   char b[48];
@@ -9950,7 +9958,7 @@ void fpTap(int16_t x, int16_t y) {
 
 static void fpRenderResult() {
   drawGameScene();
-  if (millis() > fpOverUntil) { fpOpen = false; return; }
+  if (timeUp(millis(), fpOverUntil)) { fpOpen = false; return; }
   uint16_t ink = fpInk();
   uiTextFit(UIF_MID, CX, 140, T(fpTitle(fpGame)), ink, 1, 300);
   char buf[22];
@@ -9966,7 +9974,7 @@ static void fpRenderResult() {
   char g[24];
   snprintf(g, sizeof(g), T(fpGainFmt(fpGame)), fpGain);
   uiTextFit(UIF_BIG, CX, 280, g, Pet::miniGameStat(fpGame) == MINI_NO_STAT ? UI_BAR_OK : UI_BAR_BAD, 1, 340);
-  if (millis() < pet.coinFlashUntil) {
+  if (timeOn(millis(), pet.coinFlashUntil)) {
     char c[10];
     snprintf(c, sizeof(c), "+%u", pet.coinFlash);
     drawMap(SPR_ICON_COIN, 16, CX - 50, 300, 2, false);
@@ -10061,7 +10069,7 @@ void drawTopBar() {
   uiText(UIF_TINY, TOPBTN_RX, TOPBTN_Y + TOPBTN_R + 16, c, UI_INK, 1);
   // "+N" rising from the purse while coins arrive
   uint32_t now = millis();
-  if (now < pet.coinFlashUntil) {
+  if (timeOn(now, pet.coinFlashUntil)) {
     uint32_t age = 1800 - (pet.coinFlashUntil - now);
     char f[8];
     snprintf(f, sizeof(f), "+%u", pet.coinFlash);
@@ -11200,7 +11208,7 @@ void scrubRub(int16_t x, int16_t y) {
 
 void renderScrub() {
   uint32_t now = millis();
-  if (scrubDoneUntil && now > scrubDoneUntil) { scrubOpen = false; return; }
+  if (scrubDoneUntil && timeUp(now, scrubDoneUntil)) { scrubOpen = false; return; }
   drawGameScene();
   uint16_t ink = fpInk();
   uiTextFit(UIF_MID, CX, 60, T(S_SCRUB), ink, 1, 250);
@@ -11514,7 +11522,7 @@ static void drawPlaceFx() {
 static void drawPlaceMsg() {
   drawPlaceFx();
   if (!placeMsgUntil) return;
-  if (millis() > placeMsgUntil) { placeMsgUntil = 0; placeFriend = 0; return; }
+  if (timeUp(millis(), placeMsgUntil)) { placeMsgUntil = 0; placeFriend = 0; return; }
   gfx->fillRoundRect(63, 112, 340, 52, 16, UI_WHITE);
   gfx->drawRoundRect(63, 112, 340, 52, 16, UI_INK);
   uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, 112, 52), placeMsg, UI_INK, 1, 316);
@@ -11554,7 +11562,7 @@ static void parkScene(uint32_t now) {
   // the walk: across and back
   int x = CX;
   uint8_t act = PMD_IDLE;
-  if (placeAnimUntil && now < placeAnimUntil) {
+  if (placeAnimUntil && timeOn(now, placeAnimUntil)) {
     float t = 1.0f - (placeAnimUntil - now) / 1800.0f;
     x = CX + (int)(sinf(t * 6.2832f) * 80);
     act = cosf(t * 6.2832f) > 0 ? PMD_WALKR : PMD_WALKL;
@@ -11836,7 +11844,7 @@ uint32_t capShakeUntil = 0;
 
 void drawCapsuleMachine() {
   uint32_t now = millis();
-  int sx = (capShakeUntil > now) ? (int)(sinf(now * 0.08f) * 3) : 0;
+  int sx = (timeOn(now, capShakeUntil)) ? (int)(sinf(now * 0.08f) * 3) : 0;
   int x = CAPM_X + sx, y = CAPM_Y;
   // the dome full of capsules
   gfx->fillCircle(x + CAPM_W / 2, y + 36, 34, C565(0xe8, 0xf4, 0xff));
@@ -11945,7 +11953,7 @@ void finishStudy() {
   placeSay(b);
 }
 
-void studyTick() { if (studyEnd && millis() >= studyEnd) finishStudy(); }
+void studyTick() { if (studyEnd && timeUp(millis(), studyEnd)) finishStudy(); }
 
 // entering the school: back to the room, unless homework is still running
 void schoolReset() { if (!studyEnd) schoolMode = SCH_ROOM; }
@@ -12022,7 +12030,7 @@ static void renderSchool() {
       drawSchoolButton(2, S_LEAVE, UI_WHITE, UI_INK);
       break;
     case SCH_STUDY: {
-      uint32_t left = studyEnd > now ? (studyEnd - now + 999) / 1000 : 0;
+      uint32_t left = timeOn(now, studyEnd) ? (studyEnd - now + 999) / 1000 : 0;
       snprintf(b, sizeof(b), "%02u:%02u", (unsigned)(left / 60), (unsigned)(left % 60));
       drawChalkboard(b);
       uiTextFit(UIF_SMALL, CX, 240, T(S_STUDYING), UI_INK, 1, 300);
@@ -12057,7 +12065,7 @@ static void renderSchool() {
       }
       fpDrawPet(CX, FP_GROUND, PMD_IDLE, 2);
       drawSchoolButton(2, S_LEAVE, UI_WHITE, UI_INK);
-      if (quizPicked >= 0 && now > quizFlashUntil) {       // on to the next one
+      if (quizPicked >= 0 && timeUp(now, quizFlashUntil)) {       // on to the next one
         quizQ++;
         if (quizQ >= QUIZ_QUESTIONS) {
           quizCoins = pet.quizDone(quizCorrect);
@@ -12153,7 +12161,7 @@ static void renderTeeth() {
   gfx->fillRoundRect(CX - 60, 104, 120, 60, 10, C565(0xc8, 0xe0, 0xf0));   // the mirror
   gfx->drawRoundRect(CX - 60, 104, 120, 60, 10, UI_INK);
   fpDrawPet(CX, FP_GROUND, PMD_IDLE, 4);
-  bool brushing = teethEnd && now < teethEnd;
+  bool brushing = teethEnd && timeOn(now, teethEnd);
   if (brushing) {
     // the toothbrush scrubs side to side, faster after a tap
     float sp = (now - teethTapAt < 600) ? 0.03f : 0.012f;
@@ -12376,12 +12384,12 @@ static StrId pickTalk() {
 void drawTalk() {
   if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil || sweepUntil || uiCurrentScreen() != SCR_MAIN) { talkUntil = 0; return; }
   uint32_t now = millis();
-  if (!talkUntil && now >= talkNextAt) {
+  if (!talkUntil && timeUp(now, talkNextAt)) {
     talkMsg = pickTalk();
     talkUntil = now + 4000;
   }
   if (!talkUntil) return;
-  if (now > talkUntil) { talkUntil = 0; talkNextAt = now + 45000 + random(30000); return; }
+  if (timeUp(now, talkUntil)) { talkUntil = 0; talkNextAt = now + 45000 + random(30000); return; }
   // a speech bubble over the creature, with its tail pointing down at it
   char wb[48];
   const char *m = T(talkMsg);
@@ -12686,8 +12694,8 @@ static void lakeScene(uint32_t now) {
 }
 
 static void lakeTick(uint32_t now) {
-  if (fishPhase == FISH_WAITING && now >= fishBiteAt) { fishPhase = FISH_BITING; sfxPlay(SFX_TAP); }
-  else if (fishPhase == FISH_BITING && now > fishBiteAt + FISH_BITE_WINDOW) { fishPhase = FISH_IDLE; fishShow = 0; fishSay(S_FISH_AWAY); }
+  if (fishPhase == FISH_WAITING && timeUp(now, fishBiteAt)) { fishPhase = FISH_BITING; sfxPlay(SFX_TAP); }
+  else if (fishPhase == FISH_BITING && now - fishBiteAt > FISH_BITE_WINDOW) { fishPhase = FISH_IDLE; fishShow = 0; fishSay(S_FISH_AWAY); }
 }
 
 static void lakeAction() {
@@ -12927,7 +12935,7 @@ void alarmTick() {
   uint32_t now = millis();
   if (alarmRinging) {
     if (now - alarmStartAt > ALARM_RING_MS) alarmRinging = false;
-    else if (now >= alarmNextTune) { audioMusic(MUS_VICTORY); alarmNextTune = now + 7000; }
+    else if (timeUp(now, alarmNextTune)) { audioMusic(MUS_VICTORY); alarmNextTune = now + 7000; }
     lastInteract = now;                                    // keep the screen up while it rings
     return;
   }
@@ -14341,7 +14349,7 @@ static void libraryScene(uint32_t now) {
   drawIndoor(C565(0xe8, 0xd8, 0xb8), C565(0x9c, 0x6a, 0x40));
   for (int r = 0; r < 2; r++) for (int k = 0; k < 9; k++)  // shelves of books
     gfx->fillRect(70 + k * 36, 110 + r * 70, 26, 56, (k + r) % 3 == 0 ? UI_BAR_BAD : (k + r) % 3 == 1 ? C565(0x4f, 0x93, 0xc4) : UI_BAR_OK);
-  if (townUntil && now < townUntil && townDex) {            // the open book: a Pokemon's page
+  if (townUntil && timeOn(now, townUntil) && townDex) {            // the open book: a Pokemon's page
     gfx->fillRoundRect(83, 112, 300, 170, 14, UI_WHITE);
     gfx->drawRoundRect(83, 112, 300, 170, 14, UI_INK);
     gfx->drawFastVLine(CX, 116, 162, UI_TRACK_TEXT);
@@ -14361,7 +14369,7 @@ static void musicScene(uint32_t now) {
   gfx->fillRect(60, 300, 346, 20, C565(0xb0, 0x7a, 0x45));  // the stage
   for (int k = 0; k < 5; k++)                                 // spotlights
     gfx->fillTriangle(90 + k * 70, 90, 70 + k * 70 + (int)(sinf(now * 0.0015f + k) * 24), 300, 110 + k * 70 + (int)(sinf(now * 0.0015f + k) * 24), 300, lerp565(C565(0x50, 0x3c, 0x78), UI_WHITE, 1, 6));
-  bool dancing = townUntil && now < townUntil;
+  bool dancing = townUntil && timeOn(now, townUntil);
   int bob = dancing ? (int)(fabsf(sinf(now * 0.012f)) * 18) : 0;
   fpDrawPet(CX, 300 - bob, PMD_IDLE, 3);
   if (dancing) for (int k = 0; k < 4; k++) drawMap(SPR_CARE_NOTE, 16, 100 + k * 80, 130 + (int)(sinf(now * 0.004f + k) * 14), 2, false);
@@ -14387,7 +14395,7 @@ static void contestScene(uint32_t now) {
   for (int k = 0; k < 3; k++) { gfx->fillCircle(150 + k * 83, 196, 12, RC[k]); gfx->drawCircle(150 + k * 83, 196, 12, UI_INK);
     char n[6]; snprintf(n, sizeof(n), "%u", (unsigned)pet.ribbons[k]); uiText(UIF_SMALL, 172 + k * 83, 204, n, UI_INK, 0); }
   (void)b;
-  if (townShowResult && townUntil && now < townUntil) {
+  if (townShowResult && townUntil && timeOn(now, townUntil)) {
     static const uint16_t RCOL[4] = { UI_TRACK_TEXT, C565(0xc0, 0x80, 0x40), C565(0xc0, 0xc8, 0xd0), C565(0xff, 0xcb, 0x05) };
     gfx->fillCircle(CX, 240, 24, RCOL[townRibbon]);
     gfx->drawCircle(CX, 240, 24, UI_INK);
@@ -14517,7 +14525,7 @@ static bool nurseryTap(int16_t x, int16_t y, bool act) {
     return true;
   }
   if (pet.nurseryHasEgg()) {
-    if (nurAskUntil && millis() < nurAskUntil) { nurAskUntil = 0; pet.nurseryGiveBack(); sfxPlay(SFX_TAP); }
+    if (nurAskUntil && timeOn(millis(), nurAskUntil)) { nurAskUntil = 0; pet.nurseryGiveBack(); sfxPlay(SFX_TAP); }
     else { nurAskUntil = millis() + 3000; sfxPlay(SFX_TAP); placeSay(T(S_NUR_SURE)); }
     return true;
   }
@@ -14964,4 +14972,19 @@ void placeMusicTick() {
   if (tune) audioMusic(tune);
   else if (placeTune) audioMusic(MUS_NONE);                // left a place: quiet again
   lastScene = placeScene;
+}
+
+// See sweepTimer() in pet.h for why these need sweeping.
+void sweepOldTimers(uint32_t now) {
+  pet.sweepOldTimers(now);
+  uint32_t *const timers[] = {
+    &confirmUntil, &choiceUntil, &feedMenuUntil, &partyBannerUntil, &bathUntil, &sweepUntil,
+    &gameUntil, &gameOverUntil, &sackUntil, &sackOverUntil, &spdUntil, &spdOverUntil,
+    &btlLungeUntil[0], &btlLungeUntil[1], &btlHitUntil[0], &btlHitUntil[1],
+    &btlFaintUntil[0], &btlFaintUntil[1], &btlEnterUntil[0], &btlEnterUntil[1],
+    &fpToastUntil, &fpOverUntil, &scrubDoneUntil, &placeAnimUntil, &placeMsgUntil,
+    &capShakeUntil, &studyEnd, &quizFlashUntil, &teethEnd, &talkUntil, &talkNextAt,
+    &alarmNextTune, &townUntil, &nurAskUntil,
+  };
+  for (uint32_t *t : timers) sweepTimer(*t, now);
 }

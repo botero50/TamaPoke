@@ -182,7 +182,7 @@ void Pet::syncClock(uint32_t nowEpoch) {
 
 void Pet::update(uint32_t nowMs) {
   // end of ceremony: the creature leaves and a new egg remains
-  if (ceremony != CER_NONE && millis() > ceremonyUntil) {
+  if (ceremony != CER_NONE && timeUp(millis(), ceremonyUntil)) {
     snapshotForParty();  // hand it over BEFORE newEgg() erases everything
     newEgg();
     return;
@@ -1612,7 +1612,7 @@ uint16_t Pet::earnCoins(uint16_t amount, bool capped) {
   uint32_t v = coins + amount;
   coins = v > COIN_MAX ? COIN_MAX : v;
   uint32_t now = millis();
-  coinFlash = (now < coinFlashUntil ? coinFlash : 0) + amount;
+  coinFlash = (timeOn(now, coinFlashUntil) ? coinFlash : 0) + amount;
   coinFlashUntil = now + 1800;
   pendingSave = true;
   return amount;

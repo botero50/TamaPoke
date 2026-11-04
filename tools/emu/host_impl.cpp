@@ -67,7 +67,7 @@ bool PmdMon::load(int16_t dexNum, bool shiny) {
     if (w == 0 || h == 0 || nf == 0 || q + bytes > end) { unload(); return false; }
     PmdAct &a = acts[id];
     a.w = w; a.h = h; a.frames = nf;
-    for (uint8_t k = 0; k < nf; k++) { a.ms[k] = q[0] | (q[1] << 8); q += 2; }
+    for (uint8_t k = 0; k < nf; k++) { a.ms[k] = pmdFrameMs(q[0] | (q[1] << 8)); q += 2; }
     a.data = q;
     q += (uint32_t)w * h * nf;
     uint8_t base = 1;
@@ -93,7 +93,6 @@ void PmdMon::unload() {
 }
 
 bool SdThumbs::load() {
-  uint32_t size = 0;
   data = slurp(g_spriteDir + "/thumbs.bin", &size);
   if (!data) { Serial.println("emu: no thumbs.bin"); return false; }
   if (memcmp(data, "TPTH", 4) != 0) { free(data); data = nullptr; return false; }
@@ -104,10 +103,7 @@ bool SdThumbs::load() {
 }
 
 const uint8_t *SdThumbs::get(int16_t dex) const {
-  if (!loaded || dex < 1 || dex > count) return nullptr;
-  uint32_t off;
-  memcpy(&off, data + 6 + 4 * (dex - 1), 4);
-  return data + off;
+  return loaded ? thumbAt(data, size, count, dex) : nullptr;
 }
 
 bool SdMon::load(int16_t, bool) { return false; }   // legacy TPK1 path unused

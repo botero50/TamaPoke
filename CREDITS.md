@@ -24,6 +24,8 @@ Phase 40 also takes only ideas: the low-need warning beep from [AlteSocke](https
 
 Phase 41 reuses code: the gym arenas (`tools/gen_arenas.py` and the `ARENA_OF_TYPE` table) are from [tubiana](https://github.com/tubiana/TamaPoke), under the MIT licence: Copyright (c) 2026 Quique Tortosa, Dylan Dao and Thibault Tubiana. The gentler poop drain and the idea of a marked exit in games come from [AlteSocke](https://github.com/AlteSocke/TamaPoke).
 
+Phase 42 adapts more work under the same MIT licence. The verified backup before installing follows [eperdeme](https://github.com/eperdeme/TamaPoke). The LAN keepalive and the installer's version and Pokédex count come from crenberries428. From the [original repository](https://github.com/socquique/TamaPoke), with its thanks to ajtudela: the wrap-safe timers, rejecting zero-length sprite frames, checking `thumbs.bin`, the harder `PUT`, resumed uploads, the pinned installer library and filtering touches outside a grid.
+
 
 TamaPoke is a **non-commercial, personal-use** project. It does not sell or
 commercially redistribute any copyrighted material. Pokémon and all related

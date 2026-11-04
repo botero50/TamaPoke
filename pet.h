@@ -1,4 +1,16 @@
 #pragma once
+#include <stdint.h>
+
+// Timers hold a millis() deadline, with 0 meaning "off". millis() wraps after 49.7
+// days and a ball with no battery can stay on that long, so a plain "now < until"
+// goes wrong there. These subtract instead, which holds across the wrap.
+inline bool timeOn(uint32_t now, uint32_t until) { return until && (int32_t)(until - now) > 0; }
+inline bool timeUp(uint32_t now, uint32_t until) { return !timeOn(now, until); }
+// A timer that ended long ago and was never cleared would read as running again
+// once it is more than 24.8 days old, the limit of that subtraction. So anything
+// over a day past its end goes back to 0, which leaves any flow still waiting on a
+// finished timer plenty of time to see it first.
+inline void sweepTimer(uint32_t &t, uint32_t now) { if (t && (int32_t)(t - now) < -86400000L) t = 0; }
 #include <Arduino.h>
 #include <Preferences.h>
 #include "dex.h"
@@ -626,7 +638,7 @@ public:
   void scrubDone(uint8_t spots);  // the scrub game finished: a bath plus joy
   bool startNap();              // light off, wakes by itself after NAP_MINUTES
   bool lullaby();               // put to bed with a song: bedtime plus joy
-  bool shining() const { return millis() < shineUntil; }
+  bool shining() const { return timeOn(millis(), shineUntil); }
 
   // Places. Player-wide.
   uint32_t parkDay = 0;         // the day parkFinds counts
@@ -1030,14 +1042,18 @@ public:
 
   bool isEgg() const { return speciesId < 0; }
   uint8_t eggCracks() const { return eggTaps; }
-  bool eating() const { return millis() < eatUntil; }
-  uint32_t eatLeftMs() const { uint32_t n = millis(); return eatUntil > n ? eatUntil - n : 0; }
-  bool showHeart() const { return millis() < heartUntil; }
-  uint32_t heartLeftMs() const { uint32_t n = millis(); return heartUntil > n ? heartUntil - n : 0; }
-  bool evolving() const { return millis() < evolveUntil; }
+  void sweepOldTimers(uint32_t now) {
+    for (uint32_t *t : { &eatUntil, &heartUntil, &evolveUntil, &medalUntil, &milestoneUntil,
+                         &shineUntil, &coinFlashUntil, &ceremonyUntil }) sweepTimer(*t, now);
+  }
+  bool eating() const { return timeOn(millis(), eatUntil); }
+  uint32_t eatLeftMs() const { uint32_t n = millis(); return timeOn(n, eatUntil) ? eatUntil - n : 0; }
+  bool showHeart() const { return timeOn(millis(), heartUntil); }
+  uint32_t heartLeftMs() const { uint32_t n = millis(); return timeOn(n, heartUntil) ? heartUntil - n : 0; }
+  bool evolving() const { return timeOn(millis(), evolveUntil); }
   float evolveT() const {     // progress of the evolution animation 0..1
     uint32_t n = millis();
-    uint32_t left = evolveUntil > n ? evolveUntil - n : 0;
+    uint32_t left = timeOn(n, evolveUntil) ? evolveUntil - n : 0;
     return 1.0f - (float)left / (float)EVOLVE_ANIM_MS;
   }
   bool canEvolveNow() const;  // evolution conditions met (ready)
@@ -1112,15 +1128,15 @@ public:
   float ceremonyT() const {
     if (ceremony == CER_NONE) return 0.0f;
     uint32_t n = millis();
-    uint32_t left = ceremonyUntil > n ? ceremonyUntil - n : 0;
+    uint32_t left = timeOn(n, ceremonyUntil) ? ceremonyUntil - n : 0;
     return 1.0f - (float)left / (float)CEREMONY_MS;
   }
 
   // streak / bond / medals / name
   void rename(const char *name);
   bool hasMedal(uint16_t m) const { return medals & m; }
-  bool showMedal() const { return millis() < medalUntil; }
-  bool showMilestone() const { return millis() < milestoneUntil; }
+  bool showMedal() const { return timeOn(millis(), medalUntil); }
+  bool showMilestone() const { return timeOn(millis(), milestoneUntil); }
   int careBonus() const;  // egg improvement from streak + bond
 
   // deferred periodic save: tick() marks it pending and the loop flushes it

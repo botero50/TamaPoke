@@ -13,6 +13,7 @@ static uint32_t g_timeScale = 1;   // >1 makes in-game minutes pass faster
 
 void emuSetTimeScale(uint32_t s) { g_timeScale = s ? s : 1; }
 uint32_t emuTimeScale() { return g_timeScale; }
+void emuSetMillis(uint32_t ms) { g_virtUs = (uint64_t)ms * 1000; }
 
 // The sketch times gestures off this same clock -- a tap needs dt < 1500 and a
 // swipe dt < 800 -- so scaling it wholesale shrinks the window you have to

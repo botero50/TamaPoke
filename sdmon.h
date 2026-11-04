@@ -1,4 +1,5 @@
 #pragma once
+#include <string.h>
 #include <Arduino.h>
 #include "dex.h"
 #include "noart.h"
@@ -66,7 +67,24 @@ uint8_t albumDeleteAllButFav();              // how many went
 void albumMigrate();                         // at boot: old .raw photos become .bmp
 
 // gallery thumbnails (the whole thumbs.bin in PSRAM)
+// Both of these judge what comes off the card, so the ball and the emulator's
+// stand-in share them and the tests exercise the real checks.
+// A frame duration of 0 would freeze the animation.
+inline uint16_t pmdFrameMs(uint16_t ms) { return ms ? ms : 100; }
+// The picture for a dex number in a loaded thumbs.bin, or null if the file's table
+// points outside it: a cut or damaged file must not read outside the buffer.
+inline const uint8_t *thumbAt(const uint8_t *data, uint32_t size, uint16_t count, int16_t dex) {
+  if (!data || dex < 1 || dex > count || 6UL + 4UL * count > size) return nullptr;
+  uint32_t off;
+  memcpy(&off, data + 6 + 4 * (dex - 1), 4);
+  if (size < 3 || off > size - 3) return nullptr;              // w, h, colours
+  uint32_t need = 3 + (uint32_t)data[off + 2] * 2 + (uint32_t)data[off] * data[off + 1];
+  if (need > size || off > size - need) return nullptr;        // and the whole picture
+  return data + off;
+}
+
 struct SdThumbs {
+  uint32_t size = 0;      // bytes in data
   bool loaded = false;
   uint8_t *data = nullptr;
   uint16_t count = 0;

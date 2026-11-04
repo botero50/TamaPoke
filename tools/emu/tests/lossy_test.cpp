@@ -185,6 +185,27 @@ int main(){
     deaf=false;
   }
 
+  // --- a slow PLAYER is not a lost PEER (crenberries) -----------------------
+  {
+    seen=dropped=0; deaf=false; dropEvery=3; dupEvery=0;
+    pair(true,false);
+    run(3000);
+    ck(A.ready() && B.ready(), "paired for the idle check");
+    run(LINK_BATTLE_TIMEOUT_MS * 5, 100);
+    ck(A.ready() && B.ready(),
+       "a long wait with nobody choosing, before the first move, keeps both live");
+    B.sendAct(1); run(2000);
+    ck(A.hasPeerAct(), "the late first move still lands");
+    LinkResult r{}; r.hostHp = 50; r.guestHp = 50;
+    A.sendResult((const uint8_t*)&r, sizeof(r));
+    run(2000);
+    ck(B.resultNew && B.ready(), "the guest has the result");
+    run(LINK_BATTLE_TIMEOUT_MS * 5, 100);
+    ck(A.live() && B.ready(),
+       "a long wait with the guest thinking, after a result, keeps both live");
+    dropEvery=0;
+  }
+
   // --- leaving on purpose is instant, not a timeout ------------------------
   {
     pair(true,false);

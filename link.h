@@ -32,7 +32,7 @@
 // whole handshake without a radio, and a deliberately lossy transport exercises
 // all of the above. Only the radio itself is unverifiable here.
 
-#define LINK_PROTO 2        // bump on ANY wire change; a mismatch is refused
+#define LINK_PROTO 3        // bump on ANY wire change; a mismatch is refused
 #define LINK_MAX_PAYLOAD 200
 #define LINK_NAME_LEN 12
 
@@ -44,7 +44,9 @@
 // fixed interval, one squad packet was destroyed on all ten attempts.
 #define LINK_JITTER_MS 200
 #define LINK_PAIR_TIMEOUT_MS 20000    // waiting for a peer that may not exist
-#define LINK_BATTLE_TIMEOUT_MS 12000  // mid-fight, where one is known to be there
+#define LINK_BATTLE_TIMEOUT_MS 60000  // mid-fight, where one is known to be there
+// This measures RADIO silence, not player silence: tick() sends LM_PING whenever it
+// has nothing to repeat, so a player taking their time to choose keeps the link up.
 
 // An action is a move slot, or a switch with the high bit set. One message
 // rather than two, so turn matching and resend have a single path -- which is
@@ -80,6 +82,7 @@ enum LinkMsg : uint8_t {
   LM_END,
   LM_BYE,        // leaving on purpose, so the peer need not wait for a timeout
   LM_REMATCH,    // go again with the same squads
+  LM_PING,       // keepalive while neither side has anything to resend
 };
 
 // A creature on the wire. Deliberately not `Combatant` itself: that carries

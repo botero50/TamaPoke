@@ -26,7 +26,7 @@
   .row { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
   #log { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
          border-radius:10px; padding:.75rem 1rem; margin-top:1rem; max-height:220px; overflow:auto; white-space:pre-wrap; display:none; }
-  #savelog, #wifilog { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
+  #savelog, #wifilog, #installlog { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
          border-radius:10px; padding:.75rem 1rem; margin-top:1rem; max-height:160px; overflow:auto; white-space:pre-wrap; display:none; }
   .bar { height:10px; background:var(--track); border-radius:5px; overflow:hidden; margin-top:.75rem; display:none; }
   .bar > div { height:100%; width:0; background:var(--ok); transition: width .15s; }
@@ -37,8 +37,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>🐢 TamaPoke <small>Fun Pack</small></h1>
-  <p class="sub">A 386-Pokémon tamagotchi for the Waveshare ESP32-S3-Touch-AMOLED-1.75.
+  <h1>🐢 TamaPoke <small>Fun Pack</small> <small id="fwver"></small></h1>
+  <p class="sub">A tamagotchi with <span id="dexn">hundreds of</span> Pokémon for the Waveshare ESP32-S3-Touch-AMOLED-1.75.
      Install it from your browser — no Arduino, no drivers.</p>
 
   <p class="unsupported" id="unsupported">
@@ -59,11 +59,12 @@
        computer</b> rather than through a hub.</p>
   </div>
 
-  <h2><span class="num">💾</span>Updating? Save your pet first</h2>
+  <h2><span class="num">💾</span>Save or restore your pet</h2>
   <div class="step" style="border-left:4px solid var(--ok)">
-    <p>Already playing? Press <b>Save my pet</b> before you install. It downloads a
-       small backup file of your creature, Pokédex, coins and items. If anything goes
-       wrong, <b>Restore my pet</b> puts it all back. New board? Skip this.</p>
+    <p>Step 1 below takes a backup for you before it installs. Use <b>Save my pet</b>
+       to take one any other time: it downloads a small file of your creature, Pokédex,
+       coins and items, after checking that the file is complete. If anything goes wrong,
+       <b>Restore my pet</b> puts it all back. New board? Skip this.</p>
     <div class="row">
       <button id="petsave">💾 Save my pet</button>
       <button id="petload">♻️ Restore my pet</button>
@@ -102,13 +103,22 @@
 
   <h2><span class="num">1</span>Flash the firmware</h2>
   <div class="step">
-    <p>Plug the board in via USB and press install. Pick the port and wait.
-       Takes about a minute. No drivers needed on any OS.</p>
-    <esp-web-install-button manifest="manifest.json">
-      <button slot="activate">⚡ Install TamaPoke</button>
-      <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
-      <span slot="not-allowed">Needs HTTPS.</span>
-    </esp-web-install-button>
+    <p>Plug the board in via USB and press <b>Back up, then install</b>. Pick the port
+       when asked. It saves your pet to a file and checks the file is complete, and only
+       then shows <b>Install now</b>. Press that and pick the port again, because the
+       browser asks once for each. The install takes about a minute, with no drivers
+       on any OS.</p>
+    <div class="row"><button id="backupinstall">💾 Back up, then install</button></div>
+    <div id="installgate" hidden>
+      <p><b>Ready to install.</b></p>
+      <esp-web-install-button manifest="manifest.json">
+        <button slot="activate">⚡ Install now</button>
+        <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
+        <span slot="not-allowed">Needs HTTPS.</span>
+      </esp-web-install-button>
+    </div>
+    <pre id="installlog"></pre>
+    <p class="note">New board with nothing to save? <a href="#" id="skipbackup">Install without a backup</a>.</p>
     <p class="note" style="border-left:4px solid #e8503a;padding-left:10px">
        🔄 <b>Updating? Leave "Erase device" unchecked.</b> The installer asks
        once, with the box already unchecked — click <b>Next</b> without ticking
@@ -119,9 +129,9 @@
        <b>Installers before v2.7 erased it every time, without asking.</b>
        They shipped one image covering the whole start of flash, the save
        included, and were configured to wipe the chip before writing. Both are
-       fixed here. Even so, a backup is the only real safety net: use
-       <b>Save my pet</b> above before any update you care about (it is the
-       same as typing <code>EXPORT</code> on the serial console).<br><br>
+       fixed here. Even so, a backup is the only real safety net, which is why
+       this step takes one first (it is the same as typing <code>EXPORT</code> on
+       the serial console).<br><br>
        A fresh board with nothing on it can be erased safely, and on a board
        that has never run TamaPoke it makes no difference either way.</p>
   </div>
@@ -149,6 +159,7 @@
     </div>
     <p class="note">Have your own <code>.bin</code> files? <label style="cursor:pointer;text-decoration:underline">pick them manually<input id="files" type="file" accept=".bin" multiple disabled hidden></label></p>
     <p class="note">🎨 Want to make your own sprites? See <a href="https://github.com/botero50/TamaPoke#generate-and-load-the-sprites-yourself" target="_blank">how to generate &amp; load them</a> in the repo.</p>
+    <p class="note">If the sending stops, press the same button again: it carries on from where it was. Changed the card since? <a href="#" id="sendover">Send everything again</a>.</p>
     <div class="bar" id="bar"><div></div></div>
     <pre id="log"></pre>
   </div>
@@ -170,8 +181,16 @@
      Pokémon is a ™ of Nintendo / Game Freak. Non-commercial project.</p>
 </div>
 
-<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js"></script>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js"
+        integrity="sha384-9XfyvAabgkISlB/Xb3OpshGKpZx0TOt5Mmu78SeiNU3so/p4o2s9m66vy6Utdnom" crossorigin="anonymous"></script>
+<script src="savefile.js"></script>
 <script>
+// The firmware version and Pokedex size come from the manifest the installer flashes
+// from, so this page never carries its own copy of either number.
+fetch('manifest.json').then((r) => r.json()).then((m) => {
+  if (m.version) document.getElementById('fwver').textContent = 'firmware v' + m.version;
+  if (m.dex_count) document.getElementById('dexn').textContent = m.dex_count;
+}).catch(() => {});
 const log = (m) => { const el = document.getElementById('log'); el.style.display='block';
   el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
 const supported = 'serial' in navigator;
@@ -233,17 +252,51 @@ function parsePak(buf) {
   return items;
 }
 
+// Which files already reached the card, by name and size, so a cut does not mean
+// sending 40 MB again. A bundle rebuilt with different sizes is sent afresh.
+const SENT_KEY = 'tamapoke-sent-files';
+function loadSent() {
+  try { return new Set(JSON.parse(localStorage.getItem(SENT_KEY) || '[]')); } catch (e) { return new Set(); }
+}
+function saveSent(sent) {
+  try { localStorage.setItem(SENT_KEY, JSON.stringify([...sent])); } catch (e) {}
+}
+
 async function sendAll(items) {
   const bar = document.getElementById('bar'); bar.style.display = 'block';
   const fill = bar.firstElementChild;
-  let done = 0, fail = 0;
+  const sent = loadSent();
+  const key = (it) => it.name + ':' + it.data.length;
+  let done = 0, fail = 0, skipped = 0;
   for (const it of items) {
-    if (!await sendOne(it.name, it.data)) { log('   failed ' + it.name); fail++; }
+    if (sent.has(key(it))) {
+      skipped++;
+    } else {
+      let ok = false;
+      try {
+        ok = await sendOne(it.name, it.data);
+      } catch (e) {
+        log('The connection was lost: ' + e.message);
+        log('Reload the page, connect again and press the same button. It carries on from here.');
+        return;
+      }
+      if (ok) { sent.add(key(it)); saveSent(sent); }
+      else { log('   failed ' + it.name); fail++; }
+    }
     done++;
     fill.style.width = (done / items.length * 100) + '%';
   }
-  log(`Done (${done - fail}/${items.length}). Restart the board (PWR button).`);
+  if (skipped) log(`${skipped} files were already on the card.`);
+  if (fail) { log(`${fail} files failed. Press the same button again to retry just those.`); return; }
+  for (const it of items) sent.delete(key(it));   // all there: a later re-send starts clean
+  saveSent(sent);
+  log(`Done (${done}/${items.length}). Restart the board (PWR button).`);
 }
+document.getElementById('sendover').onclick = (ev) => {
+  ev.preventDefault();
+  saveSent(new Set());
+  log('Forgot what was sent: the next load sends everything.');
+};
 
 // ---------- save / restore the pet (EXPORT / IMPORT over serial) ----------
 // Each button opens the port, does its one job and closes it again, so the
@@ -288,40 +341,85 @@ async function withPort(job) {
   }
 }
 
-document.getElementById('petsave').onclick = () => withPort(async (send, line) => {
-  slog('Reading the save...');
-  await send('EXPORT');
-  const out = []; let started = false;
-  while (true) {
-    const l = await line(5000);
-    if (l === null) break;
-    if (l.startsWith('# TamaPoke save')) { started = true; out.length = 0; }
+// Reads the save and downloads it, but only once it passes the check. USB can drop
+// a line now and then, so a read that fails is tried again before giving up.
+// Answers 'saved', 'none' (nothing answered: no TamaPoke running) or 'bad'.
+async function takeBackup(send, line, say) {
+  say('Reading the save...');
+  let reason = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    while (await line(200) !== null) {}   // drop anything printed so far
+    await send('EXPORT');
+    const out = []; let started = false;
+    while (true) {
+      const l = await line(5000);
+      if (l === null) break;
+      if (l.startsWith('# TamaPoke save')) { started = true; out.length = 0; }
+      if (!started) continue;
+      out.push(l);
+      if (l === 'IMPORT') break;          // the empty IMPORT closes the block
+    }
     if (!started) continue;
-    out.push(l);
-    if (l === 'IMPORT') break;            // the empty IMPORT closes the block
+    const text = out.join('\n') + '\n';
+    const r = checkSave(text, true);
+    if (!r.ok) { reason = r.reason; say('That read failed the check: ' + reason + '. Trying again...'); continue; }
+    const d = new Date(), z = (n) => String(n).padStart(2, '0');   // local time, as on the clock
+    const stamp = d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes());
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    a.download = 'tamapoke-save-' + stamp + '.txt';
+    a.click();
+    say('Saved ' + a.download + ' (' + r.bytes + ' bytes, checked and complete). Keep it somewhere safe.');
+    return 'saved';
   }
-  if (!started || out[out.length - 1] !== 'IMPORT') {
-    slog('No save came back. Is TamaPoke running on the board? Try again.');
-    return;
-  }
-  const d = new Date(), z = (n) => String(n).padStart(2, '0');   // local time, as on the clock
-  const stamp = d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes());
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([out.join('\n') + '\n'], { type: 'text/plain' }));
-  a.download = 'tamapoke-save-' + stamp + '.txt';
-  a.click();
-  slog('Saved ' + a.download + ' (' + (out.length - 2) + ' lines). Keep it somewhere safe.');
+  return reason ? 'bad' : 'none';
+}
+
+document.getElementById('petsave').onclick = () => withPort(async (send, line) => {
+  const got = await takeBackup(send, line, slog);
+  if (got === 'none') slog('No save came back. Is TamaPoke running on the board? Try again.');
+  if (got === 'bad') slog('The backup never came through complete, so nothing was saved. Check the cable and try again.');
 });
+
+// ---------- step 1: back up, then install ----------
+// The install button appears only once there is a good backup or the player has said
+// there is nothing to save. It takes its own click because a browser only shows the
+// port picker straight after one, and reading the save takes longer than that allows.
+const ilog = (m) => { const el = document.getElementById('installlog'); el.style.display = 'block';
+  el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
+function showInstall() {
+  const gate = document.getElementById('installgate');
+  gate.hidden = false;
+  gate.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+document.getElementById('backupinstall').onclick = async () => {
+  let got = null;
+  await withPort(async (send, line) => { got = await takeBackup(send, line, ilog); });
+  if (got === 'saved') {          // the port is closed again by now, so the installer can have it
+    ilog('Now press Install now, and leave "Erase device" unticked.');
+    showInstall();
+  } else if (got === 'bad') {
+    ilog('The backup never came through complete, so nothing will be installed. Check the cable and try again.');
+  } else if (got === 'none') {
+    ilog('Nothing answered, so there was nothing to back up.');
+    if (confirm('No pet answered on this board. That is normal for a new board.\n\nIf this board has a pet on it, press Cancel and check the cable. Install without a backup?')) showInstall();
+  }
+};
+document.getElementById('skipbackup').onclick = (ev) => {
+  ev.preventDefault();
+  if (confirm('Install without a backup? If this board has a pet on it, take a backup first.')) showInstall();
+};
 
 document.getElementById('petload').onclick = () => document.getElementById('petfile').click();
 document.getElementById('petfile').onchange = async (ev) => {
   const f = ev.target.files[0]; ev.target.value = '';
   if (!f) return;
-  const lines = (await f.text()).split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('IMPORT'));
-  if (lines.length < 2 || lines[lines.length - 1] !== 'IMPORT') {
-    slog('That file is not a TamaPoke save (it needs the IMPORT lines from Save my pet).');
+  const checked = checkSave(await f.text(), false);
+  if (!checked.ok) {
+    slog('That file cannot be restored: ' + checked.reason + '. Nothing was changed.');
     return;
   }
+  const lines = checked.lines;
   if (!confirm('Replace the pet on the board with the one in ' + f.name + '?')) return;
   await withPort(async (send, line) => {
     slog('Restoring ' + f.name + '...');
