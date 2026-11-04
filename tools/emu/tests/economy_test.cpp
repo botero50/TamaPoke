@@ -25,6 +25,9 @@ struct Player { const char *name; int feeds, pets, baths, games, score, steps; b
 // not whether the creature survives the player.
 static uint32_t playDay(Pet &p, uint32_t d, const Player &pl) {
   uint32_t before = p.coins;
+  // This budgets DAILY income. The walking prizes are 640 coins once in a lifetime
+  // of walking, about 10 a day over a first month of normal play, and not part of it.
+  p.walkPrize = WALK_PRIZES;
   p.lastSeenEpoch = at(d, 9);
   for (int i = 0; i < pl.feeds; i++) { p.fullness = 40; g_ms += 5000; p.feedBerry((uint8_t)(i % 3)); }
   for (int i = 0; i < pl.pets; i++) p.caress();
@@ -60,6 +63,10 @@ int main(){
     p.begin();
     p.dbgHatchAs(1, false);
     p.coins = 0; p.streak = 0; p.lastCareDay = 0; p.coinDay = 0;
+    // Each player starts walking from nothing. They share one store, so the last
+    // player's step day, weeks ahead of this one's first day, used to carry over and
+    // make every step read as 0: step missions never paid and this budget read low.
+    p.stepDay = 0; p.stepCount = 0; p.stepHistDay = 0; p.stepCoinK = 0;
     uint32_t total = 0, lo = 0xFFFFFFFF, hi = 0;
     for (uint32_t d = 20000; d < 20030; d++) {
       uint32_t c = playDay(p, d, PLAYERS[k]);

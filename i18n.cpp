@@ -135,7 +135,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Pasos listos! El reto llega en %u dias", "Pasos listos! El reto llega manana",
     // phase 36
-    "Reto en %u dias", "Reto manana", },
+    "Reto en %u dias", "Reto manana",
+    // phase 40
+    "Buena caminata! +%u monedas", "Premio a los %u pasos", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -265,7 +267,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Steps done! The challenge comes in %u days", "Steps done! The challenge comes tomorrow",
     // phase 36
-    "Challenge in %u days", "Challenge tomorrow", },
+    "Challenge in %u days", "Challenge tomorrow",
+    // phase 40
+    "Great walking! +%u coins", "Next prize at %u steps", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -394,7 +398,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Pas faits ! Le defi arrive dans %u jours", "Pas faits ! Le defi arrive demain",
     // phase 36
-    "Defi dans %u jours", "Defi demain", },
+    "Defi dans %u jours", "Defi demain",
+    // phase 40
+    "Belle marche ! +%u pieces", "Prix suivant a %u pas", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -523,7 +529,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Schritte geschafft! Herausforderung in %u Tagen", "Schritte geschafft! Herausforderung morgen",
     // phase 36
-    "Duell in %u Tagen", "Duell morgen", },
+    "Duell in %u Tagen", "Duell morgen",
+    // phase 40
+    "Toll gelaufen! +%u Muenzen", "Preis bei %u Schritten", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -652,7 +660,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Passi fatti! La sfida arriva tra %u giorni", "Passi fatti! La sfida arriva domani",
     // phase 36
-    "Sfida tra %u giorni", "Sfida domani", },
+    "Sfida tra %u giorni", "Sfida domani",
+    // phase 40
+    "Bella camminata! +%u monete", "Premio a %u passi", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -781,7 +791,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Passos prontos! O desafio chega em %u dias", "Passos prontos! O desafio chega amanha",
     // phase 36
-    "Desafio em %u dias", "Desafio amanha", },
+    "Desafio em %u dias", "Desafio amanha",
+    // phase 40
+    "Boa caminhada! +%u moedas", "Premio aos %u passos", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -912,7 +924,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "步数够了! %u天后迎来挑战", "步数够了! 明天迎来挑战",
     // phase 36
-    "%u天后挑战", "明天挑战", },
+    "%u天后挑战", "明天挑战",
+    // phase 40
+    "走得真棒! +%u 金币", "%u 步有奖励", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -1042,7 +1056,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "걸음 완료! %u일 후 도전이 와요", "걸음 완료! 내일 도전이 와요",
     // phase 36
-    "%u일 후 도전", "내일 도전", },
+    "%u일 후 도전", "내일 도전",
+    // phase 40
+    "잘 걸었어! +%u 코인", "%u 걸음에 보상", },
 };
 
 // Medal names in their three lengths [language][medal].

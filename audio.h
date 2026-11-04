@@ -23,6 +23,7 @@ enum Sfx : uint8_t {
   SFX_VICTORY,  // the fight is won
   SFX_THUNDER,  // a storm outside (the real weather)
   SFX_HEAL,     // the Pokemon Center's machine (an original jingle)
+  SFX_NEED,     // a need is very low
   SFX_COUNT
 };
 
@@ -47,5 +48,8 @@ void sfxPlay(uint8_t id);   // queues an effect (does not block the loop)
 // Queues a species' cry. Silent for a species with none (everything past Kanto),
 // so callers do not need to check.
 void audioCry(int16_t dex);
+// Quiet nights: effects and cries are dropped while this is on. Music is not, so
+// the alarm always rings.
+void audioSetQuiet(bool on);
 void audioSetEnabled(bool on);
 bool audioEnabled();

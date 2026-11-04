@@ -3,7 +3,7 @@
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://botero50.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
-![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.41-8A2BE2)
+![Firmware](https://img.shields.io/badge/firmware-v3.14--funpack.42-8A2BE2)
 ![Code](https://img.shields.io/badge/code-MIT-blue)
 ![Languages](https://img.shields.io/badge/languages-8-FFCB05)
 [![Stars](https://img.shields.io/github/stars/botero50/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/botero50/TamaPoke/stargazers)
@@ -83,6 +83,8 @@ Built on crenberries428's 3.14, all in 8 languages:
 - **Places to go**: park, store, Pokémon Center, garden, school, lake, kitchen, beach, library, music hall, contest and part-time jobs, each with its own animations (the Center heals with a machine and a jingle).
 - **The road to the gym**: walk with the ball and a dial fills at the edge of the screen. When you've walked far enough, the next leader challenges you, about one gym a week, across 7 regions.
 - **A steps panel**: today, your last 7 days, the road to the gym, the adventure route and every step you've ever walked.
+- **Walking prizes**: coins at 5 000, 10 000 and on up to a million steps walked in total, once each.
+- **A warning beep** when a need is very low, and **quiet nights**: from 21:00 to 07:00 the ball makes no sound by itself.
 - **The Nursery**: two favourites from the party or box leave an egg for the next raising.
 - **Wi-Fi time and the real weather**: fog, rain, storms, settling snow, and snow from New York for places where it never snows.
 - **It talks**: about 150 things to say, picked by its needs, the weather, the time of day, events and things to do.
@@ -148,7 +150,7 @@ any orientation, screen on or off, read about 60 times a second in the backgroun
 and the home screen shows today's total on a plate curved along the left edge. Tap it
 for the steps panel. Today's count resets at midnight; the 7-day history, the lifetime
 total, the adventure route and the road to the gym carry on, and all of them are saved,
-so they survive switching the ball off. A counted walk of 100 steps gave 105, and it
+every 20 steps, so unplugging the ball loses at most 19. A counted walk of 100 steps gave 105, and it
 counts nothing while the ball lies still.
 
 ### Day, dusk, night

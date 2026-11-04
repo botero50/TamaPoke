@@ -113,12 +113,14 @@ static uint8_t dropTo(uint8_t v, uint8_t d, uint8_t fl) {
   return (v - fl > d) ? v - d : fl;
 }
 
-void Pet::setClock(uint32_t nowEpoch) {
+void Pet::setClock(uint32_t nowEpoch, bool trusted) {
   lastSeenEpoch = nowEpoch;
-  // a deliberate clock change (Wi-Fi sync, TIME) may move the date back: then
-  // the step day and the 7-day history follow it, where a glitch would not
-  if (nowEpoch && stepDay > today()) { stepDay = today(); stepCount = 0; }
-  if (nowEpoch && stepHistDay > today()) { stepHistDay = 0; for (int k = 0; k < 7; k++) stepHist[k] = 0; }
+  // A clock change never erases steps. Treating every earlier date as a new start
+  // wiped a real day's walk when the hour was set on a clock that had lost its date.
+  if (nowEpoch && trusted) {
+    if (stepDay > today()) stepDay = today();
+    if (stepHistDay > today()) stepHistDay = today();
+  }
   if (nowEpoch) save();  // persists already: a power cut does not lose the reference
 }
 
@@ -592,7 +594,8 @@ void Pet::stepHistRoll(uint32_t d) {
 
 uint16_t Pet::stepsDaysAgo(uint8_t ago) const {
   uint32_t d = today();
-  if (!stepHistDay || d < stepHistDay) return 0;
+  if (!stepHistDay) return 0;
+  if (d < stepHistDay) d = stepHistDay;         // a wrong clock: the history stands as it is
   uint32_t k = ago + stepHistDay - d;          // where that day sits in the history
   return (d - stepHistDay <= ago && k < 7) ? stepHist[k] : 0;
 }
@@ -618,9 +621,16 @@ void Pet::addSteps(uint32_t n) {
     gymSteps = (uint16_t)(g > cap ? (gymSteps > cap ? gymSteps : cap) : g);
   }
   stepsUnsaved += n;
-  if (stepsUnsaved >= 20) {
+  if (stepsUnsaved >= 20) {                     // at once, screen on or off: an unplug loses at most 19
     stepsUnsaved = 0;
-    pendingSave = true;
+    saveSteps();
+  }
+  while (walkPrizeAt(walkPrize) && stepTotal >= walkPrizeAt(walkPrize)) {
+    uint16_t c = walkPrizeCoins(walkPrize);
+    earnCoins(c, false);
+    walkPrizeGain += c;
+    walkPrize++;
+    pendingSave = true;                         // unplugged first: both coins and prize are unsaved, so it pays again
   }
   rollCoinDay();
   uint32_t k = stepCount / 1000;
@@ -633,6 +643,43 @@ void Pet::addSteps(uint32_t n) {
   noteMission(MIS_STEPS, 0);
   noteMission(MIS_STEPS_BIG, 0);
   if (stepsToday() >= QUEST_WALK_STEPS) questNote(QK_STEPS);
+}
+
+// Far less than save(): a pause too short to see, so it can run while walking.
+void Pet::saveSteps() {
+  if (!opened) return;
+  prefs.putUInt("stps", stepCount);
+  prefs.putUInt("sday", stepDay);
+  prefs.putBytes("sth7", stepHist, sizeof(stepHist));
+  prefs.putUInt("sthd", stepHistDay);
+  prefs.putUInt("stpT", stepTotal);
+  prefs.putUShort("gymS", gymSteps);
+  prefs.putUInt("advS", advSteps);
+}
+
+uint32_t Pet::walkPrizeAt(uint8_t i) {
+  static const uint32_t AT[WALK_PRIZES] = { 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000 };
+  return i < WALK_PRIZES ? AT[i] : 0;
+}
+
+uint16_t Pet::walkPrizeCoins(uint8_t i) {
+  static const uint16_t COINS[WALK_PRIZES] = { 10, 20, 30, 50, 80, 100, 150, 200 };
+  return i < WALK_PRIZES ? COINS[i] : 0;
+}
+
+bool Pet::isQuietAt(uint32_t epoch) {
+  int h = (int)((epoch / 3600) % 24);
+  return h >= 21 || h < 7;
+}
+
+bool Pet::needBeepDue(uint32_t nowMs) {
+  if (lowestStat() > NEED_BEEP_AT) { needBeeps = 0; return false; }   // cared for: it may warn again
+  if (isEgg() || sleeping || frozen || ceremony != CER_NONE || quietHours()) return false;
+  if (needBeeps >= NEED_BEEP_MAX) return false;
+  if (needBeeps && nowMs - needBeepMs < NEED_BEEP_MS) return false;
+  needBeeps++;
+  needBeepMs = nowMs;
+  return true;
 }
 
 void Pet::setStepsToday(uint32_t n) {
@@ -3056,6 +3103,7 @@ void Pet::save() {
   prefs.putBytes("sth7", stepHist, sizeof(stepHist));
   prefs.putUInt("sthd", stepHistDay);
   prefs.putUInt("stpT", stepTotal);
+  prefs.putUChar("stpM", walkPrize);
   prefs.putUInt("sday", stepDay);
   prefs.putUChar("bond", bond);
   prefs.putUShort("medal", medals);
@@ -3256,6 +3304,7 @@ void Pet::load() {
   if (prefs.getBytesLength("sth7") == sizeof(stepHist)) prefs.getBytes("sth7", stepHist, sizeof(stepHist));
   stepHistDay = prefs.getUInt("sthd", 0);
   stepTotal = prefs.getUInt("stpT", 0);
+  walkPrize = prefs.getUChar("stpM", 0);
   stepDay = prefs.getUInt("sday", 0);
   bond = prefs.getUChar("bond", 0);
   medals = prefs.getUShort("medal", 0);

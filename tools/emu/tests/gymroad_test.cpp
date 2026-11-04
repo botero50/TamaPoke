@@ -5,6 +5,7 @@
 #include "Preferences.h"
 #include "pet.h"
 #include "party.h"
+#include "save.h"
 #include <cstdio>
 uint32_t g_seed=31; FakeSerial Serial; FakeESP ESP; FakeWire Wire;
 volatile int g_touchX=0,g_touchY=0; volatile bool g_touchDown=false; bool wasPressed=false;
@@ -153,10 +154,108 @@ int main(){
     p.lastSeenEpoch = 20010 * DAY + 9 * 3610;      // and back to the real time
     p.addSteps(5);
     ck(p.stepsToday() == 410 && p.stepsDaysAgo(1) == 800 && p.stepTotal == 1210, "after the glitch: today 410, yesterday still 800, nothing lost");
-    p.setClock(20008 * DAY + 9 * 3600);           // a deliberate change to an earlier date (TIME, a sync)
-    ck(p.stepsToday() == 0, "a deliberate earlier date starts today again");
+    p.setClock(20008 * DAY + 9 * 3600);           // the clock set to an earlier date
+    ck(p.stepsToday() == 410 && p.stepsDaysAgo(1) == 800, "an earlier date erases nothing: today and yesterday still show");
     p.addSteps(20);
-    ck(p.stepsToday() == 20 && p.stepsDaysAgo(0) == 20, "and counts from there");
+    ck(p.stepsToday() == 430 && p.stepTotal == 1230, "and walking goes on counting");
+    p.setClock(20010 * DAY + 10 * 3600);
+    ck(p.stepsToday() == 430 && p.stepsDaysAgo(1) == 800, "back on the right date, all of it is there");
+  }
+  // --- what really happened on the ball on 3 Nov: a walk, the power out, the date
+  // restarted in January, the hour set by hand, and then Wi-Fi with the real date
+  {
+    nvs().clear();
+    Pet p; fresh(p);
+    p.addSteps(504);
+    uint32_t walkDay = 20000 * DAY + 18 * 3600;
+    p.setClock(19000 * DAY + 8 * 3600);           // the clock screen, on a clock stuck in the past
+    ck(p.stepsToday() == 504 && p.stepsDaysAgo(0) == 504, "the hour set on a wrong date: the walk is untouched");
+    p.setClock(walkDay, true);                    // Wi-Fi
+    ck(p.stepsToday() == 504 && p.stepsDaysAgo(0) == 504 && p.stepTotal == 504, "and the real date finds it all still there");
+    // a date that really was ahead: Wi-Fi brings it back, with the numbers
+    p.setClock(walkDay + 3 * DAY);
+    p.addSteps(6);
+    p.setClock(walkDay + DAY, true);
+    ck(p.stepDay == 20001 && p.stepsToday() == 6, "a step day in the future moves back when Wi-Fi says so");
+    ck(p.stepHistDay == 20001 && p.stepsDaysAgo(3) == 504, "and the history keeps its numbers");
+  }
+
+  // --- saved as you walk, whatever the screen is doing
+  {
+    nvs().clear();
+    Pet a; fresh(a);
+    a.saveNow();
+    for (int i = 0; i < 40; i++) a.addSteps(1);
+    { Pet b; b.begin(); b.lastSeenEpoch = a.lastSeenEpoch;
+      ck(b.stepsToday() == 40 && b.stepTotal == 40 && b.gymSteps == 40 && b.advSteps == 40, "40 steps, unplugged: all 40 are there, on both roads too"); }
+    for (int i = 0; i < 19; i++) a.addSteps(1);
+    { Pet b; b.begin(); b.lastSeenEpoch = a.lastSeenEpoch;
+      ck(b.stepsToday() == 40, "59 steps, unplugged: 40, so at most 19 are ever lost");
+      ck(b.stepsDaysAgo(0) == 40, "and the history went with it"); }
+    // unplugged in the middle of that small save: never a zero, and no false alarm
+    for (long at = 0; at < 7; at++) {
+      Preferences::writeBudget() = at;
+      a.saveSteps();
+      Preferences::writeBudget() = -1;
+      Pet b; b.begin(); b.lastSeenEpoch = a.lastSeenEpoch;
+      if (b.stepsToday() < 40 || b.stepTotal < 40) { ck(false, "a cut in a small save lost steps"); break; }
+      if (saveWasCut()) { ck(false, "a small save raised the cut flag"); break; }
+    }
+    ck(true, "a cut at any point of a small save keeps what was saved");
+  }
+
+  // --- the warning beep
+  {
+    nvs().clear();
+    Pet q; fresh(q);
+    q.fullness = q.joy = q.energy = q.hygiene = 50;
+    uint32_t t = 1000000;
+    ck(!q.needBeepDue(t), "all needs fine: silent");
+    q.fullness = 16;
+    ck(!q.needBeepDue(t), "16 is not low yet");
+    q.fullness = 15;
+    ck(q.needBeepDue(t), "15 beeps straight away");
+    ck(!q.needBeepDue(t + 1000), "and not again a second later");
+    ck(!q.needBeepDue(t + NEED_BEEP_MS - 1), "nor just before 5 minutes");
+    int n = 1;
+    for (int i = 1; i < 20; i++) if (q.needBeepDue(t + i * NEED_BEEP_MS)) n++;
+    ck(n == NEED_BEEP_MAX, "it stops after 6");
+    q.fullness = 60;
+    ck(!q.needBeepDue(t + 30 * NEED_BEEP_MS), "cared for: silent");
+    q.joy = 3;
+    ck(q.needBeepDue(t + 31 * NEED_BEEP_MS), "another need low later: it warns again");
+    q.joy = 60; q.needBeepDue(t + 32 * NEED_BEEP_MS);
+    q.energy = 10; q.sleeping = true;
+    ck(!q.needBeepDue(t + 33 * NEED_BEEP_MS), "silent while it sleeps");
+    q.sleeping = false;
+    q.lastSeenEpoch = 20000 * DAY + 23 * 3600;
+    ck(!q.needBeepDue(t + 34 * NEED_BEEP_MS), "silent at night");
+    q.lastSeenEpoch = 20001 * DAY + 7 * 3600;
+    ck(q.needBeepDue(t + 35 * NEED_BEEP_MS), "and the night used up none of them");
+    Pet e; e.begin(); e.fullness = 5; e.speciesId = -1;
+    ck(!e.needBeepDue(t), "silent as an egg");
+    ck(Pet::isQuietAt(21 * 3600) && Pet::isQuietAt(6 * 3600 + 59 * 60) && !Pet::isQuietAt(7 * 3600) && !Pet::isQuietAt(20 * 3600 + 59 * 60), "quiet from 21:00 to 06:59");
+  }
+
+  // --- walking prizes
+  {
+    nvs().clear();
+    Pet r; fresh(r);
+    r.coins = 0; r.stepTotal = 4999; r.walkPrize = 0;
+    r.addSteps(1);
+    ck(r.coins == 10 && r.walkPrizeGain == 10 && r.walkPrize == 1, "5 000 steps ever: 10 coins");
+    r.walkPrizeGain = 0;
+    r.addSteps(1);
+    ck(r.coins == 10 && r.walkPrize == 1, "and only once");
+    r.stepTotal = 99999;
+    r.addSteps(1);
+    ck(r.coins == 190 && r.walkPrizeGain == 180 && r.walkPrize == 5, "several crossed at once all pay");
+    r.saveNow();
+    { Pet s; s.begin(); s.addSteps(1);
+      ck(s.walkPrize == 5 && s.coins == 190, "a reload pays nothing twice"); }
+    r.stepTotal = 2000000;
+    r.addSteps(1);
+    ck(r.walkPrize == WALK_PRIZES && Pet::walkPrizeAt(r.walkPrize) == 0, "past the last prize it just stops");
   }
 
   if (bad) printf("FAILURES\n");

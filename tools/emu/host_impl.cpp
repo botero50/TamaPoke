@@ -156,6 +156,7 @@ uint32_t imuDroppedCount() { return 0; }
 // --- audio (silent) ---
 void audioBegin() {}
 void sfxPlay(uint8_t) {}
+void audioSetQuiet(bool) {}
 // remembers the last request so tests can see which creature was asked to cry
 int16_t g_emuLastCry = 0; int g_emuCryCount = 0;
 void audioCry(int16_t dex) { g_emuLastCry = dex; g_emuCryCount++; }

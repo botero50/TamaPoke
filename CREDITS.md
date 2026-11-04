@@ -20,6 +20,8 @@ exist without it.
 
 The reliability work in Phase 39 takes its ideas, not its code, from other forks: resuming the clock from the save and skipping drawing with the screen off from the original repository, a save that survives a power cut from [eperdeme](https://github.com/eperdeme/TamaPoke), and the sound task that cannot spin from [tubiana](https://github.com/tubiana/TamaPoke).
 
+Phase 40 also takes only ideas: the low-need warning beep from [AlteSocke](https://github.com/AlteSocke/TamaPoke), quiet nights from [danielberndt](https://github.com/danielberndt/TamaPoke), and walking milestones from the cren and ShadowEnemyx forks.
+
 
 TamaPoke is a **non-commercial, personal-use** project. It does not sell or
 commercially redistribute any copyrighted material. Pokémon and all related

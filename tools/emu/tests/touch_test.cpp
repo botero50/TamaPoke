@@ -1289,5 +1289,28 @@ int main(int argc, char **argv) {
     if (sweepUntil || pet.poops != 0) { printf("FAIL: the broom never finished after waking\n"); return 1; }
     printf("PASS: a broom left running finishes on that frame\n");
   }
+
+  // Phase 40: quiet nights, decided by the clock and the last touch.
+  {
+    extern uint32_t lastTouchAt; bool soundQuietNow(uint32_t);
+    const uint32_t D = 20000UL * 86400UL, T = 5000000;
+    lastTouchAt = T - 2 * 60000;
+    pet.setClock(D + 21 * 3600);
+    if (!soundQuietNow(T)) { printf("FAIL: not quiet at 21:00\n"); return 1; }
+    pet.setClock(D + 6 * 3600 + 59 * 60);
+    if (!soundQuietNow(T)) { printf("FAIL: not quiet at 06:59\n"); return 1; }
+    pet.setClock(D + 7 * 3600);
+    if (soundQuietNow(T)) { printf("FAIL: still quiet at 07:00\n"); return 1; }
+    printf("PASS: quiet from 21:00 to 06:59, sound from 07:00\n");
+    pet.setClock(D + 23 * 3600);
+    lastTouchAt = T - 1000;
+    if (soundQuietNow(T)) { printf("FAIL: a touch at night stayed silent\n"); return 1; }
+    printf("PASS: a touch at night still sounds\n");
+    lastTouchAt = T - 2 * 60000;
+    click(233, 233);
+    if (lastTouchAt < T - 60000 && lastTouchAt == T - 2 * 60000) { printf("FAIL: a real tap did not count as a touch\n"); return 1; }
+    printf("PASS: a real tap counts as the touch\n");
+    pet.setClock(D + 12 * 3600);
+  }
   return 0;
 }

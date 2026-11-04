@@ -25,6 +25,7 @@ static void fresh(Pet &p, uint32_t day){
   p.fullness = p.joy = p.energy = p.hygiene = 60;
   p.sickness = SICK_NONE;
   p.coins = 0; p.coinsToday = 0; p.coinDay = 0; p.stepCoinK = 0;
+  p.walkPrize = WALK_PRIZES;   // the once-only walking prizes have their own test (gymroad_test)
   memset(p.missionProg, 0, sizeof(p.missionProg)); p.missionDone = 0; p.missionKindDay = 0;
   p.bedtimeDay = 0; p.stepCount = 0; p.stepDay = 0;
   p.lastCareDay = day;          // today's care already counted: no daily bonus noise

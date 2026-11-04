@@ -265,6 +265,10 @@ enum QuestKind : uint8_t { QK_PARK = 0, QK_BEACH, QK_READ, QK_FISH, QK_COOK, QK_
                            QK_GARDEN, QK_CHORE, QK_NAP, QK_TEETH, QK_QUIZ, QK_CAPSULE, QK_SHOP, QK_TICKETS, QK_STEPS, QK_FAVBERRY, QK_COUNT };
 #define QUEST_COUNT 12
 #define QUEST_STEPS 4
+#define NEED_BEEP_AT 15         // a need this low starts the warning beep
+#define NEED_BEEP_MAX 6
+#define NEED_BEEP_MS 300000UL
+#define WALK_PRIZES 8
 #define QUEST_WALK_STEPS 3000    // the "long walk" step
 #define GYM_STEPS_BASE 10000     // phase 36: steps to the first leader ...
 #define GYM_STEPS_PER 2000       // ... and this much more for each one after
@@ -1004,7 +1008,9 @@ public:
   void newEgg();   // start over with a random starter
   void release();  // release (long press + confirm)
   void syncClock(uint32_t nowEpoch);  // applies the time elapsed while switched off
-  void setClock(uint32_t nowEpoch);   // sets the time without applying progression
+  // Sets the time without applying progression. trusted: this is the real date
+  // (Wi-Fi), so a step day ahead of it was wrong and moves down, numbers kept.
+  void setClock(uint32_t nowEpoch, bool trusted = false);
   void startFarewell();  // also usable from the serial console (BYE)
   // Retire on demand. Before the farewell is earned this is the SAME ceremony
   // -- the creature is banked exactly as it would be -- but it hands the next
@@ -1152,8 +1158,21 @@ public:
   void stepHistRoll(uint32_t d);              // move the history on to day d
   uint16_t stepsDaysAgo(uint8_t ago) const;   // 0 = today .. 6
   uint16_t stepsUnsaved = 0;
-  uint32_t stepsToday() const { return stepDay == today() ? stepCount : 0; }
+  // A date behind the step day is a wrong clock, not a new day: today stays today.
+  uint32_t stepsToday() const { return stepDay >= today() ? stepCount : 0; }
   void addSteps(uint32_t n);
+  void saveSteps();                           // just the step values, for use while walking
+  // Prizes for all the steps ever walked (phase 40).
+  uint8_t walkPrize = 0;                      // how many have been paid
+  uint16_t walkPrizeGain = 0;                 // coins waiting to be announced
+  static uint32_t walkPrizeAt(uint8_t i);     // 0 past the last one
+  static uint16_t walkPrizeCoins(uint8_t i);
+  // Sounds it makes by itself stay silent from 21:00 to 07:00 (phase 40).
+  static bool isQuietAt(uint32_t epoch);
+  bool quietHours() const { return lastSeenEpoch && isQuietAt(lastSeenEpoch); }
+  // A need very low: true when it is time for a warning beep. Every 5 minutes, at
+  // most NEED_BEEP_MAX times, then silent until it is cared for.
+  bool needBeepDue(uint32_t nowMs);
   void setStepsToday(uint32_t n);   // debug/console: sets today's total outright
 
 private:
@@ -1184,6 +1203,8 @@ private:
   uint8_t ticksSinceSave = 0;
   bool pendingSave = false;     // periodic save pending flush
   uint32_t savesDone = 0;
+  uint8_t needBeeps = 0;
+  uint32_t needBeepMs = 0;
   uint8_t evoDeclinedLv = 0;    // "keep form": do not offer evolution until the next level up
   uint32_t farDeclinedAge = 0;  // "stay together": do not offer farewell until this age
   bool starterPick = false;     // first game: waiting for the player to pick a starter

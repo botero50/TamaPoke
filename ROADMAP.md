@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 3 November 2026, with Phase 39._
+_Last updated: 3 November 2026, with Phase 40._
 
 ## Done
 | Phase | What | Release |
@@ -32,6 +32,7 @@ _Last updated: 3 November 2026, with Phase 39._
 | 37 | Menus that fit the round screen: chores and bath in pages with arrows, the adventure note and missions footer off the edge, DIARY / ALBUM tabs instead of a button over the title; the PASOS panel titles its gym section "Steps to reach the gym" | v1.22 |
 | 38 | Bigger page arrows (a near miss turns the page instead of closing the menu), the tasks bubble moved onto the glass, a Pokéball team button at the left edge, the bath as six tiles on one page; a README with two GIFs and the new features | v1.23 |
 | 39 | A sturdier ball, from the fork review: the date never goes back after a power cut, safety copies of the save on the SD card to recover a save cut off midway, nothing drawn with the screen off, a sound task that cannot spin | v1.24 |
+| 40 | Steps that cannot be lost: a clock change never erases them, and they are saved every 20 steps. A warning beep when a need is very low, quiet nights from 21:00 to 07:00, and coins for lifetime steps | v1.25 |
 
 ## Next
 | # | Item | Needs | Notes |
@@ -54,6 +55,8 @@ _Last updated: 3 November 2026, with Phase 39._
   need at least 0.3 mm falling, drizzle is never drawn as rain, grey skies need 60% cloud:
   forecast models flagged drizzle over a sunny house. With Wi-Fi set up, the old made-up
   weather never shows; without Wi-Fi it rains in 1-2 hour spells, not all day.
+- **Steps:** a clock change never erases them; only Wi-Fi may move the step day back, numbers kept. Saved every 20 steps, not every step, to spare the flash: an unplug loses at most 19.
+- **Quiet nights:** decided by the clock and the last touch (a minute), not per sound. Thunder is silent at night too. The alarm uses music, so it always rings.
 - **Clock jumps** from a Wi-Fi sync apply without replaying the missing time on the pet.
 - **The Wi-Fi password** lives in its own NVS namespace and never goes into a backup.
 - **Snow from New York:** only on days that are clear or cloudy at home; anything real

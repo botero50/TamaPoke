@@ -110,11 +110,14 @@ static const Note N_THUNDER[] = { {1, 220}, {1, 420}, {1, 700} };
 static const Note N_HEAL[] = { {523, 110}, {659, 110}, {784, 110}, {659, 110}, {698, 110}, {880, 110},
                                {1047, 260}, {0, 80}, {784, 140}, {1047, 420} };
 
+// a need is very low: two soft tones, easy to tell from everything else
+static const Note N_NEED[] = { {880, 90}, {0, 70}, {880, 90} };
+
 static const SfxDef SFX[SFX_COUNT] = {
   {N_TAP, 1}, {N_EAT, 3}, {N_PLAY, 2}, {N_HEART, 2}, {N_HATCH, 4},
   {N_EVOLVE, 5}, {N_MEDAL, 5}, {N_DENY, 2}, {N_BYE, 3}, {N_LEVEL, 2},
   {N_HIT, 2}, {N_BEAM, 3}, {N_STATUS, 3}, {N_SUPER, 3}, {N_FAINT, 4},
-  {N_VICTORY, 6}, {N_THUNDER, 3}, {N_HEAL, 10},
+  {N_VICTORY, 6}, {N_THUNDER, 3}, {N_HEAL, 10}, {N_NEED, 3},
 };
 
 // A loop, not a one-shot: the task walks it and starts over.
@@ -392,12 +395,15 @@ void audioBegin() {
   sfxPlay(SFX_HATCH);  // boot jingle (confirms it sounds)
 }
 
+static volatile bool gQuiet = false;
+void audioSetQuiet(bool on) { gQuiet = on; }
+
 void sfxPlay(uint8_t id) {
-  if (gReady && gOn && gQ) xQueueSend(gQ, &id, 0);  // dropped if the queue is full
+  if (gReady && gOn && !gQuiet && gQ) xQueueSend(gQ, &id, 0);  // dropped if the queue is full
 }
 
 void audioCry(int16_t dex) {
-  if (gReady && gOn && gCryQ && cryHas(dex)) xQueueSend(gCryQ, &dex, 0);
+  if (gReady && gOn && !gQuiet && gCryQ && cryHas(dex)) xQueueSend(gCryQ, &dex, 0);
 }
 
 void audioSetEnabled(bool on) {

@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.41"
+#define FW_VERSION "3.14-funpack.42"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -741,6 +741,7 @@ void IRAM_ATTR touchIsr() { gTouchIrq = true; }
 uint32_t lastRender = 0;
 // AMOLED protection: dimmed on inactivity
 uint32_t lastInteract = 0;
+uint32_t lastTouchAt = 0;    // a real touch, unlike lastInteract, which events also move
 uint32_t gClockJumps = 0;    // RTC reads thrown out as glitches (STATS)
 uint8_t dimStage = 0;        // 0 despierto, 1 atenuado (90s), 2 casi apagado (5min)
 bool swallowGesture = false; // el toque que despierta no acciona nada
@@ -776,6 +777,14 @@ void drawSplash() {
   drawLogo(CY);
   uiText(UIF_TINY, CX, CY + LOGO_H / 2 + 24, "by Salchi", UI_TRACK_TEXT, 1);   // quiet credit
   gfx->flush();
+}
+
+// At night the ball makes no sound by itself. Going by the sound's cause would mean
+// sorting 270 calls and missing some, so this goes by the touch: for a minute after
+// one, everything sounds; otherwise nothing does. Music is never held back.
+#define SOUND_TOUCH_MS 60000UL
+bool soundQuietNow(uint32_t now) {
+  return pet.quietHours() && now - lastTouchAt > SOUND_TOUCH_MS;
 }
 
 // ---------- surviving a power cut (phase 39) ----------
@@ -972,7 +981,7 @@ void loop() {
     if (wifiTakeTime(&le)) {
       uint32_t cur = rtcEpoch();
       // without catch-up, like TIME: after a blank RTC the gap is months of nothing
-      if (!cur || (cur > le ? cur - le : le - cur) > 60) { rtcSetEpoch(le); pet.setClock(le); }
+      if (!cur || (cur > le ? cur - le : le - cur) > 60) { rtcSetEpoch(le); pet.setClock(le, true); }
     }
     static uint32_t nyToastDay = 0;
     uint32_t day = pet.lastSeenEpoch / 86400;
@@ -994,6 +1003,7 @@ void loop() {
   handleTouch();
   handleSerial();
   ensureMon();
+  audioSetQuiet(soundQuietNow(now));
 
   // A sprite pack can arrive long after the card was mounted: the web installer
   // streams it over PUT into the FIRMWARE THAT IS ALREADY RUNNING. gRegionArt was
@@ -1051,6 +1061,13 @@ void loop() {
   if (pet.wishGrantedFlash) { pet.wishGrantedFlash = false; sfxPlay(SFX_MEDAL); fpShowToast(S_WISH_DONE, UI_BAR_OK); }
   if (pet.jobDoneFlash) { pet.jobDoneFlash = false; sfxPlay(SFX_MEDAL); fpShowToast(S_JOB_DONE, UI_BAR_OK); }
   if (pet.questDoneFlash) { pet.questDoneFlash = false; photoPending = true; sfxPlay(SFX_VICTORY); fpShowToast(S_QUEST_DONE, UI_BAR_OK); }
+  if (pet.walkPrizeGain && !screenOff && uiCurrentScreen() == SCR_MAIN) {   // waits to be seen
+    sfxPlay(SFX_MEDAL);
+    fpShowToast(S_WALK_PRIZE_FMT, UI_BAR_OK);
+    fpToastNum = (int16_t)pet.walkPrizeGain;
+    pet.walkPrizeGain = 0;
+  }
+  if (pet.needBeepDue(now)) sfxPlay(SFX_NEED);
   // a trophy reached is announced on the main screen; homework ends on time
   static uint32_t lastTrophyCheck = 0;
   if (now - lastTrophyCheck > 5000 && uiCurrentScreen() == SCR_MAIN && !screenOff) {
@@ -1611,6 +1628,7 @@ void handleTouch() {
     if (screenOff) pet.setScreenOff(false);        // waking the screen wakes it
     screenOff = false;
     lastInteract = millis();
+    lastTouchAt = lastInteract;
   } else if (pressed) {  // still pressed
     tXl = x;
     tYl = y;
@@ -10044,6 +10062,10 @@ static void gymStageText(int8_t i, char *b, size_t n) {
   else snprintf(b, n, "%s", T(S_GYM_CHAMPION));
 }
 
+#define STP_TOTAL_Y 281
+#define STP_PRIZE_Y 296
+static_assert(STP_PRIZE_Y <= 300, "the steps panel ends at PANEL_Y + 300");
+
 void renderSteps() {
   drawPanelBase();
   uiTextFit(UIF_MID, CX, PANEL_Y + 34, T(S_STEPS_TITLE), UI_INK, 1, PANEL_W - 80);
@@ -10103,7 +10125,11 @@ void renderSteps() {
   drawPmBar(L + 150, PANEL_Y + 257, W - 150, 10, pet.advSteps, an, C565(0x4f, 0x93, 0xc4));
   // everything ever walked
   snprintf(b, sizeof(b), T(S_STEPS_TOTAL_FMT), (unsigned)pet.stepTotal);
-  uiTextFit(UIF_TINY, CX, PANEL_Y + 290, b, UI_INK, 1, W);
+  uiTextFit(UIF_TINY, CX, PANEL_Y + STP_TOTAL_Y, b, UI_INK, 1, W);
+  if (uint32_t nextAt = Pet::walkPrizeAt(pet.walkPrize)) {   // phase 40: the next prize
+    snprintf(b, sizeof(b), T(S_STEPS_PRIZE_FMT), (unsigned)nextAt);
+    uiTextFit(UIF_TINY, CX, PANEL_Y + STP_PRIZE_Y, b, UI_TRACK_TEXT, 1, W);
+  }
   drawFpToast();
   gfx->flush();
 }
@@ -12861,6 +12887,7 @@ void alarmTick() {
   } else if (pet.bedReminderDue()) {
     pet.bedReminded();
     wakeScreenForAlarm(now);
+    lastTouchAt = now;                   // asked for by a parent: it sounds at night
     sfxPlay(SFX_HEART);
     talkMsg = S_BED_REMINDER;
     talkUntil = now + 8000;
