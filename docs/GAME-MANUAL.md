@@ -241,6 +241,14 @@ in December-February). Only the sky changes.
   10/20/30 games a day. Tap a row to change it. It is not locked: it is a
   reminder for the family, not a security feature.
 
+### Walking rewards (phase 43)
+Three goals a day care for the Pokemon, each paid once and marked on the bar in the
+steps panel: **2 500 steps** a snack (+15 food, +10 joy), **5 000** a great walk (+20
+joy, +10 energy, +3 bond), **10 000** a training reward with +30 joy and +5 bond.
+All the steps ever walked earn a **rank**, shown beside the total: Beginner, Stroller
+(5 000), Walker (10 000), Hiker (25 000), Trekker (50 000), Route Guide (100 000),
+Globetrotter (250 000), Trail Ace (500 000) and Legend (1 000 000).
+
 ### Out and about (phase 10)
 The map is a grid of eight places now.
 - **Adventure**: steps walked with the ball move it along a route of five stops

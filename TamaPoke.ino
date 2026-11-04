@@ -44,7 +44,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.44"
+#define FW_VERSION "3.14-funpack.45"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -1076,8 +1076,19 @@ void loop() {
   if (pet.walkPrizeGain && !screenOff && uiCurrentScreen() == SCR_MAIN) {   // waits to be seen
     sfxPlay(SFX_MEDAL);
     fpShowToast(S_WALK_PRIZE_FMT, UI_BAR_OK);
-    fpToastNum = (int16_t)pet.walkPrizeGain;
+    snprintf(fpToastText, sizeof(fpToastText), T(S_WALK_PRIZE_FMT), walkRankName(pet.walkRank()), (unsigned)pet.walkPrizeGain);
     pet.walkPrizeGain = 0;
+  }
+  pet.claimStepGoals();   // one held back by an egg or a ceremony pays once it is over
+  if (pet.stepGoalNew && !screenOff && uiCurrentScreen() == SCR_MAIN && !timeOn(now, fpToastUntil)) {
+    static const StrId GOAL_TOAST[STEP_GOALS] = { S_GOAL_SNACK, S_GOAL_WALK, S_GOAL_STRONG };
+    for (uint8_t i = 0; i < STEP_GOALS; i++) {   // one at a time, smallest first
+      if (!(pet.stepGoalNew & (1 << i))) continue;
+      pet.stepGoalNew &= ~(1 << i);
+      sfxPlay(i == STEP_GOALS - 1 ? SFX_MEDAL : SFX_HEART);
+      fpShowToast(GOAL_TOAST[i], UI_BAR_OK);
+      break;
+    }
   }
   if (pet.needBeepDue(now)) sfxPlay(SFX_NEED);
   // a trophy reached is announced on the main screen; homework ends on time
@@ -1574,7 +1585,7 @@ void handleSerial() {
     { char dg[96]; wifiDiag(dg, sizeof(dg)); Serial.printf("wifidiag %s\n", dg); }
     Serial.printf("tickets=%u today=%u golds=%u\n", pet.tickets, pet.ticketsToday, pet.goldBadges());
     Serial.printf("imu fifo=%d dropped=%lu clockjumps=%lu\n", imuFifoOn(), (unsigned long)imuDroppedCount(), (unsigned long)gClockJumps);
-    Serial.printf("steps=%lu hist=%u,%u,%u,%u,%u,%u,%u total=%lu adv=%u/%u\n", (unsigned long)pet.stepsToday(), pet.stepsDaysAgo(0), pet.stepsDaysAgo(1), pet.stepsDaysAgo(2), pet.stepsDaysAgo(3), pet.stepsDaysAgo(4), pet.stepsDaysAgo(5), pet.stepsDaysAgo(6), (unsigned long)pet.stepTotal, (unsigned)pet.advSteps, (unsigned)Pet::advNeed(pet.advStop));
+    Serial.printf("steps=%lu hist=%u,%u,%u,%u,%u,%u,%u total=%lu adv=%u/%u goals=%u rank=%u\n", (unsigned long)pet.stepsToday(), pet.stepsDaysAgo(0), pet.stepsDaysAgo(1), pet.stepsDaysAgo(2), pet.stepsDaysAgo(3), pet.stepsDaysAgo(4), pet.stepsDaysAgo(5), pet.stepsDaysAgo(6), (unsigned long)pet.stepTotal, (unsigned)pet.advSteps, (unsigned)Pet::advNeed(pet.advStop), (unsigned)pet.stepGoalsDone, (unsigned)pet.walkRank());
     { int8_t gi = pet.gymChallengeIdx(); Serial.printf("gym=%u/%u next=%d region=%u ready=%d\n", pet.gymSteps, gi >= 0 ? Pet::gymStepsNeed((uint8_t)gi) : 0, gi, pet.gymChallengeRegion(), pet.gymChallengeReady()); }
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
                   (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
@@ -9163,6 +9174,11 @@ static StrId fpTitle(uint8_t g) {
 // ---------- toasts: sick, medicine ----------
 
 // Takes a plain integer: the generated prototypes sit above the #includes.
+const char *walkRankName(uint8_t r) {
+  static const StrId N[WALK_RANKS] = { S_RANK_0, S_RANK_1, S_RANK_2, S_RANK_3, S_RANK_4, S_RANK_5, S_RANK_6, S_RANK_7, S_RANK_8 };
+  return T(N[r < WALK_RANKS ? r : WALK_RANKS - 1]);
+}
+
 void fpShowToast(uint16_t s, uint16_t color) {
   fpToast = (StrId)s;
   fpToastNum = -1;
@@ -10139,6 +10155,11 @@ void renderSteps() {
   snprintf(b, sizeof(b), "%lu", (unsigned long)today);
   uiText(UIF_MID, L + W, PANEL_Y + 66, b, UI_INK, 2);
   drawPmBar(L, PANEL_Y + 72, W, 8, today, STEP_GOAL, today >= STEP_GOAL ? UI_BAR_WARN : UI_BAR_OK);
+  for (uint8_t g = 0; g < STEP_GOALS; g++) {      // the day's 3 goals along the bar: gold once reached
+    int mx = L + (int)((uint32_t)W * Pet::stepGoalAt(g) / STEP_GOAL);
+    gfx->fillCircle(mx, PANEL_Y + 76, 6, today >= Pet::stepGoalAt(g) ? C565(0xff, 0xcb, 0x05) : UI_WHITE);
+    gfx->drawCircle(mx, PANEL_Y + 76, 6, UI_INK);
+  }
   // the last 7 days: today on the right
   uiText(UIF_TINY, L, PANEL_Y + 98, T(S_STEPS_WEEK), UI_TRACK_TEXT, 0);
   uint16_t top = 1000;
@@ -10186,7 +10207,11 @@ void renderSteps() {
   uint16_t an = Pet::advNeed(pet.advStop);
   drawPmBar(L + 150, PANEL_Y + 257, W - 150, 10, pet.advSteps, an, C565(0x4f, 0x93, 0xc4));
   // everything ever walked
-  snprintf(b, sizeof(b), T(S_STEPS_TOTAL_FMT), (unsigned)pet.stepTotal);
+  {
+    char t[32];
+    snprintf(t, sizeof(t), T(S_STEPS_TOTAL_FMT), (unsigned)pet.stepTotal);
+    snprintf(b, sizeof(b), "%s - %s", t, walkRankName(pet.walkRank()));
+  }
   uiTextFit(UIF_TINY, CX, PANEL_Y + STP_TOTAL_Y, b, UI_INK, 1, W);
   if (uint32_t nextAt = Pet::walkPrizeAt(pet.walkPrize)) {   // phase 40: the next prize
     snprintf(b, sizeof(b), T(S_STEPS_PRIZE_FMT), (unsigned)nextAt);

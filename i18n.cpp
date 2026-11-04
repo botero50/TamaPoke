@@ -137,7 +137,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Reto en %u dias", "Reto manana",
     // phase 40
-    "Buena caminata! +%u monedas", "Premio a los %u pasos", },
+    "%s! +%u monedas", "Premio a los %u pasos",
+    // phase 43
+    "2500 pasos! Un bocadillo", "5000 pasos! Gran paseo", "10000 pasos! Mas fuerte", "Aprendiz", "Paseante", "Caminante", "Excursionista", "Senderista", "Guia de ruta", "Trotamundos", "As del camino", "Leyenda", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -269,7 +271,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Challenge in %u days", "Challenge tomorrow",
     // phase 40
-    "Great walking! +%u coins", "Next prize at %u steps", },
+    "%s! +%u coins", "Next prize at %u steps",
+    // phase 43
+    "2500 steps! A snack", "5000 steps! A great walk", "10000 steps! Stronger", "Beginner", "Stroller", "Walker", "Hiker", "Trekker", "Route Guide", "Globetrotter", "Trail Ace", "Legend", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -400,7 +404,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Defi dans %u jours", "Defi demain",
     // phase 40
-    "Belle marche ! +%u pieces", "Prix suivant a %u pas", },
+    "%s ! +%u pieces", "Prix suivant a %u pas",
+    // phase 43
+    "2500 pas ! Un en-cas", "5000 pas ! Belle balade", "10000 pas ! Plus fort", "Novice", "Promeneur", "Marcheur", "Randonneur", "Trekkeur", "Guide", "Globe-trotteur", "As du sentier", "Legende", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -531,7 +537,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Duell in %u Tagen", "Duell morgen",
     // phase 40
-    "Toll gelaufen! +%u Muenzen", "Preis bei %u Schritten", },
+    "%s! +%u Muenzen", "Preis bei %u Schritten",
+    // phase 43
+    "2500 Schritte! Ein Snack", "5000 Schritte! Tolle Runde", "10000 Schritte! Staerker", "Neuling", "Bummler", "Geher", "Wanderer", "Trekker", "Routenguide", "Weltenbummler", "Pfad-Ass", "Legende", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -662,7 +670,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Sfida tra %u giorni", "Sfida domani",
     // phase 40
-    "Bella camminata! +%u monete", "Premio a %u passi", },
+    "%s! +%u monete", "Premio a %u passi",
+    // phase 43
+    "2500 passi! Uno spuntino", "5000 passi! Bella passeggiata", "10000 passi! Piu forte", "Principiante", "Passeggiatore", "Camminatore", "Escursionista", "Trekker", "Guida", "Giramondo", "Asso dei sentieri", "Leggenda", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -793,7 +803,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "Desafio em %u dias", "Desafio amanha",
     // phase 40
-    "Boa caminhada! +%u moedas", "Premio aos %u passos", },
+    "%s! +%u moedas", "Premio aos %u passos",
+    // phase 43
+    "2500 passos! Um lanche", "5000 passos! Belo passeio", "10000 passos! Mais forte", "Aprendiz", "Passeante", "Caminhante", "Excursionista", "Trilheiro", "Guia de rota", "Globetrotter", "As da trilha", "Lenda", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -926,7 +938,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "%u天后挑战", "明天挑战",
     // phase 40
-    "走得真棒! +%u 金币", "%u 步有奖励", },
+    "%s! +%u 金币", "%u 步有奖励",
+    // phase 43
+    "2500 步! 吃点心", "5000 步! 走得真棒", "10000 步! 变强了", "新手", "散步者", "步行者", "远足者", "徒步者", "领路人", "环球旅人", "步道高手", "传奇", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -1058,7 +1072,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 36
     "%u일 후 도전", "내일 도전",
     // phase 40
-    "잘 걸었어! +%u 코인", "%u 걸음에 보상", },
+    "%s! +%u 코인", "%u 걸음에 보상",
+    // phase 43
+    "2500 걸음! 간식 시간", "5000 걸음! 멋진 산책", "10000 걸음! 더 강해졌어", "초보", "산책가", "걷기꾼", "등산가", "트레커", "길잡이", "세계 여행자", "길의 고수", "전설", },
 };
 
 // Medal names in their three lengths [language][medal].

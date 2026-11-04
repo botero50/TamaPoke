@@ -606,6 +606,7 @@ void Pet::addSteps(uint32_t n) {
   if (d > stepDay || !stepDay) {                // a new day (never a step back: a clock glitch keeps today)
     stepDay = d;
     stepCount = 0;
+    stepGoalsDone = 0;                          // a new day: all three can pay again
     pendingSave = true;
   }
   stepHistRoll(d);
@@ -643,6 +644,47 @@ void Pet::addSteps(uint32_t n) {
   noteMission(MIS_STEPS, 0);
   noteMission(MIS_STEPS_BIG, 0);
   if (stepsToday() >= QUEST_WALK_STEPS) questNote(QK_STEPS);
+  claimStepGoals();
+}
+
+uint32_t Pet::stepGoalAt(uint8_t i) {
+  static const uint32_t AT[STEP_GOALS] = { 2500, 5000, STEP_GOAL };
+  return i < STEP_GOALS ? AT[i] : 0;
+}
+
+void Pet::claimStepGoals() {
+  if (isEgg() || awaitingStarter() || ceremony != CER_NONE) return;
+  uint32_t walked = stepsToday();
+  bool paid = false;
+  for (uint8_t i = 0; i < STEP_GOALS; i++) {
+    if ((stepGoalsDone & (1 << i)) || walked < stepGoalAt(i)) continue;
+    stepGoalsDone |= 1 << i;
+    stepGoalNew |= 1 << i;
+    paid = true;
+    if (i == 0) {                               // a snack
+      fullness = clamp100((int)fullness + 15);
+      joy = clamp100((int)joy + 10);
+    } else if (i == 1) {                        // a great walk
+      joy = clamp100((int)joy + 20);
+      energy = clamp100((int)energy + 10);
+      addBond(3);
+    } else {                                    // the day's goal
+      uint8_t which;
+      rewardTraining(3, which);                 // holds to the training ceiling
+      joy = clamp100((int)joy + 30);
+      addBond(5);
+    }
+  }
+  if (paid) {
+    saveSteps();                                // at once: an unplug must not pay it twice
+    pendingSave = true;
+  }
+}
+
+uint8_t Pet::walkRankOf(uint32_t total) {
+  uint8_t r = 0;
+  while (r < WALK_PRIZES && total >= walkPrizeAt(r)) r++;
+  return r;
 }
 
 // Far less than save(): a pause too short to see, so it can run while walking.
@@ -655,6 +697,7 @@ void Pet::saveSteps() {
   prefs.putUInt("stpT", stepTotal);
   prefs.putUShort("gymS", gymSteps);
   prefs.putUInt("advS", advSteps);
+  prefs.putUChar("stpc", stepGoalsDone);
 }
 
 uint32_t Pet::walkPrizeAt(uint8_t i) {
@@ -3104,6 +3147,7 @@ void Pet::save() {
   prefs.putUInt("sthd", stepHistDay);
   prefs.putUInt("stpT", stepTotal);
   prefs.putUChar("stpM", walkPrize);
+  prefs.putUChar("stpc", stepGoalsDone);
   prefs.putUInt("sday", stepDay);
   prefs.putUChar("bond", bond);
   prefs.putUShort("medal", medals);
@@ -3305,6 +3349,7 @@ void Pet::load() {
   stepHistDay = prefs.getUInt("sthd", 0);
   stepTotal = prefs.getUInt("stpT", 0);
   walkPrize = prefs.getUChar("stpM", 0);
+  stepGoalsDone = prefs.getUChar("stpc", 0);
   stepDay = prefs.getUInt("sday", 0);
   bond = prefs.getUChar("bond", 0);
   medals = prefs.getUShort("medal", 0);

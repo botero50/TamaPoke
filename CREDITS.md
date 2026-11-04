@@ -26,6 +26,8 @@ Phase 41 reuses code: the gym arenas (`tools/gen_arenas.py` and the `ARENA_OF_TY
 
 Phase 42 adapts more work under the same MIT licence. The verified backup before installing follows [eperdeme](https://github.com/eperdeme/TamaPoke). The LAN keepalive and the installer's version and Pokédex count come from crenberries428. From the [original repository](https://github.com/socquique/TamaPoke), with its thanks to ajtudela: the wrap-safe timers, rejecting zero-length sprite frames, checking `thumbs.bin`, the harder `PUT`, resumed uploads, the pinned installer library and filtering touches outside a grid.
 
+Phase 43's three daily step goals are adapted from crenberries428 (MIT). Lifetime ranks are [ShadowEnemyx](https://github.com/ShadowEnemyx/TamaPoke)'s idea, with our own names and code.
+
 
 TamaPoke is a **non-commercial, personal-use** project. It does not sell or
 commercially redistribute any copyrighted material. Pokémon and all related

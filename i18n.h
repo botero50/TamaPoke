@@ -226,6 +226,8 @@ enum StrId : uint16_t {
   S_GYM_WAIT_SHORT_FMT, S_GYM_WAIT_SHORT_1,
   // phase 40: the walking prizes
   S_WALK_PRIZE_FMT, S_STEPS_PRIZE_FMT,
+  // phase 43: daily step goals and lifetime ranks
+  S_GOAL_SNACK, S_GOAL_WALK, S_GOAL_STRONG, S_RANK_0, S_RANK_1, S_RANK_2, S_RANK_3, S_RANK_4, S_RANK_5, S_RANK_6, S_RANK_7, S_RANK_8,
   STR_COUNT
 };
 

@@ -282,6 +282,8 @@ enum QuestKind : uint8_t { QK_PARK = 0, QK_BEACH, QK_READ, QK_FISH, QK_COOK, QK_
 #define NEED_BEEP_MAX 6
 #define NEED_BEEP_MS 300000UL
 #define WALK_PRIZES 8
+#define WALK_RANKS (WALK_PRIZES + 1)
+#define STEP_GOALS 3
 #define QUEST_WALK_STEPS 3000    // the "long walk" step
 #define GYM_STEPS_BASE 10000     // phase 36: steps to the first leader ...
 #define GYM_STEPS_PER 2000       // ... and this much more for each one after
@@ -1184,6 +1186,16 @@ public:
   uint16_t walkPrizeGain = 0;                 // coins waiting to be announced
   static uint32_t walkPrizeAt(uint8_t i);     // 0 past the last one
   static uint16_t walkPrizeCoins(uint8_t i);
+  // A rank for all those steps (phase 43): one more for each prize reached, so it
+  // comes from the total and needs no saving of its own.
+  static uint8_t walkRankOf(uint32_t total);
+  uint8_t walkRank() const { return walkRankOf(stepTotal); }
+  // Three goals a day that care for the Pokemon (phase 43). stepGoalsDone holds one
+  // bit per goal paid and belongs to stepDay; stepGoalNew holds those not yet shown.
+  uint8_t stepGoalsDone = 0;
+  uint8_t stepGoalNew = 0;
+  static uint32_t stepGoalAt(uint8_t i);      // 0 past the last one
+  void claimStepGoals();                      // pays any reached, unless an egg or ceremony is waiting
   // Sounds it makes by itself stay silent from 21:00 to 07:00 (phase 40).
   static bool isQuietAt(uint32_t epoch);
   bool quietHours() const { return lastSeenEpoch && isQuietAt(lastSeenEpoch); }
