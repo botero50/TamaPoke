@@ -2316,6 +2316,24 @@ static const char* const SPR_BALL_ULTRA[16] = {  // 16x16
   "................",
 };
 static const char* const* const SPR_BALLS[3] = { SPR_BALL_POKE, SPR_BALL_GREAT, SPR_BALL_ULTRA };
+static const char* const SPR_PLACE_TRIP[16] = {  // 16x16
+  "................",
+  ".....kkkkkk.....",
+  "....kkOOOOkk....",
+  "....k......k....",
+  "...kkkkkkkkkk...",
+  "..krrrrrrrrrrk..",
+  "..krrrrrrrrrrk..",
+  "..kRRRRkkRRRRk..",
+  "..krrrrkkrrrrk..",
+  "..krrrrrrrrrrk..",
+  "..krkkkkkkkkrk..",
+  "..krkrrrrrrkrk..",
+  "..krkrrrrrrkrk..",
+  "..kRkkkkkkkkRk..",
+  "...kkkkkkkkkk...",
+  "................",
+};
 static const char* const SPR_PLACE_SPROUT[16] = {  // 16x16
   "................",
   "................",

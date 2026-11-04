@@ -249,6 +249,14 @@ All the steps ever walked earn a **rank**, shown beside the total: Beginner, Str
 (5 000), Walker (10 000), Hiker (25 000), Trekker (50 000), Route Guide (100 000),
 Globetrotter (250 000), Trail Ace (500 000) and Legend (1 000 000).
 
+### The Pokemon trip (phase 45)
+The **Trip** tile, on page 3 of the map, sends it off alone, twice a day, for 30 to 60
+minutes. Its needs pause, as they do for a job, and a sign shows when it will be back. It
+comes home with a story and something it found: 5-10 coins, a Poke Ball, a friend (+10 joy
+and +3 bond), a cookie, a seed, a soap, an extra wild encounter or a Great Ball, plus +5 joy
+every time. **Call back** on the sign brings it home at once, with no story, and that trip
+still counts. It can't leave from 20:00 until 07:00, or while asleep, sick or at work.
+
 ### Wild encounters (phase 44)
 The **Tall Grass** tile, on page 2 of the map, shows how many encounters are waiting:
 one free each day, plus one per 500 steps walked, holding up to 3 from steps. Tapping it

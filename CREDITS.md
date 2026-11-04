@@ -30,6 +30,8 @@ Phase 43's three daily step goals are adapted from crenberries428 (MIT). Lifetim
 
 Phase 44's wild encounters follow the formulas in [eperdeme](https://github.com/eperdeme/TamaPoke)'s fork, whose design comes from [nzlov](https://github.com/nzlov/TamaPoke)'s, both MIT. The catch and shiny bonus for walking is ShadowEnemyx's idea.
 
+Phase 45's Pokemon trip is the idea of [Spocky2024](https://github.com/Spocky2024/TamaPoke_MrsSpock), with our own stories and code.
+
 
 TamaPoke is a **non-commercial, personal-use** project. It does not sell or
 commercially redistribute any copyrighted material. Pokémon and all related

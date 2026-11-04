@@ -257,7 +257,8 @@ struct NurseryState {
   int16_t eggA, eggB;                   // whose egg it is (for the faces on it)
 };
 enum NurseryResult : uint8_t { NUR_OK = 0, NUR_BAD_PAIR, NUR_BUSY, NUR_TOO_SOON, NUR_NO_COINS };
-enum JobId : uint8_t { JOB_NONE = 0, JOB_CAFE, JOB_FLOWERS, JOB_POST, JOB_KINDS };
+enum JobId : uint8_t { JOB_NONE = 0, JOB_CAFE, JOB_FLOWERS, JOB_POST, JOB_KINDS,
+                       JOB_TRIP = JOB_KINDS };   // a trip is an absence too, but not on the board
 enum Ribbon : uint8_t { RIB_NONE = 0, RIB_BRONZE, RIB_SILVER, RIB_GOLD };
 
 // Wishes: now and then it asks for something; doing it grants the wish.
@@ -288,6 +289,10 @@ enum QuestKind : uint8_t { QK_PARK = 0, QK_BEACH, QK_READ, QK_FISH, QK_COOK, QK_
 #define WILD_CHARGES_MAX 3
 #define WILD_STARTER_BALLS 5
 #define BALL_STACK_MAX 99
+#define TRIPS_PER_DAY 2
+#define TRIP_MIN_SECS 1800UL
+#define TRIP_MAX_SECS 3600UL
+enum TripTale : uint8_t { TALE_NONE = 0, TALE_COINS, TALE_BALL, TALE_FRIEND, TALE_COOKIE, TALE_SEED, TALE_SOAP, TALE_GRASS, TALE_GREAT, TALE_KINDS };
 #define QUEST_WALK_STEPS 3000    // the "long walk" step
 #define GYM_STEPS_BASE 10000     // phase 36: steps to the first leader ...
 #define GYM_STEPS_PER 2000       // ... and this much more for each one after
@@ -716,6 +721,25 @@ public:
   bool jobDoneFlash = false;                   // the screen says it came back with its pay
   bool atWork() const { return jobKind != JOB_NONE && lastSeenEpoch < jobUntil; }
   bool startJob(uint8_t k);
+  // The Pokemon trip (phase 45): away on its own for 30 to 60 minutes, twice a day,
+  // and home with a story. Needs pause as they do for a job, because it is one.
+  uint8_t tripsToday = 0;
+  uint32_t tripDay = 0;                       // today() + 1 for tripsToday
+  uint8_t tripTale = 0;                       // the story waiting to be read, 0 for none
+  int16_t tripFriend = 0;                     // who it met, for TALE_FRIEND
+  uint8_t tripCoins = 0;                      // what it found, for TALE_COINS
+  bool tripBackFlash = false;                 // it has just come home: to announce
+  bool onTrip() const { return jobKind == JOB_TRIP && atWork(); }
+  uint8_t tripsLeft() const;
+  static bool tripTooLate(uint32_t epoch);    // from 20:00 until the morning
+  static uint8_t tripTaleForRoll(uint8_t roll);    // roll is 0..99
+  static uint32_t tripSecsForRoll(uint32_t roll);  // 30 to 60 minutes
+  static uint8_t tripCoinsForRoll(uint8_t roll);   // 5 to 10
+  bool tripBlocked() const;                   // egg, ceremony, asleep, sick or away
+  bool startTrip(uint32_t secsRoll);          // false if it cannot leave now
+  void callBackTrip();                        // home now: no story, and the trip still counts
+  void payTale(uint8_t tale, uint8_t coinRoll, uint32_t friendRoll);   // the reward, and the story to read
+  void readTale();                            // the story has been read
   bool jobDoneToday() const { return jobDay == today(); }
   uint32_t mailDay = 0;
   uint8_t mailKind = 0;                        // the letter waiting, 1..LETTER_KINDS

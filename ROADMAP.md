@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 4 November 2026, with Phase 44._
+_Last updated: 4 November 2026, with Phase 45._
 
 ## Done
 | Phase | What | Release |
@@ -33,6 +33,7 @@ _Last updated: 4 November 2026, with Phase 44._
 | 38 | Bigger page arrows (a near miss turns the page instead of closing the menu), the tasks bubble moved onto the glass, a Pokéball team button at the left edge, the bath as six tiles on one page; a README with two GIFs and the new features | v1.23 |
 | 39 | A sturdier ball, from the fork review: the date never goes back after a power cut, safety copies of the save on the SD card to recover a save cut off midway, nothing drawn with the screen off, a sound task that cannot spin | v1.24 |
 | 40 | Steps that cannot be lost: a clock change never erases them, and they are saved every 20 steps. A warning beep when a need is very low, quiet nights from 21:00 to 07:00, and coins for lifetime steps | v1.25 |
+| 45 | The Pokemon trip: twice a day it can go off for 30 to 60 minutes with its needs paused, and comes home with one of 8 stories and a small reward. A Call back button brings it home early, with no story | v1.30 |
 | 44 | Wild encounters and catching: a Tall Grass tile on the map, one free encounter a day plus one per 500 steps, three kinds of ball in the shop and bag, and caught Pokemon join the team or box and fill the Pokedex | v1.29 |
 | 43 | Walking rewards: 2 500 steps a day give a snack, 5 000 joy, energy and bond, 10 000 a training reward, each once a day. A rank for lifetime steps, from Beginner to Legend, on the steps panel and in the prize toast | v1.28 |
 | 42 | Back up, then install: the installer checks each backup is complete before it shows Install. Sprite uploads resume after a cut. Fixes from the fork review: timers safe when `millis()` wraps after 49.7 days, damaged sprite and thumbnail files can't freeze or crash the game, a harder `PUT`, taps outside a grid, and a LAN battle no longer drops a slow player (both balls need this version) | v1.27 |
@@ -43,7 +44,6 @@ The order agreed from the fork review. Each phase still gets its own short plan.
 | Phase | What | Notes |
 |---|---|---|
 | 44b | Potions, training items and choosing which caught Pokemon to raise | Changes how saved Pokemon are stored, so its own phase and tests |
-| 45 | Pokémon trip: away 30-60 minutes, back with a story | Spocky2024 |
 | 46 | New games: number-merge, brick-breaker, a hidden Eevee runner | Check TamaDaci's licence first |
 | 47 | New training games | Replaces bag, speed and defence training, so compare first |
 | 48 | Jukebox | Prefer public-domain tunes; decide then |
@@ -61,7 +61,7 @@ Also open:
 |---|---|---|
 | **Friend visits and trading** | a second ball | "Not for now" (2 Nov). Would use the existing ESP-NOW battle link |
 | **Battery saver** | a battery fitted | The ball reports no battery now (`bat=-1`) |
-| **SD content packs** | only if space runs out | Firmware at 83%; revisit near 90% |
+| **SD content packs** | only if space runs out | Firmware at 84%; revisit near 90% |
 | **Translations review** | native speakers | FR, DE, IT, PT, ZH and KO were machine-written |
 
 ## Decisions on record

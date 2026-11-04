@@ -29,7 +29,7 @@ const SaveField SAVE_FIELDS[] = {
   { "badgX", SK_BYTES },{ "badhX", SK_BYTES },
   { "badh", SK_U16 },   { "dexreg", SK_BYTES }, { "dexsh", SK_BYTES },
   { "strk", SK_U16 },   { "bstrk", SK_U16 },  { "cday", SK_U32 },
-  { "stps", SK_U32 },   { "sday", SK_U32 },   { "sth7", SK_BYTES }, { "sthd", SK_U32 }, { "stpT", SK_U32 }, { "stpM", SK_U8 }, { "stpc", SK_U8 }, { "wbal", SK_BYTES }, { "wchg", SK_U8 }, { "wstp", SK_U16 }, { "wfre", SK_U32 }, { "wkit", SK_U8 },
+  { "stps", SK_U32 },   { "sday", SK_U32 },   { "sth7", SK_BYTES }, { "sthd", SK_U32 }, { "stpT", SK_U32 }, { "stpM", SK_U8 }, { "stpc", SK_U8 }, { "wbal", SK_BYTES }, { "wchg", SK_U8 }, { "wstp", SK_U16 }, { "wfre", SK_U32 }, { "wkit", SK_U8 }, { "tpn", SK_U8 }, { "tpd", SK_U32 }, { "tpt", SK_U8 }, { "tpf", SK_I16 }, { "tpc", SK_U8 },
   { "medal", SK_U16 },  { "tmedal", SK_U16 }, { "mstone", SK_U16 },
   { "ghi", SK_U16 },    { "shi", SK_U16 },    { "qhi", SK_U16 },
   // Fun Pack: the extra minigames' records and the statuses

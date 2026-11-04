@@ -207,6 +207,12 @@ void Pet::tick() {
     return;
   }
 
+  // A clock moved back must never keep it away: no trip is ever longer than this.
+  if (jobKind == JOB_TRIP && jobUntil > lastSeenEpoch + TRIP_MAX_SECS) jobUntil = lastSeenEpoch;
+  if (jobKind == JOB_TRIP && !atWork() && lastSeenEpoch) {   // home from a trip, with a story
+    jobKind = JOB_NONE;
+    payTale(tripTaleForRoll((uint8_t)random(100)), (uint8_t)random(6), (uint32_t)random(100000));
+  }
   if (jobKind && !atWork() && lastSeenEpoch) {    // home from work, with its pay
     jobKind = JOB_NONE;
     earnCoins(JOB_COINS, false);
@@ -696,7 +702,7 @@ uint32_t Pet::stepGoalAt(uint8_t i) {
 }
 
 void Pet::claimStepGoals() {
-  if (isEgg() || awaitingStarter() || ceremony != CER_NONE) return;
+  if (isEgg() || awaitingStarter() || ceremony != CER_NONE || atWork()) return;   // waits until it is home
   uint32_t walked = stepsToday();
   bool paid = false;
   for (uint8_t i = 0; i < STEP_GOALS; i++) {
@@ -762,7 +768,7 @@ bool Pet::isQuietAt(uint32_t epoch) {
 
 bool Pet::needBeepDue(uint32_t nowMs) {
   if (lowestStat() > NEED_BEEP_AT) { needBeeps = 0; return false; }   // cared for: it may warn again
-  if (isEgg() || sleeping || frozen || ceremony != CER_NONE || quietHours()) return false;
+  if (isEgg() || sleeping || frozen || ceremony != CER_NONE || quietHours() || atWork()) return false;
   if (needBeeps >= NEED_BEEP_MAX) return false;
   if (needBeeps && nowMs - needBeepMs < NEED_BEEP_MS) return false;
   needBeeps++;
@@ -2394,6 +2400,109 @@ Ribbon Pet::enterContest(uint8_t score) {
   return r;
 }
 
+// ---------- the Pokemon trip ----------
+
+uint8_t Pet::tripsLeft() const {
+  uint8_t used = tripDay == today() + 1 ? tripsToday : 0;
+  return used >= TRIPS_PER_DAY ? 0 : (uint8_t)(TRIPS_PER_DAY - used);
+}
+
+bool Pet::tripTooLate(uint32_t epoch) {
+  int h = (int)((epoch / 3600) % 24);
+  return h >= 20 || h < 7;
+}
+
+uint8_t Pet::tripTaleForRoll(uint8_t roll) {
+  if (roll < 25) return TALE_COINS;    // 25%
+  if (roll < 40) return TALE_BALL;     // 15%
+  if (roll < 60) return TALE_FRIEND;   // 20%
+  if (roll < 70) return TALE_COOKIE;   // 10%
+  if (roll < 80) return TALE_SEED;     // 10%
+  if (roll < 85) return TALE_SOAP;     //  5%
+  if (roll < 95) return TALE_GRASS;    // 10%
+  return TALE_GREAT;                   //  5%
+}
+
+uint32_t Pet::tripSecsForRoll(uint32_t roll) {
+  return TRIP_MIN_SECS + roll % (TRIP_MAX_SECS - TRIP_MIN_SECS + 1);
+}
+
+uint8_t Pet::tripCoinsForRoll(uint8_t roll) { return (uint8_t)(5 + roll % 6); }
+
+bool Pet::tripBlocked() const {
+  return isEgg() || awaitingStarter() || ceremony != CER_NONE || sleeping || isSick() || atWork();
+}
+
+bool Pet::startTrip(uint32_t secsRoll) {
+  if (tripBlocked() || !tripsLeft() || tripTooLate(lastSeenEpoch)) return false;
+  if (tripDay != today() + 1) { tripDay = today() + 1; tripsToday = 0; }
+  tripsToday++;
+  jobKind = JOB_TRIP;
+  jobUntil = lastSeenEpoch + tripSecsForRoll(secsRoll);
+  save();
+  return true;
+}
+
+void Pet::callBackTrip() {
+  if (jobKind != JOB_TRIP) return;
+  jobKind = JOB_NONE;
+  jobUntil = 0;
+  save();
+}
+
+static bool tripFriendOk(int16_t d) { return regionAvailable(regionOfDex(d)); }
+
+void Pet::payTale(uint8_t tale, uint8_t coinRoll, uint32_t friendRoll) {
+  joy = clamp100((int)joy + 5);                 // every trip does it good
+  tripCoins = 0;
+  tripFriend = 0;
+  switch (tale) {
+    case TALE_COINS:
+      tripCoins = tripCoinsForRoll(coinRoll);
+      earnCoins(tripCoins, false);
+      break;
+    case TALE_BALL:
+      if (wildBalls[0] < BALL_STACK_MAX) wildBalls[0]++;
+      break;
+    case TALE_FRIEND: {
+      uint16_t lo = 1, hi = DEX_COUNT;
+      if (region < REGION_COUNT && region != REGION_ALL) { lo = REGIONS[region].lo; hi = REGIONS[region].hi; }
+      tripFriend = wildPickSpecies(lo, hi, R_COMUN, friendRoll, tripFriendOk);
+      if (!tripFriend) tripFriend = speciesId;  // nobody about: it played with its reflection
+      joy = clamp100((int)joy + 10);
+      addBond(3);
+      break;
+    }
+    case TALE_COOKIE:
+      if (foodCount[FOOD_COOKIE] < FOOD_STACK_MAX) foodCount[FOOD_COOKIE]++;
+      break;
+    case TALE_SEED:
+      if (seedCount < FOOD_STACK_MAX) seedCount++;
+      break;
+    case TALE_SOAP:
+      if (soapCount < FOOD_STACK_MAX) soapCount++;
+      break;
+    case TALE_GRASS:
+      if (wildCharges < 255) wildCharges++;     // on top of the 3 that steps can hold
+      break;
+    case TALE_GREAT:
+      if (wildBalls[1] < BALL_STACK_MAX) wildBalls[1]++;
+      break;
+    default:
+      break;
+  }
+  tripTale = tale;
+  tripBackFlash = true;
+  save();                                       // the reward and its story together
+}
+
+void Pet::readTale() {
+  tripTale = 0;
+  tripFriend = 0;
+  tripCoins = 0;
+  save();
+}
+
 bool Pet::startJob(uint8_t k) {
   if (k == JOB_NONE || k >= JOB_KINDS || isEgg() || sleeping || isSick() || atWork() || jobDoneToday() || !lastSeenEpoch) return false;
   jobKind = k;
@@ -3198,6 +3307,11 @@ void Pet::save() {
   prefs.putUShort("wstp", wildStepBank);
   prefs.putUInt("wfre", wildFreeDay);
   prefs.putUChar("wkit", wildKit);
+  prefs.putUChar("tpn", tripsToday);
+  prefs.putUInt("tpd", tripDay);
+  prefs.putUChar("tpt", tripTale);
+  prefs.putShort("tpf", tripFriend);
+  prefs.putUChar("tpc", tripCoins);
   prefs.putUInt("sday", stepDay);
   prefs.putUChar("bond", bond);
   prefs.putUShort("medal", medals);
@@ -3406,6 +3520,12 @@ void Pet::load() {
   wildStepBank = prefs.getUShort("wstp", 0);
   wildFreeDay = prefs.getUInt("wfre", 0);
   wildKit = prefs.getUChar("wkit", 0);
+  tripsToday = prefs.getUChar("tpn", 0);
+  tripDay = prefs.getUInt("tpd", 0);
+  tripTale = prefs.getUChar("tpt", 0);
+  if (tripTale >= TALE_KINDS) tripTale = TALE_NONE;
+  tripFriend = prefs.getShort("tpf", 0);
+  tripCoins = prefs.getUChar("tpc", 0);
   if (!wildKit) {                               // everyone starts with a few balls, once
     wildKit = 1;
     wildBalls[0] = (uint8_t)(wildBalls[0] + WILD_STARTER_BALLS);
@@ -3597,7 +3717,8 @@ void Pet::load() {
   songsToday = prefs.getUChar("msn", 0);
   contestWeek = prefs.getUInt("ctw", 0);
   if (prefs.getBytesLength("rib") == sizeof(ribbons)) prefs.getBytes("rib", ribbons, sizeof(ribbons));
-  jobKind = prefs.getUChar("jbk", 0) % JOB_KINDS;
+  jobKind = prefs.getUChar("jbk", 0);
+  if (jobKind > JOB_TRIP) jobKind = JOB_NONE;
   jobUntil = prefs.getUInt("jbu", 0);
   jobDay = prefs.getUInt("jbd", 0);
   mailDay = prefs.getUInt("mld", 0);

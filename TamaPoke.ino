@@ -45,7 +45,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.46"
+#define FW_VERSION "3.14-funpack.47"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -250,7 +250,11 @@ bool photoPending = false;   // the next main-screen frame goes into the album
 bool albumOpen = false;      // browsing the photos
 uint8_t albumIdx = 0, albumShown = 255;   // the photo asked for, and the one in the buffer
 uint8_t albumDlg = 0;        // 0 none, 1 delete: this one / all / cancel, 2 "all but the favourites?"
-uint8_t mapPage = 0;         // the map has two pages of places
+uint8_t mapPage = 0;         // the map has three pages of places
+bool tripCallAsk = false;    // "call it back?" is showing over the sign
+#define TRIP_CALL_W 170
+#define TRIP_CALL_H 48
+#define TRIP_CALL_Y 266
 uint8_t arcadeView = 0;      // 1 the prize counter, 2 the weekly records (phase 26)
 uint8_t boardPage = 0;
 bool mailOpen = false;       // the letter of the day
@@ -1093,6 +1097,7 @@ void loop() {
       break;
     }
   }
+  if (pet.tripBackFlash && !screenOff && uiCurrentScreen() == SCR_MAIN) { pet.tripBackFlash = false; sfxPlay(SFX_MEDAL); }
   if (pet.wildEarned && !pet.stepGoalNew && !screenOff && uiCurrentScreen() == SCR_MAIN && !timeOn(now, fpToastUntil)) {
     pet.wildEarned = false;
     sfxPlay(SFX_HEART);
@@ -1595,6 +1600,7 @@ void handleSerial() {
     Serial.printf("imu fifo=%d dropped=%lu clockjumps=%lu\n", imuFifoOn(), (unsigned long)imuDroppedCount(), (unsigned long)gClockJumps);
     Serial.printf("steps=%lu hist=%u,%u,%u,%u,%u,%u,%u total=%lu adv=%u/%u goals=%u rank=%u\n", (unsigned long)pet.stepsToday(), pet.stepsDaysAgo(0), pet.stepsDaysAgo(1), pet.stepsDaysAgo(2), pet.stepsDaysAgo(3), pet.stepsDaysAgo(4), pet.stepsDaysAgo(5), pet.stepsDaysAgo(6), (unsigned long)pet.stepTotal, (unsigned)pet.advSteps, (unsigned)Pet::advNeed(pet.advStop), (unsigned)pet.stepGoalsDone, (unsigned)pet.walkRank());
     Serial.printf("wild=%u balls=%u/%u/%u bank=%u\n", pet.wildCount(), pet.wildBalls[0], pet.wildBalls[1], pet.wildBalls[2], pet.wildStepBank);
+    Serial.printf("trip left=%u away=%d tale=%u\n", pet.tripsLeft(), pet.onTrip(), pet.tripTale);
     { int8_t gi = pet.gymChallengeIdx(); Serial.printf("gym=%u/%u next=%d region=%u ready=%d\n", pet.gymSteps, gi >= 0 ? Pet::gymStepsNeed((uint8_t)gi) : 0, gi, pet.gymChallengeRegion(), pet.gymChallengeReady()); }
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
                   (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
@@ -2159,6 +2165,17 @@ void onTap(int16_t x, int16_t y) {
   // mid-shower, a finger pops the bubbles
   if (bathUntil && !pet.awaitingStarter() && uiCurrentScreen() == SCR_MAIN && bathTap(x, y)) return;
   if (sweepUntil && uiCurrentScreen() == SCR_MAIN) return;   // the broom is busy
+  if (uiCurrentScreen() == SCR_MAIN && pet.tripTale) { sfxPlay(SFX_TAP); pet.readTale(); return; }   // the story, read
+  if (uiCurrentScreen() == SCR_MAIN && tripCallAsk) {
+    tripCallAsk = false;
+    if (x >= 118 && x <= 218 && y >= 252 && y <= 304) { sfxPlay(SFX_TAP); pet.callBackTrip(); }      // YES
+    return;                                                 // NO, or anywhere else: it stays away
+  }
+  if (uiCurrentScreen() == SCR_MAIN && pet.onTrip() && abs(x - CX) <= TRIP_CALL_W / 2 && y >= TRIP_CALL_Y && y <= TRIP_CALL_Y + TRIP_CALL_H) {
+    sfxPlay(SFX_TAP);
+    tripCallAsk = true;
+    return;
+  }
   if (uiCurrentScreen() == SCR_MAIN && !pet.awaitingStarter() && !pet.ceremony) {
     if (gymButtonHit(x, y)) { sfxPlay(SFX_TAP); gymCardOpen = true; return; }   // phase 34: the next leader is waiting
     if (gymDialHit(x, y) || stepPlateHit(x, y)) { sfxPlay(SFX_TAP); stepsOpen = true; return; }   // phase 35: how far
@@ -4542,6 +4559,10 @@ void render() {
     }
   }
 
+  if (tripCallAsk && !pet.onTrip()) tripCallAsk = false;   // it came home meanwhile
+  if (tripCallAsk) drawTripCallAsk();
+  if (pet.tripTale) drawTripTale();
+
   // "release?" dialog (long press on the creature)
   if (confirmUntil) {
     if (timeUp(millis(), confirmUntil)) {
@@ -6021,6 +6042,66 @@ bool startWildBattle() {
   btlWild = true;
   btlSay(T(S_WILD_APPEARS), btlFoe.name);
   return true;
+}
+
+// ---------- the Pokemon trip (phase 45) ----------
+
+static const char *tripPetName() {
+  return pet.nick[0] ? pet.nick : DEX_TBL[pet.speciesId].name;
+}
+
+// The Trip tile. Says why and starts nothing if it cannot leave.
+bool startTripFromMap() {
+  if (pet.isEgg() || pet.ceremony != CER_NONE || pet.awaitingStarter()) { sfxPlay(SFX_DENY); return false; }
+  if (pet.sleeping) { sfxPlay(SFX_DENY); fpShowToast(S_WILD_ASLEEP, UI_BAR_WARN); return false; }
+  if (fpBlockedBySick()) return false;
+  if (!pet.tripsLeft()) { sfxPlay(SFX_DENY); fpShowToast(S_TRIP_NONE_LEFT, UI_BAR_WARN); return false; }
+  if (Pet::tripTooLate(pet.lastSeenEpoch)) { sfxPlay(SFX_DENY); fpShowToast(S_TRIP_LATE, UI_BAR_WARN); return false; }
+  if (!pet.startTrip((uint32_t)random(100000))) { sfxPlay(SFX_DENY); return false; }
+  sfxPlay(SFX_HEART);
+  fpShowToast(S_TRIP_SET_OFF, UI_BAR_OK);
+  snprintf(fpToastText, sizeof(fpToastText), T(S_TRIP_SET_OFF), tripPetName());
+  return true;
+}
+
+void drawTripCallAsk() {
+  gfx->fillRoundRect(94, 168, 278, 152, 16, UI_WHITE);
+  gfx->drawRoundRect(94, 168, 278, 152, 16, UI_INK);
+  uiTextFit(UIF_SMALL, CX, 210, T(S_TRIP_CALL_Q), UI_INK, 1, 258);
+  gfx->fillRoundRect(118, 252, 100, 52, 12, UI_BAR_OK);
+  uiTextFit(UIF_SMALL, 118 + 50, 284, T(S_YES), UI_WHITE, 1, 92);
+  gfx->fillRoundRect(248, 252, 100, 52, 12, UI_BAR_BAD);
+  uiTextFit(UIF_SMALL, 248 + 50, 284, T(S_NO), UI_WHITE, 1, 92);
+}
+
+// The story it came home with. It stays until she taps it.
+void drawTripTale() {
+  static const StrId A[TALE_KINDS] = { S_TALE_COINS_A, S_TALE_COINS_A, S_TALE_BALL_A, S_TALE_FRIEND_A, S_TALE_COOKIE_A, S_TALE_SEED_A, S_TALE_SOAP_A, S_TALE_GRASS_A, S_TALE_GREAT_A };
+  static const StrId B[TALE_KINDS] = { S_TALE_COINS_B, S_TALE_COINS_B, S_TALE_BALL_B, S_TALE_FRIEND_B, S_TALE_COOKIE_B, S_TALE_SEED_B, S_TALE_SOAP_B, S_TALE_GRASS_B, S_TALE_GREAT_B };
+  uint8_t t = pet.tripTale < TALE_KINDS ? pet.tripTale : TALE_COINS;
+  gfx->fillRoundRect(63, 104, 340, 268, 18, UI_WHITE);
+  gfx->drawRoundRect(63, 104, 340, 268, 18, UI_INK);
+  uiTextFit(UIF_MID, CX, 142, T(S_TRIP_BACK), UI_INK, 1, 300);
+  const uint8_t *th = t == TALE_FRIEND && pet.tripFriend > 0 ? thumbs.get(pet.tripFriend) : nullptr;
+  if (th) drawThumb(th, CX - 40, 156, 2, false);
+  else {
+    const char *const *ic = t == TALE_BALL ? SPR_BALLS[0] : t == TALE_GREAT ? SPR_BALLS[1] : t == TALE_COOKIE ? SPR_FOODS[FOOD_COOKIE]
+                          : t == TALE_SEED ? SPR_PLACE_SEED : t == TALE_SOAP ? SPR_CARE_SOAP : t == TALE_GRASS ? SPR_PLACE_GRASS
+                          : t == TALE_FRIEND ? SPR_ICON_MISSION : SPR_ICON_COIN;
+    drawMap(ic, 16, CX - 32, 164, 4, false);
+  }
+  char line[64];
+  if (t == TALE_FRIEND) {
+    int16_t f = pet.tripFriend >= 1 && pet.tripFriend <= DEX_COUNT ? pet.tripFriend : pet.speciesId;
+    snprintf(line, sizeof(line), T(A[t]), tripPetName(), DEX_TBL[f].name);
+  } else {
+    snprintf(line, sizeof(line), T(A[t]), tripPetName());
+  }
+  uiTextFit(UIF_SMALL, CX, 262, line, UI_INK, 1, 306);
+  if (t == TALE_COINS) snprintf(line, sizeof(line), T(B[t]), (unsigned)pet.tripCoins);
+  else snprintf(line, sizeof(line), "%s", T(B[t]));
+  uiTextFit(UIF_SMALL, CX, 292, line, UI_INK, 1, 306);
+  uiText(UIF_TINY, CX, 340, "tap...", UI_TRACK_TEXT, 1);
 }
 
 // roll is 0..99: below the chance is a catch. Split out so the tests can choose it.
@@ -9087,7 +9168,7 @@ void drawHeartFloat(int hx, int hy) {
 }
 
 const char *statusMsg() {
-  if (pet.atWork()) return T(S_AT_WORK);
+  if (pet.atWork()) return T(pet.onTrip() ? S_ON_TRIP : S_AT_WORK);
   if (pet.evolving()) return T(S_EVOLVING);
   if (bathUntil) return "Splish splash!";  // universal onomatopoeia
   if (pet.sleeping) return pet.lightOn ? T(S_ST_LIGHT) : pet.isRestHour() ? T(S_ST_RESTING) : "";   // the Zs say the rest
@@ -9327,7 +9408,7 @@ void fpShowToast(uint16_t s, uint16_t color) {
 // THE single answer to "may it play/train/fight right now?", asked by every
 // entry point so the rule cannot be enforced in one and forgotten in its twin.
 bool fpBlockedBySick() {
-  if (pet.atWork()) { sfxPlay(SFX_DENY); fpShowToast(S_AT_WORK, UI_BAR_WARN); return true; }
+  if (pet.atWork()) { sfxPlay(SFX_DENY); fpShowToast(pet.onTrip() ? S_ON_TRIP : S_AT_WORK, UI_BAR_WARN); return true; }
   if (parentBlocksPlay()) return true;
   if (!pet.isSick()) return false;
   sfxPlay(SFX_DENY);
@@ -11494,7 +11575,7 @@ void drawBathDuck() {
 #define DEX_CHANSEY 113           // the nurse
 enum : uint8_t { PLACE_NONE = 0, PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_TEETH,
                  PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN,
-                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS };
+                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS, PLACE_TRIP };
 
 uint32_t placeAnimUntil = 0;      // the park walk animation
 // An action's animation (phase 28): what is playing, when it began, where, and in
@@ -11535,6 +11616,7 @@ void mapMenuTap(int16_t x, int16_t y) {
   sfxPlay(SFX_TAP);
   mapOpen = false;
   if (pl == PLACE_GRASS) { startWildBattle(); return; }
+  if (pl == PLACE_TRIP) { startTripFromMap(); return; }
   if (pl == PLACE_ARCADE) { if (!fpBlockedBySick()) trainOpen = true; return; }   // the arcade is the games menu
   schoolReset();
   enterPlaceFamily();
@@ -12607,48 +12689,53 @@ static int tileHit(int16_t x, int16_t y, int n, bool hub) {
   return -1;
 }
 
-static const uint8_t MAP_PLACE[2][MAP_TILES] = {
+#define MAP_PAGES 3
+static const uint8_t MAP_PLACE[MAP_PAGES][MAP_TILES] = {
   { PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN },
   { PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS },
+  { PLACE_TRIP, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE },
 };
 
 void renderMapGrid() {
   drawMenuTitle(S_MAP_TITLE);
-  static const char *const *const ICON[2][MAP_TILES] = {
+  static const char *const *const ICON[MAP_PAGES][MAP_TILES] = {
     { SPR_PLACE_TREE, SPR_ICON_COIN, SPR_PLACE_CROSS, SPR_PLACE_SPROUT, SPR_ICON_MISSION, SPR_PLACE_FISH, SPR_PLACE_FLAG, SPR_PLACE_POT },
     { SPR_DEC_DUCK, SPR_ICON_DIARY, SPR_CARE_NOTE, SPR_ACC_MEDAL, SPR_CAT_ARCADE, SPR_FURN_CLOCK, SPR_PLACE_NURSERY, SPR_PLACE_GRASS },
+    { SPR_PLACE_TRIP },
   };
-  static const StrId NAME[2][MAP_TILES] = {
+  static const StrId NAME[MAP_PAGES][MAP_TILES] = {
     { S_PLACE_PARK, S_SHOP, S_CENTER_SHORT, S_PLACE_GARDEN, S_PLACE_SCHOOL, S_PLACE_LAKE, S_PLACE_ADVENTURE, S_PLACE_KITCHEN },
     { S_PLACE_BEACH, S_PLACE_LIBRARY, S_PLACE_MUSIC, S_PLACE_CONTEST, S_PLACE_ARCADE, S_PLACE_JOBS, S_PLACE_NURSERY, S_PLACE_GRASS },
+    { S_PLACE_TRIP },
   };
   uint16_t lit = lerp565(UI_BAR_OK, UI_WHITE, 4, 8);
-  uint8_t pg = mapPage % 2;
+  uint8_t pg = mapPage % MAP_PAGES;
   for (int i = 0; i < MAP_TILES; i++) {
     if (MAP_PLACE[pg][i] == PLACE_NONE) continue;
     bool hot = (pg == 0 && ((i == 3 && pet.gardenReady()) || (i == 6 && pet.advReady()))) || (pg == 1 && i == 6 && pet.nurseryReady());
     if (MAP_PLACE[pg][i] == PLACE_GRASS) hot = pet.wildCount() > 0;
+    if (MAP_PLACE[pg][i] == PLACE_TRIP) hot = pet.tripsLeft() > 0 && !pet.tripBlocked() && !Pet::tripTooLate(pet.lastSeenEpoch);
     drawTile(TILE_X(i % 2), MAP_TILE_Y(i / 2), ICON[pg][i], NAME[pg][i], hot ? lit : UI_BG_DAY);
-    if (MAP_PLACE[pg][i] == PLACE_GRASS && hot) {   // how many are waiting
+    if ((MAP_PLACE[pg][i] == PLACE_GRASS || MAP_PLACE[pg][i] == PLACE_TRIP) && hot) {   // how many are waiting
       int bx = TILE_X(i % 2) + TILE_W - 8, by = MAP_TILE_Y(i / 2) + 8;
       gfx->fillCircle(bx, by, 10, UI_BAR_BAD);
       char n[4];
-      snprintf(n, sizeof(n), "%u", (unsigned)pet.wildCount());
+      snprintf(n, sizeof(n), "%u", (unsigned)(MAP_PLACE[pg][i] == PLACE_TRIP ? pet.tripsLeft() : pet.wildCount()));
       uiText(UIF_TINY, bx, by + 5, n, UI_WHITE, 1);
     }
   }
-  drawPageNav(pg, 2);
+  drawPageNav(pg, MAP_PAGES);
   gfx->flush();
 }
 
 // -1 outside the panel (close), -2 inside on nothing, else the PLACE_*
 int mapGridHit(int16_t x, int16_t y) {
-  int nav = pageNavHit(x, y, 2);
-  if (nav) { mapPage = (uint8_t)((mapPage + 2 + nav) % 2); sfxPlay(SFX_TAP); return -2; }
+  int nav = pageNavHit(x, y, MAP_PAGES);
+  if (nav) { mapPage = (uint8_t)((mapPage + MAP_PAGES + nav) % MAP_PAGES); sfxPlay(SFX_TAP); return -2; }
   if (!inPanel(x, y)) return -1;
   int i = tileHit(x, y, MAP_TILES, false);
-  if (i < 0 || MAP_PLACE[mapPage % 2][i] == PLACE_NONE) return -2;
-  return MAP_PLACE[mapPage % 2][i];
+  if (i < 0 || MAP_PLACE[mapPage % MAP_PAGES][i] == PLACE_NONE) return -2;
+  return MAP_PLACE[mapPage % MAP_PAGES][i];
 }
 
 // the purse: SHOP, BAG, CHORES, PIGGY BANK, TROPHIES, DIARY, HOW TO EARN
@@ -14895,17 +14982,23 @@ void renderMail() {
 
 // ---------- away at work ----------
 
+static_assert(TRIP_CALL_H >= UI_TAP_MIN, "a finger has to fit");
 void drawAwaySign() {
-  static const StrId JOB[JOB_KINDS] = { S_AT_WORK, S_JOB_CAFE, S_JOB_FLOWERS, S_JOB_POST };
+  static const StrId JOB[JOB_KINDS + 1] = { S_AT_WORK, S_JOB_CAFE, S_JOB_FLOWERS, S_JOB_POST, S_ON_TRIP };
   int x = CX - 90, y = PET_GROUND - 120;
   gfx->fillRect(CX - 4, y + 70, 8, 50, C565(0x7e, 0x55, 0x30));          // a little signpost
   gfx->fillRoundRect(x, y, 180, 76, 10, C565(0xc8, 0x9a, 0x60));
   gfx->drawRoundRect(x, y, 180, 76, 10, UI_INK);
-  uiTextFit(UIF_SMALL, CX, y + 28, T(JOB[pet.jobKind % JOB_KINDS]), UI_INK, 1, 166);
+  uiTextFit(UIF_SMALL, CX, y + 28, T(JOB[pet.jobKind % (JOB_KINDS + 1)]), UI_INK, 1, 166);
   uint32_t back = pet.jobUntil;
   char b[32];
   snprintf(b, sizeof(b), T(S_BACK_AT_FMT), (unsigned)((back / 3600) % 24), (unsigned)((back / 60) % 60));
   uiTextFit(UIF_TINY, CX, y + 58, b, UI_INK, 1, 166);
+  if (pet.onTrip()) {                                      // she can always have it back
+    gfx->fillRoundRect(CX - TRIP_CALL_W / 2, TRIP_CALL_Y, TRIP_CALL_W, TRIP_CALL_H, 12, UI_WHITE);
+    gfx->drawRoundRect(CX - TRIP_CALL_W / 2, TRIP_CALL_Y, TRIP_CALL_W, TRIP_CALL_H, 12, UI_INK);
+    uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, TRIP_CALL_Y, TRIP_CALL_H), T(S_TRIP_CALL), UI_INK, 1, TRIP_CALL_W - 12);
+  }
 }
 
 // ===========================================================================
