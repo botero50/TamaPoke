@@ -24,6 +24,7 @@
 #include "linknow.h"
 #include "backs.h"
 #include "wild.h"
+#include "arcade.h"
 #include "badges.h"
 #include "avatars.h"
 #include "cjk.h"
@@ -45,7 +46,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.48"
+#define FW_VERSION "3.14-funpack.49"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -229,6 +230,7 @@ bool trainOpen = false;
 uint8_t fpMenuCat = 0;     // 0 = closed, else FP_CAT_* + 1: the open game list
 bool fpOpen = false;
 uint8_t fpGame = 0;
+extern uint32_t fpOverUntil;   // defined with the other game state further down
 StrId fpToast = S_TOO_SICK;
 int16_t fpToastNum = -1;      // >= 0: fpToast is a format with one %u
 char fpToastText[48] = "";    // set: shown instead of fpToast
@@ -263,6 +265,10 @@ bool mailOpen = false;       // the letter of the day
 uint8_t mailShown = 0;       // which letter is on screen
 float gAccX = 0, gAccY = 0, gAccZ = 1;  // the last accelerometer sample
 bool gAccFresh = false;
+MotionDetector gMotion;     // a swing (throw a ball) or a shake (play), read beside the step counter
+uint32_t gLastStepMs = 0;   // when the step counter last counted
+uint32_t aboutSecretUntil = 0;
+uint8_t gWalkRun = 0;       // steps in the current walking spell (a gap over 1.5 s starts a new one)
 bool shopOpen = false;
 bool bagOpen = false;
 bool hatAdjust = false;      // the hat-moving pad is up on the main screen
@@ -598,6 +604,8 @@ int8_t btlSwapWho = -1;        // 0 = your side, 1 = the foe's, -1 = nothing due
 #define BTL_ENTER_MS 420
 // battle menu: 0 = FIGHT/POKEMON, 1 = the moves, 2 = the switch list
 uint8_t btlMenu = 0;
+uint8_t btlSwingKind = 0;       // the ball that is waiting for a swing (menu 5)
+uint32_t btlSwingUntil = 0;
 #define BTL_LUNGE_MS 260
 #define BTL_HIT_MS 420
 #define BTL_MSG_MAX 12
@@ -983,11 +991,18 @@ void loop() {
   uint8_t na = imuReadBatch(acc, accMs, IMU_BATCH_MAX);   // phase 36: every sample since the last pass
   if (na) {
     uint32_t got = 0;
-    for (uint8_t i = 0; i < na; i++)                 // oldest first, each with the time it was read
+    for (uint8_t i = 0; i < na; i++) {               // oldest first, each with the time it was read
       got += stepper.feed(acc[i * 3], acc[i * 3 + 1], acc[i * 3 + 2], accMs[i]);
-    if (got) pet.addSteps(got);
+      gMotion.feed(acc[i * 3], acc[i * 3 + 1], acc[i * 3 + 2], accMs[i]);   // a swing or a shake, beside the step count
+    }
+    if (got) {
+      pet.addSteps(got);
+      gWalkRun = (gLastStepMs && now - gLastStepMs < 1500) ? (uint8_t)min(250, (int)gWalkRun + (int)got) : (uint8_t)min(250, (int)got);
+      gLastStepMs = now;
+    }
     gAccX = acc[(na - 1) * 3]; gAccY = acc[(na - 1) * 3 + 1]; gAccZ = acc[(na - 1) * 3 + 2];
     gAccFresh = true;                                // the tilt games read the last sample
+    if (gMotion.takeShake()) shakeToPlay(now);
   }
 
   // The link is pumped here rather than from the LAN screen, because it has to
@@ -1704,6 +1719,14 @@ void handleTouch() {
     }
     int dx = tXl - tX0, dy = tYl - tY0;
     uint32_t dt = millis() - tStart;
+    if (fpOpen && fpGame == MINI_MERGE && !fpOverUntil) {   // Merge: a swipe slides the board, a tap is for the X
+      if (!swallowGesture) {
+        if (abs(dx) >= 30 || abs(dy) >= 30) mergeSwipe(abs(dx) > abs(dy) ? (dx > 0 ? 1 : 0) : (dy > 0 ? 3 : 2));
+        else fpTap(tX0, tY0);
+      }
+      wasPressed = pressed;
+      return;
+    }
     if (!holdFired && !swallowGesture) {
       if (abs(dx) > 80 && abs(dy) < 70 && dt < 800) onSwipe(dx > 0 ? 1 : -1);
       else if (abs(dy) > 80 && abs(dx) < 70 && dt < 800) onSwipeV(dy > 0 ? 1 : -1);
@@ -5172,7 +5195,8 @@ void renderClock() {
     else if (ws == WIFI_ST_FAIL) snprintf(wl, sizeof(wl), "%s", T(S_WIFI_FAIL));
     else if (wifiLastSync()) snprintf(wl, sizeof(wl), "%s %02u:%02u", T(S_WIFI_OK), (unsigned)(wifiLastSync() / 3600 % 24), (unsigned)(wifiLastSync() / 60 % 60));
     else snprintf(wl, sizeof(wl), "Wi-Fi: %s", wifiNetwork());
-    uiTextFit(UIF_TINY, CX, 284, wl, UI_TRACK_TEXT, 1, 320);
+    if (timeOn(millis(), aboutSecretUntil)) uiTextFit(UIF_TINY, CX, 284, T(S_SECRET_FOUND), UI_BAR_OK, 1, 320);
+    else uiTextFit(UIF_TINY, CX, 284, wl, UI_TRACK_TEXT, 1, 320);
     bool ny = weatherNySnow();                     // the snow-from-New-York switch
     gfx->fillRoundRect(CX - 130, 294, 260, 28, 14, ny ? lerp565(UI_BAR_OK, UI_WHITE, 4, 8) : UI_WHITE);
     gfx->drawRoundRect(CX - 130, 294, 260, 28, 14, UI_INK);
@@ -5278,6 +5302,23 @@ void clockTap(int16_t x, int16_t y) {
   } else if (settingsPage == SET_PARENT) {
     parentPageTap(x, y);
   } else if (settingsPage == SET_ABOUT) {
+    if (y >= 236 && y <= 276 && x >= CX - 100 && x <= CX + 100) {   // five taps on the version wake the secret game
+      static uint8_t taps = 0;
+      static uint32_t lastTap = 0;
+      uint32_t nowT = millis();
+      taps = (taps && nowT - lastTap < 2500) ? taps + 1 : 1;
+      lastTap = nowT;
+      if (taps >= 5) {
+        taps = 0;
+        pet.secretRun = 1;
+        pet.saveNow();
+        aboutSecretUntil = nowT + 4000;
+        sfxPlay(SFX_MEDAL);
+      } else {
+        sfxPlay(SFX_TAP);
+      }
+      return;
+    }
     if (y >= 290 && y <= 326 && x >= CX - 130 && x <= CX + 130) { wifiSetNySnow(!weatherNySnow()); sfxPlay(SFX_TAP); }
   }
 }
@@ -6582,6 +6623,10 @@ void renderWin() {
 
 void renderBattle() {
   if (btlWinUntil) { renderWin(); return; }
+  if (btlMenu == 5) {                     // waiting for a swing: no ball is spent if it never comes
+    if (gMotion.takeSwing()) btlThrowWith(btlSwingKind, (uint8_t)random(100));
+    else if (timeUp(millis(), btlSwingUntil)) btlMenu = 4;
+  }
   btlEaseBars();
   gfx->fillScreen(RGB565_BLACK);
   drawBattleBack();
@@ -6661,6 +6706,15 @@ void renderBattle() {
       uiTextFit(UIF_TINY, x + 40, y + 19, T(BALL_NAME[i]), have ? UI_INK : 0x8410, 0, BTL_CELL_W - 46);
       uiText(UIF_TINY, x + 40, y + 37, c, have ? UI_INK : 0x8410, 0);
     }
+  } else if (btlMenu == 5) {             // the swing window
+    gfx->fillRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H * 2 + 14, 12, UI_WHITE);
+    gfx->drawRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H * 2 + 14, 12, UI_INK);
+    drawMap(SPR_BALLS[btlSwingKind < WILD_BALL_KINDS ? btlSwingKind : 0], 16, BTL_GRID_X + 18, BTL_GRID_Y + 12, 3, false);
+    uiTextFit(UIF_SMALL, BTL_GRID_X + 200, BTL_GRID_Y + 38, T(S_SWING_THROW), UI_INK, 1, 230);
+    uiTextFit(UIF_SMALL, BTL_GRID_X + 200, BTL_GRID_Y + 64, T(S_SWING_OR_TAP), UI_TRACK_TEXT, 1, 230);
+    uint32_t nowS = millis(), leftS = timeOn(nowS, btlSwingUntil) ? btlSwingUntil - nowS : 0;
+    gfx->fillRoundRect(BTL_GRID_X + 24, BTL_GRID_Y + 86, 280, 8, 4, UI_TRACK_TEXT);
+    if (leftS > 60) gfx->fillRoundRect(BTL_GRID_X + 24, BTL_GRID_Y + 86, (int)(280UL * (leftS > 3000 ? 3000 : leftS) / 3000), 8, 4, UI_BAR_OK);
   } else if (btlMenu == 3) {
     gfx->fillRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H, 10, UI_BG_DAY);
     gfx->drawRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H, 10, UI_INK);
@@ -6844,13 +6898,24 @@ void battleTap(int16_t x, int16_t y) {
     if (btlCellHit(3, x, y)) { sfxPlay(SFX_TAP); btlMenu = 3; return; }
     return;
   }
+  if (btlMenu == 5) {                    // a tap throws as well as a swing
+    btlThrowWith(btlSwingKind, (uint8_t)random(100));
+    return;
+  }
   if (btlMenu == 4) {
     if (btlBackTap(x, y)) return;
     for (uint8_t i = 0; i < WILD_BALL_KINDS; i++) {
       if (!btlCellHit(i, x, y)) continue;
       if (!pet.wildBalls[i]) { sfxPlay(SFX_DENY); return; }
       sfxPlay(SFX_TAP);
-      btlThrowWith(i, (uint8_t)random(100));
+      if (gAccFresh) {                   // the sensor is there: swing to throw (or tap, or let it go by)
+        btlSwingKind = i;
+        btlSwingUntil = millis() + 3000;
+        gMotion.clear();
+        btlMenu = 5;
+      } else {
+        btlThrowWith(i, (uint8_t)random(100));   // no sensor: a tap throws, as before
+      }
       return;
     }
     btlMenu = 0;      // anywhere else backs out
@@ -9395,12 +9460,12 @@ enum : uint8_t { FP_CAT_ATK = 0, FP_CAT_SPE, FP_CAT_DEF, FP_CAT_BRAIN, FP_CAT_FU
 // an entry is a MINI_* game, or one of the original three
 enum : uint8_t { FP_G_BAG = 100, FP_G_REACT, FP_G_BALL, FP_G_PRIZES, FP_G_BOARD, FP_G_NONE = 255 };
 static const uint8_t FP_CATS[FP_CAT_COUNT][FPM_ROWS] = {
-  { FP_G_BAG,   MINI_MOLE,    MINI_MAZE,    MINI_BALLOON, FP_G_NONE  },   // strength
+  { FP_G_BAG,   MINI_MOLE,    MINI_MAZE,    MINI_BALLOON, MINI_ROLL  },   // strength
   { FP_G_REACT, MINI_DROP,    MINI_ROPE,    MINI_FLAPPY,  MINI_SHAKE },   // speed
-  { FP_G_BALL,  MINI_CATCH,   MINI_BALANCE, FP_G_NONE,    FP_G_NONE  },   // defence
+  { FP_G_BALL,  MINI_CATCH,   MINI_BALANCE, MINI_BRICK,   FP_G_NONE  },   // defence
   { MINI_WHO,   MINI_MEMORY,  MINI_SIMON,   MINI_QUIZ,    MINI_SLIDE },   // brain
-  { MINI_DANCE, MINI_HIDE,    MINI_LR,      MINI_HL,      FP_G_NONE  },   // fun: joy and bond
-  { MINI_BUBBLES, MINI_DRAW,  FP_G_PRIZES,  FP_G_BOARD,   FP_G_NONE  },   // arcade, its prize counter and records
+  { MINI_DANCE, MINI_HIDE,    MINI_LR,      MINI_HL,      MINI_RUN   },   // fun: joy and bond (the last is hidden until it is found)
+  { MINI_BUBBLES, MINI_DRAW,  MINI_MERGE,   FP_G_PRIZES,  FP_G_BOARD },   // arcade, its prize counter and records
 };
 
 // shared state (only one game is open at a time)
@@ -9463,7 +9528,7 @@ static bool fpActive(uint32_t now, uint32_t at) { return at && (int32_t)(at - no
 // The games that react on the touch going DOWN, like the punching bag: a
 // release-resolved tap is ~100 ms late, which is the whole game in these four.
 bool funPackTapsOnPress(uint8_t g) {
-  return g == MINI_DROP || g == MINI_MOLE || g == MINI_ROPE || g == MINI_DANCE;
+  return g == MINI_DROP || g == MINI_MOLE || g == MINI_ROPE || g == MINI_DANCE || g == MINI_RUN;
 }
 
 static uint16_t fpInk() {
@@ -9484,7 +9549,8 @@ static StrId fpTitle(uint8_t g) {
   static const StrId T_[MINI_COUNT] = {
     S_GAME_LR, S_GAME_HL, S_GAME_WHO, S_GAME_DROP, S_GAME_MOLE, S_GAME_ROPE, S_GAME_DANCE, S_GAME_HIDE,
     S_GAME_MEMORY, S_GAME_SIMON, S_GAME_FLAPPY, S_GAME_MAZE,
-    S_GAME_BALLOON, S_GAME_SHAKE, S_GAME_CATCH, S_GAME_BALANCE, S_GAME_QUIZ, S_GAME_SLIDE, S_GAME_BUBBLES, S_GAME_DRAW
+    S_GAME_BALLOON, S_GAME_SHAKE, S_GAME_CATCH, S_GAME_BALANCE, S_GAME_QUIZ, S_GAME_SLIDE, S_GAME_BUBBLES, S_GAME_DRAW,
+    S_GAME_MERGE, S_GAME_BRICK, S_GAME_ROLL, S_GAME_RUN
   };
   return T_[g % MINI_COUNT];
 }
@@ -10185,6 +10251,9 @@ static StrId fpEntryName(uint8_t e) {
   return fpTitle(e);
 }
 
+// the Eevee run stays out of the lists until the About page has woken it
+static bool fpEntryHidden(uint8_t e) { return e == MINI_RUN && !pet.secretRun; }
+
 static uint16_t fpEntryRecord(uint8_t e) {
   if (e == FP_G_BAG) return pet.strHi;
   if (e == FP_G_REACT) return pet.spdHi;
@@ -10269,6 +10338,10 @@ void startFunPackGame(uint8_t g) {
     case MINI_SLIDE: slideStart(); break;
     case MINI_BUBBLES: bubblesStart(); break;
     case MINI_DRAW: drawStart(); break;
+    case MINI_MERGE: mergeStart(); break;
+    case MINI_BRICK: brickStart(); break;
+    case MINI_ROLL: rollStart(); break;
+    case MINI_RUN: eeveeStart(); break;
   }
   sfxPlay(SFX_TAP);
 }
@@ -13951,7 +14024,7 @@ void renderFunMenu() {
   uiTextFit(UIF_MID, CX + 10, PANEL_Y + 38, T(fpCatTitle(c)), UI_INK, 1, PANEL_W - 110);
   for (int i = 0; i < FPM_ROWS; i++) {
     uint8_t e = FP_CATS[c][i];
-    if (e == FP_G_NONE) continue;
+    if (e == FP_G_NONE || fpEntryHidden(e)) continue;
     int y = GL_ROW_Y(i);
     gfx->fillRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_BG_DAY);
     gfx->drawRoundRect(PANEL_X + 14, y, PANEL_W - 28, GL_ROW_H, 12, UI_INK);
@@ -14019,7 +14092,7 @@ static void renderBoard() {
     uint8_t tier = Pet::badgeTier((uint8_t)g, pet.miniHi[g]);
     if (tier) { gfx->fillCircle(PANEL_X + 32, y + GL_ROW_H / 2, 8, BC[tier]); gfx->drawCircle(PANEL_X + 32, y + GL_ROW_H / 2, 8, UI_INK); }
     else gfx->drawCircle(PANEL_X + 32, y + GL_ROW_H / 2, 8, UI_TRACK_TEXT);
-    uiTextFit(UIF_SMALL, PANEL_X + 48, uiMidY(UIF_SMALL, y, GL_ROW_H), T(fpTitle((uint8_t)g)), UI_INK, 0, colW - PANEL_X - 90);
+    uiTextFit(UIF_SMALL, PANEL_X + 48, uiMidY(UIF_SMALL, y, GL_ROW_H), (g == MINI_RUN && !pet.miniHi[g]) ? "???" : T(fpTitle((uint8_t)g)), UI_INK, 0, colW - PANEL_X - 90);
     char w[8], b[8];
     snprintf(w, sizeof(w), "%u", (unsigned)pet.weekHi[g]);
     snprintf(b, sizeof(b), "%u", (unsigned)pet.miniHi[g]);
@@ -14071,7 +14144,7 @@ int funMenuHit(int16_t x, int16_t y) {
   uint8_t c = (fpMenuCat - 1) % FP_CAT_COUNT;
   for (int i = 0; i < FPM_ROWS; i++) {
     int ry = GL_ROW_Y(i);
-    if (FP_CATS[c][i] == FP_G_NONE) continue;
+    if (FP_CATS[c][i] == FP_G_NONE || fpEntryHidden(FP_CATS[c][i])) continue;
     if (x >= PANEL_X + 14 && x <= PANEL_X + PANEL_W - 14 && y >= ry && y <= ry + GL_ROW_H) return FP_CATS[c][i];
   }
   return -2;
@@ -14535,10 +14608,387 @@ static void drawRender(uint32_t) {
   gfx->flush();
 }
 
+// ===========================================================================
+// Phase 46: four more games. Their rules are pure functions in arcade.h, which
+// arcade46_test drives; what is here is the screen, the touch and the tilt.
+// ===========================================================================
+
+// ---------- merge: slide the numbers together ----------
+
+#define MGM_CELL 64
+#define MGM_X0 (CX - 2 * MGM_CELL)
+#define MGM_Y0 124
+uint8_t mgmBoard[16];
+
+void mergeStart() {
+  memset(mgmBoard, 0, sizeof(mgmBoard));
+  mergeSpawn(mgmBoard, (uint32_t)random(100000));
+  mergeSpawn(mgmBoard, (uint32_t)random(100000));
+}
+
+// One swipe: dir 0 left, 1 right, 2 up, 3 down. Called from the touch code.
+void mergeSwipe(uint8_t dir) {
+  if (!fpOpen || fpGame != MINI_MERGE || fpOverUntil) return;
+  bool moved = false;
+  uint16_t pts = mergeSlide(mgmBoard, dir, &moved);
+  if (!moved) { sfxPlay(SFX_DENY); return; }
+  if (pts) fpPoint((uint8_t)(pts > 250 ? 250 : pts)); else sfxPlay(SFX_TAP);
+  mergeSpawn(mgmBoard, (uint32_t)random(100000));
+  if (!mergeCanMove(mgmBoard)) fpFinish(MINI_MERGE);
+}
+
+static void mergeTap(int16_t, int16_t) {}   // the board is steered by swipes
+
+static void mergeRender(uint32_t) {
+  drawGameScene();
+  fpHeader(MINI_MERGE, S_MERGE_HINT);
+  static const uint16_t MC[8] = { C565(0xe8, 0x50, 0x3a), C565(0xf5, 0x86, 0x3d), C565(0xe0, 0xa8, 0x00), C565(0x58, 0xb8, 0x68),
+                                  C565(0x5f, 0xae, 0x8c), C565(0x4f, 0x93, 0xc4), C565(0x6f, 0x7c, 0xb8), C565(0xc0, 0x70, 0xe0) };
+  gfx->fillRoundRect(MGM_X0 - 6, MGM_Y0 - 6, 4 * MGM_CELL + 12, 4 * MGM_CELL + 12, 16, lerp565(UI_BG_DAY, UI_INK, 1, 6));
+  for (int i = 0; i < 16; i++) {
+    int x = MGM_X0 + (i % 4) * MGM_CELL, y = MGM_Y0 + (i / 4) * MGM_CELL;
+    uint8_t v = mgmBoard[i];
+    if (!v) { gfx->fillRoundRect(x + 3, y + 3, MGM_CELL - 6, MGM_CELL - 6, 10, lerp565(UI_BG_DAY, UI_INK, 1, 10)); continue; }
+    gfx->fillRoundRect(x + 3, y + 3, MGM_CELL - 6, MGM_CELL - 6, 10, MC[(v - 1) % 8]);
+    gfx->drawRoundRect(x + 3, y + 3, MGM_CELL - 6, MGM_CELL - 6, 10, UI_INK);
+    char n[4];
+    snprintf(n, sizeof(n), "%u", (unsigned)v);
+    uiText(v >= 10 ? UIF_MID : UIF_BIG, x + MGM_CELL / 2, y + MGM_CELL / 2 + (v >= 10 ? 10 : 14), n, UI_WHITE, 1);
+  }
+  gfx->flush();
+}
+
+// ---------- brick bash: a ball, a paddle and a round wall ----------
+
+#define BRK_COLS 5
+#define BRK_ROWS 4
+#define BRK_W 52
+#define BRK_H 18
+#define BRK_X0 (CX - BRK_COLS * BRK_W / 2)
+#define BRK_Y0 146
+#define BRK_WALL_CY 240.0f
+#define BRK_WALL_R 200.0f
+#define BRK_CEIL 122.0f
+#define BRK_PADY 372
+#define BRK_PAD_HALF 40.0f
+#define BRK_BALL 7.0f
+bool brkAlive[BRK_ROWS][BRK_COLS];
+uint8_t brkLeft = 0;
+float brkX = CX, brkY = 340, brkVX = 0, brkVY = 0, brkPad = CX;
+uint32_t brkLastMs = 0, brkServeAt = 0;
+bool brkServing = true;
+
+static float brkSpeed() {
+  float s = 0.22f + fpScore * 0.0015f;
+  return s > 0.36f ? 0.36f : s;
+}
+
+static void brkFill() {
+  for (int r = 0; r < BRK_ROWS; r++) for (int c = 0; c < BRK_COLS; c++) brkAlive[r][c] = true;
+  brkLeft = BRK_ROWS * BRK_COLS;
+}
+
+static void brkServe(uint32_t now) {
+  brkServing = true;
+  brkServeAt = now + 800;
+  brkVX = brkVY = 0;
+}
+
+void brickStart() {
+  uint32_t now = millis();
+  brkFill();
+  brkPad = CX;
+  brkLastMs = now;
+  brkServe(now);
+}
+
+static void brickTap(int16_t, int16_t) {}   // the paddle follows a held finger, or the tilt
+
+static void brickRender(uint32_t now) {
+  uint32_t dt = now - brkLastMs;
+  if (dt > 100) dt = 100;                    // a frame is ~100 ms here; the small steps below keep it exact
+  brkLastMs = now;
+  if (wasPressed) brkPad += (tXl - brkPad) * 0.35f;
+  else if (gAccFresh) brkPad += -gAccX * 0.9f * dt;
+  if (brkPad < CX - 112) brkPad = CX - 112;
+  if (brkPad > CX + 112) brkPad = CX + 112;
+  if (brkServing) {                          // the ball sits on the paddle for a moment
+    brkX = brkPad;
+    brkY = BRK_PADY - BRK_BALL - 1;
+    if (fpReached(now, brkServeAt)) {
+      float a = ((int)random(41) - 20) * 0.0175f, s = brkSpeed();
+      brkVX = s * sinf(a);
+      brkVY = -s * cosf(a);
+      brkServing = false;
+    }
+  } else {
+    float spd = sqrtf(brkVX * brkVX + brkVY * brkVY);
+    int n = (int)(spd * dt / 4.0f) + 1;      // small steps: no tunnelling through a brick
+    float sdt = (float)dt / n;
+    for (int k = 0; k < n && !brkServing; k++) {
+      brkX += brkVX * sdt;
+      brkY += brkVY * sdt;
+      wallBounce(brkX, brkY, brkVX, brkVY, CX, BRK_WALL_CY, BRK_WALL_R, BRK_BALL);
+      if (brkY < BRK_CEIL + BRK_BALL) { brkY = BRK_CEIL + BRK_BALL; brkVY = fabsf(brkVY); }
+      if (paddleBounce(brkX, brkY, brkVX, brkVY, brkPad, BRK_PADY, BRK_PAD_HALF, BRK_BALL)) sfxPlay(SFX_TAP);
+      for (int r = 0; r < BRK_ROWS; r++) for (int c = 0; c < BRK_COLS; c++) {
+        if (!brkAlive[r][c]) continue;
+        if (!rectBounce(brkX, brkY, brkVX, brkVY, BRK_BALL, BRK_X0 + c * BRK_W + 1, BRK_Y0 + r * (BRK_H + 4), BRK_W - 2, BRK_H)) continue;
+        brkAlive[r][c] = false;
+        brkLeft--;
+        fpPoint(1);
+        r = BRK_ROWS;                        // one brick per step
+        break;
+      }
+      keepSlanted(brkVX, brkVY);
+      if (brkLeft == 0) {                    // a clear wall: a bonus and a new, faster one
+        fpPoint(5);
+        sfxPlay(SFX_MEDAL);
+        brkFill();
+        brkServe(now);
+      }
+      if (!brkServing && brkY - BRK_BALL > BRK_PADY + 16) {   // it got past the paddle
+        fpLoseLife(MINI_BRICK);
+        if (fpOverUntil) return;
+        brkServe(now);
+      }
+    }
+  }
+  drawGameScene();
+  gfx->drawCircle(CX, (int)BRK_WALL_CY, (int)BRK_WALL_R, UI_INK);
+  gfx->drawCircle(CX, (int)BRK_WALL_CY, (int)BRK_WALL_R - 1, UI_INK);
+  static const uint16_t RC[BRK_ROWS] = { C565(0xe8, 0x50, 0x3a), C565(0xf5, 0x86, 0x3d), C565(0xe0, 0xa8, 0x00), C565(0x58, 0xb8, 0x68) };
+  for (int r = 0; r < BRK_ROWS; r++) for (int c = 0; c < BRK_COLS; c++) {
+    if (!brkAlive[r][c]) continue;
+    int x = BRK_X0 + c * BRK_W + 1, y = BRK_Y0 + r * (BRK_H + 4);
+    gfx->fillRoundRect(x, y, BRK_W - 2, BRK_H, 5, RC[r]);
+    gfx->drawRoundRect(x, y, BRK_W - 2, BRK_H, 5, UI_INK);
+  }
+  gfx->fillRoundRect((int)(brkPad - BRK_PAD_HALF), BRK_PADY, (int)(2 * BRK_PAD_HALF), 12, 6, UI_INK);
+  gfx->fillCircle((int)brkX, (int)brkY, (int)BRK_BALL, UI_BAR_BAD);
+  gfx->drawCircle((int)brkX, (int)brkY, (int)BRK_BALL, UI_INK);
+  fpHeader(MINI_BRICK, S_BRICK_HINT);
+  gfx->flush();
+}
+
+// ---------- marble roll: tilt the tray, take the berries, mind the holes ----------
+
+#define RLL_CX 233.0f
+#define RLL_CY 248.0f
+#define RLL_R 128.0f
+#define RLL_MR 20.0f
+#define RLL_BERRIES 3
+#define RLL_HOLES 4
+#define RLL_GAME_MS 60000UL
+float rllX = RLL_CX, rllY = RLL_CY, rllVX = 0, rllVY = 0;
+float rllBX[RLL_BERRIES], rllBY[RLL_BERRIES], rllHX[RLL_HOLES], rllHY[RLL_HOLES];
+uint8_t rllHoles = 2;
+uint32_t rllLastMs = 0, rllSafeUntil = 0;
+
+// somewhere in the tray that is not on the marble, a berry or a hole
+static void rllSpot(float &x, float &y, int skipBerry, int skipHole) {
+  for (int t = 0; t < 40; t++) {
+    float a = random(628) / 100.0f, d = sqrtf(random(1000) / 1000.0f) * (RLL_R - 34);
+    x = RLL_CX + cosf(a) * d;
+    y = RLL_CY + sinf(a) * d;
+    bool ok = !within(x, y, rllX, rllY, 64);
+    for (int i = 0; i < RLL_BERRIES; i++) if (i != skipBerry && within(x, y, rllBX[i], rllBY[i], 44)) ok = false;
+    for (int j = 0; j < rllHoles; j++) if (j != skipHole && within(x, y, rllHX[j], rllHY[j], 44)) ok = false;
+    if (ok) return;
+  }
+}
+
+static void rllReset(uint32_t now) {
+  rllX = RLL_CX; rllY = RLL_CY; rllVX = rllVY = 0;
+  rllLastMs = now;
+  rllSafeUntil = now + 900;
+}
+
+void rollStart() {
+  for (int i = 0; i < RLL_BERRIES; i++) rllBX[i] = rllBY[i] = -999;
+  for (int j = 0; j < RLL_HOLES; j++) rllHX[j] = rllHY[j] = -999;
+  rllHoles = 2;
+  uint32_t now = millis();
+  rllReset(now);
+  for (int j = 0; j < rllHoles; j++) rllSpot(rllHX[j], rllHY[j], -1, j);
+  for (int i = 0; i < RLL_BERRIES; i++) rllSpot(rllBX[i], rllBY[i], i, -1);
+  fpEndAt = now + RLL_GAME_MS;
+}
+
+static void rollTap(int16_t, int16_t) {}
+
+static void rollRender(uint32_t now) {
+  if (fpReached(now, fpEndAt)) { fpFinish(MINI_ROLL); return; }
+  uint32_t dt = now - rllLastMs;
+  if (dt > 100) dt = 100;
+  rllLastMs = now;
+  float ax = 0, ay = 0;                      // the tilt, as in the maze; or a finger pulls it
+  if (wasPressed) {
+    float dx = tXl - rllX, dy = tYl - rllY, d = sqrtf(dx * dx + dy * dy);
+    if (d > 6) { ax = dx / d * 0.0016f; ay = dy / d * 0.0016f; }
+  } else if (gAccFresh) {
+    ax = -gAccX * 0.0022f;
+    ay = gAccY * 0.0022f;
+  }
+  for (int k = 0; k < 4; k++) marbleStep(rllX, rllY, rllVX, rllVY, ax, ay, dt / 4.0f, RLL_CX, RLL_CY, RLL_R, RLL_MR);
+  for (int i = 0; i < RLL_BERRIES; i++) {
+    if (!within(rllX, rllY, rllBX[i], rllBY[i], RLL_MR + 8)) continue;
+    fpPoint(1);
+    rllSpot(rllBX[i], rllBY[i], i, -1);
+    uint8_t want = (uint8_t)(2 + (fpScore >= 6) + (fpScore >= 12));
+    if (want > rllHoles && rllHoles < RLL_HOLES) { rllSpot(rllHX[rllHoles], rllHY[rllHoles], -1, rllHoles); rllHoles++; }
+  }
+  if (!timeOn(now, rllSafeUntil)) {
+    for (int j = 0; j < rllHoles; j++) {
+      if (!within(rllX, rllY, rllHX[j], rllHY[j], 16)) continue;
+      fpLoseLife(MINI_ROLL);
+      if (fpOverUntil) return;
+      rllReset(now);
+      break;
+    }
+  }
+  drawGameScene();
+  gfx->fillCircle((int)RLL_CX, (int)RLL_CY, (int)RLL_R, C565(0xf0, 0xe4, 0xc0));
+  for (int t = 0; t < 4; t++) gfx->drawCircle((int)RLL_CX, (int)RLL_CY, (int)RLL_R + t, C565(0x7e, 0x55, 0x30));
+  for (int j = 0; j < rllHoles; j++) {
+    gfx->fillCircle((int)rllHX[j], (int)rllHY[j], 17, UI_INK);
+    gfx->drawCircle((int)rllHX[j], (int)rllHY[j], 17, C565(0x7e, 0x55, 0x30));
+  }
+  for (int i = 0; i < RLL_BERRIES; i++) {
+    gfx->fillCircle((int)rllBX[i], (int)rllBY[i], 9, UI_BAR_BAD);
+    gfx->drawCircle((int)rllBX[i], (int)rllBY[i], 9, UI_INK);
+    gfx->fillCircle((int)rllBX[i] + 3, (int)rllBY[i] - 9, 3, UI_BAR_OK);
+  }
+  bool blink = timeOn(now, rllSafeUntil) && ((now / 120) % 2);
+  if (!blink && !fpThumb(pet.speciesId, (int)rllX, (int)rllY, 2, false)) {
+    gfx->fillCircle((int)rllX, (int)rllY, (int)RLL_MR, DEX_TBL[pet.speciesId].accent);
+    gfx->drawCircle((int)rllX, (int)rllY, (int)RLL_MR, UI_INK);
+  }
+  fpHeader(MINI_ROLL, S_ROLL_HINT);
+  fpTimeBar(now, fpEndAt, RLL_GAME_MS, 382);
+  gfx->flush();
+}
+
+// ---------- eevee run: the hidden one-tap runner ----------
+
+#define EVR_GROUND 340
+#define EVR_X 120
+#define EVR_W 30.0f
+#define EVR_GAME_MS 90000UL
+#define EVR_OBS 3
+struct EvObs { float x; uint8_t kind; bool alive, passed; };
+EvObs evObs[EVR_OBS];
+float evH = 0, evVY = 0;
+bool evAir = false;
+uint32_t evLastMs = 0, evSpawnAt = 0, evInvUntil = 0, evStartMs = 0;
+static const uint8_t EV_OW[3] = { 24, 20, 44 }, EV_OH[3] = { 24, 44, 24 };
+
+static float evSpeed(uint32_t now) {
+  float t = (float)(now - evStartMs) / EVR_GAME_MS;
+  return 0.26f + (t > 1 ? 1 : t) * 0.16f;
+}
+
+void eeveeStart() {
+  uint32_t now = millis();
+  for (int i = 0; i < EVR_OBS; i++) evObs[i].alive = false;
+  evH = evVY = 0;
+  evAir = false;
+  evLastMs = evStartMs = now;
+  evSpawnAt = now + 1200;
+  evInvUntil = 0;
+  fpEndAt = now + EVR_GAME_MS;
+}
+
+static void eeveeTap(int16_t, int16_t) {   // on the touch going down: a jump is the whole game
+  if (evAir) return;
+  evAir = true;
+  evVY = RUN_JUMP_V;
+  sfxPlay(SFX_TAP);
+}
+
+static void eeveeRender(uint32_t now) {
+  if (fpReached(now, fpEndAt)) { fpFinish(MINI_RUN); return; }
+  uint32_t dt = now - evLastMs;
+  if (dt > 100) dt = 100;
+  evLastMs = now;
+  float spd = evSpeed(now);
+  for (uint32_t t = 0; t < dt && evAir; t += 10) evAir = runJumpStep(evH, evVY, (float)(dt - t < 10 ? dt - t : 10));
+  if (fpReached(now, evSpawnAt)) {
+    for (int i = 0; i < EVR_OBS; i++) if (!evObs[i].alive) {
+      evObs[i] = { 500.0f, (uint8_t)random(3), true, false };
+      break;
+    }
+    evSpawnAt = now + (uint32_t)((900 + random(800)) * (0.26f / spd));   // always room to land in between
+  }
+  for (int i = 0; i < EVR_OBS; i++) {
+    if (!evObs[i].alive) continue;
+    EvObs &o = evObs[i];
+    o.x -= spd * dt;
+    if (o.x < -60) { o.alive = false; continue; }
+    if (!o.passed && o.x + EV_OW[o.kind] < EVR_X - EVR_W / 2) { o.passed = true; fpPoint(1); }
+    if (!timeOn(now, evInvUntil) && runHit(EVR_X - EVR_W / 2, EVR_W, evH, o.x, EV_OW[o.kind], EV_OH[o.kind])) {
+      o.alive = false;
+      evInvUntil = now + 1200;
+      fpLoseLife(MINI_RUN);
+      if (fpOverUntil) return;
+    }
+  }
+  drawGameScene();
+  gfx->fillRect(0, EVR_GROUND, 466, 6, C565(0x7e, 0x55, 0x30));
+  for (int d = 0; d < 8; d++) {              // the ground slides by
+    int gx = (int)(((int)(d * 60) - (int)(now * spd)) % 480);
+    if (gx < 0) gx += 480;
+    gfx->fillRect(gx, EVR_GROUND + 12, 18, 3, C565(0xb0, 0x7a, 0x45));
+  }
+  for (int i = 0; i < EVR_OBS; i++) {
+    if (!evObs[i].alive) continue;
+    int x = (int)evObs[i].x;
+    uint8_t k = evObs[i].kind;
+    if (k == 1) {                            // a tall cactus
+      gfx->fillRoundRect(x, EVR_GROUND - 44, 20, 44, 6, C565(0x3e, 0x9a, 0x4a));
+      gfx->drawRoundRect(x, EVR_GROUND - 44, 20, 44, 6, UI_INK);
+    } else {                                 // one rock, or two
+      for (int r = 0; r < (k == 2 ? 2 : 1); r++) {
+        gfx->fillRoundRect(x + r * 22, EVR_GROUND - 24, 22, 24, 8, C565(0x90, 0x98, 0xa4));
+        gfx->drawRoundRect(x + r * 22, EVR_GROUND - 24, 22, 24, 8, UI_INK);
+      }
+    }
+  }
+  bool blink = timeOn(now, evInvUntil) && ((now / 100) % 2);
+  int bob = (!evAir && (now / 130) % 2) ? 2 : 0;
+  if (!blink && !fpThumb(DEX_EEVEE, EVR_X, EVR_GROUND - 30 - (int)evH + bob, 2, false)) {
+    gfx->fillCircle(EVR_X, EVR_GROUND - 20 - (int)evH, 18, C565(0xb8, 0x80, 0x48));
+    gfx->drawCircle(EVR_X, EVR_GROUND - 20 - (int)evH, 18, UI_INK);
+  }
+  fpHeader(MINI_RUN, S_RUN_HINT);
+  fpTimeBar(now, fpEndAt, EVR_GAME_MS, 382);
+  gfx->flush();
+}
+
+// ---------- shake the ball to play with it ----------
+
+
+// A shake on the main screen: a hop, a heart and +2 joy, five a day. Shaking it
+// while walking, with the screen off or dimmed, or inside any other screen does
+// nothing: those are not play.
+void shakeToPlay(uint32_t now) {
+  if (screenOff || dimStage > 0 || uiCurrentScreen() != SCR_MAIN) return;
+  if (gWalkRun >= 8 && now - gLastStepMs < 3000) return;
+  if (!pet.shakePlay()) return;
+  lastInteract = now;
+  sfxPlay(SFX_HEART);
+  if (pmd.loaded && pmd.has(PMD_HOP)) {
+    beh.mode = 2;
+    beh.act = PMD_HOP;
+    beh.t0 = now;
+    beh.until = now + pmdActTotalMs(pmd.acts[PMD_HOP]) * 2;
+  }
+}
+
 // ---------- the framework's entry points for these eight ----------
 
 // the games steered by dragging: a swipe must not end them
-bool fpUsesDrag(uint8_t g) { return g == MINI_MAZE || g == MINI_CATCH || g == MINI_BALANCE || g == MINI_DRAW; }
+bool fpUsesDrag(uint8_t g) { return g == MINI_MAZE || g == MINI_CATCH || g == MINI_BALANCE || g == MINI_DRAW || g == MINI_BRICK || g == MINI_ROLL; }
 
 bool fpTapPhase15(int16_t x, int16_t y) {
   switch (fpGame) {
@@ -14550,6 +15000,10 @@ bool fpTapPhase15(int16_t x, int16_t y) {
     case MINI_SLIDE: slideTap(x, y); return true;
     case MINI_BUBBLES: bubblesTap(x, y); return true;
     case MINI_DRAW: drawTap(x, y); return true;
+    case MINI_MERGE: mergeTap(x, y); return true;
+    case MINI_BRICK: brickTap(x, y); return true;
+    case MINI_ROLL: rollTap(x, y); return true;
+    case MINI_RUN: eeveeTap(x, y); return true;
   }
   return false;
 }
@@ -14564,6 +15018,10 @@ bool fpRenderPhase15(uint32_t now) {
     case MINI_SLIDE: slideRender(now); return true;
     case MINI_BUBBLES: bubblesRender(now); return true;
     case MINI_DRAW: drawRender(now); return true;
+    case MINI_MERGE: mergeRender(now); return true;
+    case MINI_BRICK: brickRender(now); return true;
+    case MINI_ROLL: rollRender(now); return true;
+    case MINI_RUN: eeveeRender(now); return true;
   }
   return false;
 }

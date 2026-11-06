@@ -1469,6 +1469,10 @@ const MiniReward MINI_REWARDS[MINI_COUNT] = {
   { 4, 2, 20,   2,    MINI_NO_STAT,   1,  0,   2, 5,  0, 0,  0, 10 },  // SLIDE
   { 4, 1, 20,   1,    MINI_NO_STAT,   1,  0,   2, 6,  0, 0,  0, 30 },  // BUBBLES
   { 6, 1, 20,   3,    MINI_NO_STAT,   1,  0,   1, 9,  0, 0,  0, 10 },  // DRAW
+  { 4, 1, 20,   1,    MINI_NO_STAT,   1,  0,   2, 6,  0, 0,  0, 40 },  // MERGE: points, a good game is a 5
+  { 3, 1, 15,   1,    MINI_STAT_DEF,  3, 10,   4, 4,  0, 0,  0, 10 },  // BRICK: bricks
+  { 3, 1, 15,   1,    MINI_STAT_ATK,  2, 10,   5, 3,  0, 0,  1,  8 },  // ROLL: berries
+  { 4, 1, 20,   1,    MINI_NO_STAT,   1,  0,   3, 5,  0, 0,  1, 10 },  // RUN: hurdles
 };
 }
 
@@ -1515,6 +1519,20 @@ uint8_t Pet::applyMiniResult(uint8_t game, uint8_t score) {
   notePlayed();
   save();
   return r.stat != MINI_NO_STAT ? statGain : (uint8_t)(joy - joyBefore);
+}
+
+// Shaking the ball: a hop, a heart and +2 joy, at most 5 a day. It does not count
+// asleep, away, as an egg or during a ceremony; the screen decides the rest
+// (walking, a game open) because it is the one that knows.
+bool Pet::shakePlay() {
+  if (sleeping || isEgg() || ceremony != CER_NONE || atWork()) return false;
+  if (shakeDay != today() + 1) { shakeDay = today() + 1; shakeToday = 0; }
+  if (shakeToday >= 5) return false;
+  shakeToday++;
+  joy = clamp100((int)joy + (grumpy ? 1 : 2));
+  heartUntil = millis() + HEART_MS;
+  save();
+  return true;
 }
 
 // ---------- the arcade (phase 26) ----------
@@ -3319,6 +3337,9 @@ void Pet::save() {
   prefs.putUInt("wfre", wildFreeDay);
   prefs.putUChar("wkit", wildKit);
   prefs.putUChar("hpp", hpPct);
+  prefs.putUChar("scr", secretRun);
+  prefs.putUChar("skn", shakeToday);
+  prefs.putUInt("skd", shakeDay);
   prefs.putUChar("tpn", tripsToday);
   prefs.putUInt("tpd", tripDay);
   prefs.putUChar("tpt", tripTale);
@@ -3532,6 +3553,9 @@ void Pet::load() {
   wildStepBank = prefs.getUShort("wstp", 0);
   wildFreeDay = prefs.getUInt("wfre", 0);
   wildKit = prefs.getUChar("wkit", 0);
+  secretRun = prefs.getUChar("scr", 0) ? 1 : 0;
+  shakeToday = prefs.getUChar("skn", 0);
+  shakeDay = prefs.getUInt("skd", 0);
   hpPct = prefs.getUChar("hpp", 100);
   if (hpPct > 100) hpPct = 100;
   tripsToday = prefs.getUChar("tpn", 0);
@@ -3596,7 +3620,10 @@ void Pet::load() {
   ticketDay = prefs.getUInt("tkd", 0);
   ticketsToday = prefs.getUChar("tkn", 0);
   memset(weekHi, 0, sizeof(weekHi));
-  if (prefs.getBytesLength("wkhi") == sizeof(weekHi)) prefs.getBytes("wkhi", weekHi, sizeof(weekHi));
+  {
+    size_t n = prefs.getBytesLength("wkhi");   // shorter from before the phase 46 games: those start at 0
+    if (n && n <= sizeof(weekHi)) prefs.getBytes("wkhi", weekHi, n);
+  }
   weekId = prefs.getUInt("wkid", 0);
   sickness = prefs.getUChar("sick", SICK_NONE);
   if (sickness > SICK_COLD) sickness = SICK_NONE;

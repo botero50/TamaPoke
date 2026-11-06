@@ -33,6 +33,7 @@ _Last updated: 6 November 2026, with the battle fixes._
 | 38 | Bigger page arrows (a near miss turns the page instead of closing the menu), the tasks bubble moved onto the glass, a Pokéball team button at the left edge, the bath as six tiles on one page; a README with two GIFs and the new features | v1.23 |
 | 39 | A sturdier ball, from the fork review: the date never goes back after a power cut, safety copies of the save on the SD card to recover a save cut off midway, nothing drawn with the screen off, a sound task that cannot spin | v1.24 |
 | 40 | Steps that cannot be lost: a clock change never erases them, and they are saved every 20 steps. A warning beep when a need is very low, quiet nights from 21:00 to 07:00, and coins for lifetime steps | v1.25 |
+| 46 | Four new games drawn in code: **Merge** (slide numbers that count up), **Brick Bash** (paddle by finger or tilt, trains defence), **Marble Roll** (tilt her Pokemon around a tray, trains strength) and a hidden **Eevee Run** (tap the version on the About page five times). Swing the ball to throw a Pokemon ball (tap still works), and shake it on the main screen to play, five times a day | v1.32 |
 | 45b | Battle fixes from the first real fights: the whole turn is shown (messages page 4 lines at a time, and a foe's reply can no longer be hidden), a wild foe always has an attack, her HP bar starts at her real health, and **damage stays until the Pokemon Center**: each Pokemon keeps its health, a fainted one sits out, the Center heals everyone for free, and the team screen shows a health bar | v1.31 |
 | 45 | The Pokemon trip: twice a day it can go off for 30 to 60 minutes with its needs paused, and comes home with one of 8 stories and a small reward. A Call back button brings it home early, with no story | v1.30 |
 | 44 | Wild encounters and catching: a Tall Grass tile on the map, one free encounter a day plus one per 500 steps, three kinds of ball in the shop and bag, and caught Pokemon join the team or box and fill the Pokedex | v1.29 |
@@ -45,7 +46,6 @@ The order agreed from the fork review. Each phase still gets its own short plan.
 | Phase | What | Notes |
 |---|---|---|
 | 44b | Potions, training items and choosing which caught Pokemon to raise | Changes how saved Pokemon are stored, so its own phase and tests |
-| 46 | New games: number-merge, brick-breaker, a hidden Eevee runner | Check TamaDaci's licence first |
 | 47 | New training games | Replaces bag, speed and defence training, so compare first |
 | 48 | Jukebox | Prefer public-domain tunes; decide then |
 | 49 | Three save slots on the SD card | E1d0k4 |

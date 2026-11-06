@@ -145,7 +145,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 45
     "Excursion", "De excursion", "De vuelta!", "%s se fue de excursion!", "Ya no hay excursiones hoy", "Es tarde: manana sera", "Llamar", "Llamarlo? Sin historia", "%s fue al rio", "y encontro %u monedas!", "%s busco entre los arbustos", "y encontro una Poke Ball!", "%s conocio a %s", "y compartieron un bocadillo!", "%s paseo por el pueblo", "y le dieron una galleta!", "%s jugo en el jardin", "y encontro una semilla!", "%s salto en los charcos", "y trajo un jabon!", "%s vio algo moverse", "en la hierba alta!", "%s subio a una colina", "y encontro una Super Ball!",
     // battle damage that stays
-    "Necesita el Centro Pokemon", "Salud curada. Lo demas cuesta", },
+    "Necesita el Centro Pokemon", "Salud curada. Lo demas cuesta",
+    // phase 46: new games, swing to throw, the secret game
+    "Une numeros", "Rompe ladrillos", "Canica rodante", "Carrera de Eevee", "Desliza. Los numeros iguales se unen", "Arrastra o inclina la pala", "Inclina. Come bayas, evita huecos", "Toca para saltar", "Agita para lanzar", "o toca la pantalla", "Un juego secreto desperto!", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -285,7 +287,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 45
     "Trip", "On a trip", "Back home!", "%s set off on a trip!", "No more trips today", "Too late: try tomorrow", "Call back", "Call it back? No story", "%s went to the river", "and found %u coins!", "%s looked under a bush", "and found a Poke Ball!", "%s met %s", "and they shared a snack!", "%s walked through town", "and was given a cookie!", "%s played in a garden", "and found a seed!", "%s splashed in puddles", "and brought home soap!", "%s saw something move", "in the tall grass!", "%s climbed a hill", "and found a Great Ball!",
     // battle damage that stays
-    "Needs the Pokemon Center", "HP healed! The rest costs coins", },
+    "Needs the Pokemon Center", "HP healed! The rest costs coins",
+    // phase 46: new games, swing to throw, the secret game
+    "Merge", "Brick Bash", "Marble Roll", "Eevee Run", "Swipe to slide. Same numbers merge!", "Drag or tilt the paddle", "Tilt to roll. Get berries, skip holes", "Tap to jump!", "Swing to throw!", "or tap the screen", "A secret game woke up!", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -424,7 +428,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 45
     "Balade", "En balade", "De retour !", "%s part en balade !", "Plus de balade aujourd'hui", "Trop tard: a demain", "Rappeler", "Rappeler ? Pas d'histoire", "%s est alle a la riviere", "et trouve %u pieces !", "%s a fouille un buisson", "et trouve une Poke Ball !", "%s a rencontre %s", "et ils ont goute ensemble !", "%s a traverse la ville", "et a recu un biscuit !", "%s a joue au jardin", "et trouve une graine !", "%s a saute dans les flaques", "et rapporte du savon !", "%s a vu bouger quelque chose", "dans les hautes herbes !", "%s a grimpe une colline", "et trouve une Super Ball !",
     // battle damage that stays
-    "Va au Centre Pokemon", "PV soignes ! Le reste coute", },
+    "Va au Centre Pokemon", "PV soignes ! Le reste coute",
+    // phase 46: new games, swing to throw, the secret game
+    "Fusion", "Casse-briques", "Bille roulante", "Course d'Evoli", "Glisse. Les memes nombres fusionnent", "Glisse ou incline la raquette", "Incline. Prends les baies, evite les trous", "Touche pour sauter", "Balance pour lancer", "ou touche l'ecran", "Un jeu secret s'est reveille!", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -563,7 +569,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 45
     "Ausflug", "Auf Ausflug", "Wieder da!", "%s macht einen Ausflug!", "Heute keine Ausfluege mehr", "Zu spaet: morgen wieder", "Zurueckrufen", "Zurueckrufen? Keine Story", "%s war am Fluss", "und fand %u Muenzen!", "%s suchte im Gebuesch", "und fand einen Pokeball!", "%s traf %s", "und sie teilten einen Snack!", "%s lief durch die Stadt", "und bekam einen Keks!", "%s spielte im Garten", "und fand einen Samen!", "%s sprang in Pfuetzen", "und brachte Seife mit!", "%s sah etwas sich bewegen", "im hohen Gras!", "%s stieg auf einen Huegel", "und fand einen Superball!",
     // battle damage that stays
-    "Braucht das Pokemon-Center", "KP geheilt! Rest kostet Muenzen", },
+    "Braucht das Pokemon-Center", "KP geheilt! Rest kostet Muenzen",
+    // phase 46: new games, swing to throw, the secret game
+    "Zahlen", "Ziegelbruch", "Murmellauf", "Evoli rennt", "Wischen. Gleiche Zahlen verschmelzen", "Ziehen oder neigen", "Neigen. Beeren sammeln, Loecher meiden", "Tippen zum Springen", "Schwingen zum Werfen", "oder auf den Schirm tippen", "Ein Geheimspiel ist erwacht!", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -702,7 +710,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 45
     "Gita", "In gita", "Di ritorno!", "%s parte per una gita!", "Niente piu gite oggi", "Troppo tardi: a domani", "Richiama", "Richiamarlo? Niente storia", "%s e andato al fiume", "e ha trovato %u monete!", "%s ha frugato un cespuglio", "e ha trovato una Poke Ball!", "%s ha incontrato %s", "e hanno fatto merenda!", "%s ha girato in citta", "e ha avuto un biscotto!", "%s ha giocato in giardino", "e ha trovato un seme!", "%s ha saltato nelle pozzanghere", "e ha portato del sapone!", "%s ha visto muoversi qualcosa", "nell'erba alta!", "%s e salito su una collina", "e ha trovato una Mega Ball!",
     // battle damage that stays
-    "Serve il Centro Pokemon", "PS curati! Il resto costa", },
+    "Serve il Centro Pokemon", "PS curati! Il resto costa",
+    // phase 46: new games, swing to throw, the secret game
+    "Unisci", "Rompi mattoni", "Biglia rotolante", "Corsa di Eevee", "Scorri. I numeri uguali si uniscono", "Trascina o inclina la racchetta", "Inclina. Prendi le bacche, evita i buchi", "Tocca per saltare", "Agita per lanciare", "o tocca lo schermo", "Si e svegliato un gioco segreto!", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -841,7 +851,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 45
     "Passeio", "Em passeio", "De volta!", "%s saiu em passeio!", "Sem passeios hoje", "Tarde: so amanha", "Chamar", "Chamar? Sem historia", "%s foi ao rio", "e achou %u moedas!", "%s olhou num arbusto", "e achou uma Poke Bola!", "%s conheceu %s", "e dividiram um lanche!", "%s andou pela cidade", "e ganhou um biscoito!", "%s brincou no jardim", "e achou uma semente!", "%s pulou em pocas", "e trouxe sabao!", "%s viu algo se mexer", "no mato alto!", "%s subiu um morro", "e achou uma Grande Bola!",
     // battle damage that stays
-    "Precisa do Centro Pokemon", "PS curados! O resto custa", },
+    "Precisa do Centro Pokemon", "PS curados! O resto custa",
+    // phase 46: new games, swing to throw, the secret game
+    "Junta", "Quebra tijolos", "Bola rolante", "Corrida do Eevee", "Deslize. Numeros iguais se juntam", "Arraste ou incline a raquete", "Incline. Pegue bagas, evite buracos", "Toque para pular", "Balance para lancar", "ou toque na tela", "Um jogo secreto acordou!", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -982,7 +994,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 45
     "旅行", "旅行中", "回来了!", "%s 出发旅行了!", "今天不能再旅行了", "太晚了: 明天吧", "叫回来", "叫回来? 没有故事", "%s 去了河边", "找到了 %u 枚金币!", "%s 在灌木下找东西", "找到了精灵球!", "%s 遇见了 %s", "一起吃了点心!", "%s 逛了小镇", "得到了一块饼干!", "%s 在花园里玩", "找到了一颗种子!", "%s 踩了水坑", "带回了肥皂!", "%s 看到有东西在动", "在草丛里!", "%s 爬上了小山", "找到了超级球!",
     // battle damage that stays
-    "需要去宝可梦中心", "体力恢复了! 其余要金币", },
+    "需要去宝可梦中心", "体力恢复了! 其余要金币",
+    // phase 46: new games, swing to throw, the secret game
+    "合并数字", "打砖块", "滚珠", "伊布快跑", "滑动，相同数字会合并", "拖动或倾斜挡板", "倾斜滚动，吃果子", "点击跳跃", "挥动来投球", "或点击屏幕", "秘密游戏醒来了！", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -1122,7 +1136,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 45
     "여행", "여행 중", "돌아왔어!", "%s 여행을 떠났어!", "오늘은 여행 끝", "늦었어: 내일 가자", "부르기", "부를까? 이야기 없어", "%s 강에 갔어", "코인 %u개를 찾았어!", "%s 덤불을 뒤졌어", "몬스터볼을 찾았어!", "%s, %s 만났어", "간식을 나눠 먹었어!", "%s 마을을 걸었어", "쿠키를 받았어!", "%s 정원에서 놀았어", "씨앗을 찾았어!", "%s 물웅덩이에서 놀았어", "비누를 가져왔어!", "%s 뭔가 움직이는 걸 봤어", "풀숲에서!", "%s 언덕에 올랐어", "수퍼볼을 찾았어!",
     // battle damage that stays
-    "포켓몬 센터에 가야 해", "HP 회복! 나머지는 코인", },
+    "포켓몬 센터에 가야 해", "HP 회복! 나머지는 코인",
+    // phase 46: new games, swing to throw, the secret game
+    "숫자 합치기", "벽돌 깨기", "구슬 굴리기", "이브이 달리기", "밀어서 숫자를 합쳐요", "패들을 끌거나 기울여요", "기울여서 열매를 모아요", "눌러서 점프해요", "흔들어서 던져요", "또는 화면을 눌러요", "비밀 게임이 깨어났어요!", },
 };
 
 // Medal names in their three lengths [language][medal].

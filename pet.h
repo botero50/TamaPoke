@@ -81,6 +81,10 @@ enum MiniGameId : uint8_t {
   MINI_SLIDE,    // slide puzzle
   MINI_BUBBLES,  // pop groups of one colour
   MINI_DRAW,     // finger painting
+  MINI_MERGE,    // phase 46: slide and merge the numbers
+  MINI_BRICK,    // phase 46: brick bash
+  MINI_ROLL,     // phase 46: tilt the marble
+  MINI_RUN,      // phase 46: the hidden Eevee run
   MINI_COUNT
 };
 #define MINI_NO_STAT (-1)
@@ -728,6 +732,11 @@ public:
   uint8_t tripTale = 0;                       // the story waiting to be read, 0 for none
   int16_t tripFriend = 0;                     // who it met, for TALE_FRIEND
   uint8_t tripCoins = 0;                      // what it found, for TALE_COINS
+  // Phase 46: the secret game (unlocked from the About page) and play by shaking
+  uint8_t secretRun = 0;
+  uint8_t shakeToday = 0;
+  uint32_t shakeDay = 0;                      // today() + 1 for shakeToday
+  bool shakePlay();                           // a shake: a hop, a heart, +2 joy; 5 a day. False when it does not count
   bool tripBackFlash = false;                 // it has just come home: to announce
   bool onTrip() const { return jobKind == JOB_TRIP && atWork(); }
   uint8_t tripsLeft() const;

@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
     click(tbx, tby);
     click(311, 327);                     // tile 5 == ARCADE
     if (fpMenuCat != 6) { printf("FAIL: ARCADE tile did not open its list (%u)\n", fpMenuCat); return 1; }
-    click(233, 154 + 2 * 50);            // third row: PRIZES
+    click(233, 154 + 3 * 50);            // fourth row: PRIZES (Merge took the third)
     if (arcadeView != 1) { printf("FAIL: PRIZES did not open the prize counter\n"); return 1; }
     pet.tickets = Pet::prizePrice(PRIZE_CAP);
     click(233, 168);                     // the first prize: the arcade cap
@@ -237,7 +237,7 @@ int main(int argc, char **argv) {
     if (pet.ownsHat(HAT_VISOR)) { printf("FAIL: a prize was won without tickets\n"); return 1; }
     click(20, 233);                      // outside: back to the Arcade list
     if (arcadeView || fpMenuCat != 6) { printf("FAIL: outside the counter did not go back to the list\n"); return 1; }
-    click(233, 154 + 3 * 50);            // fourth row: RECORDS
+    click(233, 154 + 4 * 50);            // fifth row: RECORDS
     if (arcadeView != 2 || boardPage != 0) { printf("FAIL: RECORDS did not open the board\n"); return 1; }
     pump(2);
     click(357, 376);                     // next page

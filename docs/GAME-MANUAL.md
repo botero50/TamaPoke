@@ -398,6 +398,25 @@ started at midnight, and the evening before that drained it empty). A ball switc
 overnight counts the night as sleep. Daytime naps keep the slower-than-awake drain, and
 the moon button still wakes it at any hour.
 
+### Four more games, and moving the ball (phase 46)
+**Merge** (Arcade) is a 4x4 board: swipe any way and every tile slides; two tiles with the same
+number join into the next number, so the numbers count up 1, 2, 3... Each join scores the new
+number, a new 1 (sometimes a 2) arrives after every slide, and it ends when nothing can move.
+**Brick Bash** (Defence) is a ball, a paddle and a round wall: drag a finger or tilt the ball to move
+the paddle, break the 20 bricks (a point each, 5 more for a clear wall), three lives, and it trains
+DEF. **Marble Roll** (Strength) is 60 seconds of tilting a tray to roll her Pokemon over the berries
+and round the holes (a hole costs a life, three lives), and it trains ATK. The **Eevee Run** is a
+secret: open Settings, go to the About page and tap the version five times. It then appears in the
+Fun list (and on the Records board, as ??? until it has been played): tap to jump over rocks and
+cacti for 90 seconds, three lives, for joy and tickets only.
+
+**Swing to throw.** In a wild fight, picking a ball now opens a 3 second "Swing to throw!" window:
+swing the ball, or just tap the screen, and it throws. If nothing happens it goes back to the ball
+choice and no ball is used. A ball with no working sensor throws at once, as before.
+**Shake to play.** Shaking the ball on the main screen makes the Pokemon hop, show a heart and gain
+2 joy, at most 5 times a day. It does not count while walking, with the screen dim or off, asleep, as
+an egg, away, or inside any other screen.
+
 ### Arcade night: tickets, prizes, records, badges
 Every finished Fun Pack game pays **tickets**: 1 + score/20, at most 5, plus 3 for a new
 record, and at most 30 a day (coins keep their own cap). Games -> Arcade -> **PRIZES**

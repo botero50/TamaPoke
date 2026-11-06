@@ -32,6 +32,8 @@ Phase 44's wild encounters follow the formulas in [eperdeme](https://github.com/
 
 Phase 45's Pokemon trip is the idea of [Spocky2024](https://github.com/Spocky2024/TamaPoke_MrsSpock), with our own stories and code.
 
+Phase 46's games and motion play follow ideas seen in the forks of alexandru-core (TamaDaci), [nzlov](https://github.com/nzlov/TamaPoke), [ShadowEnemyx](https://github.com/ShadowEnemyx/TamaPoke) and Bittersweet1987: a number-merge game, a brick-breaker, a hidden Eevee runner, and games played by tilting, shaking or swinging the board. Only the ideas were taken; every line of code and every picture is our own.
+
 
 TamaPoke is a **non-commercial, personal-use** project. It does not sell or
 commercially redistribute any copyrighted material. Pokémon and all related
