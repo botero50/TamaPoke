@@ -185,7 +185,7 @@ enum FoodId : uint8_t {
 #define SEED_PRICE 5
 #define GARDEN_GROW_SECS (8UL * 3600)   // a seed is ready to harvest after 8 h
 enum ParkResult : uint8_t { PARK_TIRED = 0, PARK_COINS, PARK_BERRY, PARK_FRIEND, PARK_NOTHING };
-enum CenterResult : uint8_t { CENTER_FREE = 0, CENTER_PAID, CENTER_NO_COINS };
+enum CenterResult : uint8_t { CENTER_FREE = 0, CENTER_PAID, CENTER_NO_COINS, CENTER_HP_ONLY };
 // Seasonal gifts, by the RTC date. GIFT_NONE when today is no holiday or the
 // gift was already handed out today.
 enum GiftKind : uint8_t { GIFT_NONE = 0, GIFT_HALLOWEEN, GIFT_CHRISTMAS, GIFT_NEWYEAR, GIFT_VALENTINE };
@@ -1232,6 +1232,9 @@ public:
   uint32_t wildFreeDay = 0;                   // today() + 1 on the day the free one went
   uint8_t wildKit = 0;                        // the 5 starter balls have been given
   bool wildEarned = false;                    // walking just earned one: to announce
+  // Health left after fights, in percent: it stays until the Pokemon Center, and a
+  // percentage so that growing a level does not heal it or hurt it more.
+  uint8_t hpPct = 100;
   bool wildFreeLeft() const { return wildFreeDay != today() + 1; }
   uint8_t wildCount() const { return (uint8_t)(wildCharges + (wildFreeLeft() ? 1 : 0)); }
   uint16_t wildStepsLeft() const { return (uint16_t)(WILD_STEPS - wildStepBank); }

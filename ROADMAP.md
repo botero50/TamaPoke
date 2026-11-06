@@ -4,7 +4,7 @@ What is left, in the agreed order. Each phase gets a short written plan that is
 approved before it is built; small fixes skip that. This file is updated at the
 end of every phase.
 
-_Last updated: 4 November 2026, with Phase 45._
+_Last updated: 6 November 2026, with the battle fixes._
 
 ## Done
 | Phase | What | Release |
@@ -33,6 +33,7 @@ _Last updated: 4 November 2026, with Phase 45._
 | 38 | Bigger page arrows (a near miss turns the page instead of closing the menu), the tasks bubble moved onto the glass, a Pokéball team button at the left edge, the bath as six tiles on one page; a README with two GIFs and the new features | v1.23 |
 | 39 | A sturdier ball, from the fork review: the date never goes back after a power cut, safety copies of the save on the SD card to recover a save cut off midway, nothing drawn with the screen off, a sound task that cannot spin | v1.24 |
 | 40 | Steps that cannot be lost: a clock change never erases them, and they are saved every 20 steps. A warning beep when a need is very low, quiet nights from 21:00 to 07:00, and coins for lifetime steps | v1.25 |
+| 45b | Battle fixes from the first real fights: the whole turn is shown (messages page 4 lines at a time, and a foe's reply can no longer be hidden), a wild foe always has an attack, her HP bar starts at her real health, and **damage stays until the Pokemon Center**: each Pokemon keeps its health, a fainted one sits out, the Center heals everyone for free, and the team screen shows a health bar | v1.31 |
 | 45 | The Pokemon trip: twice a day it can go off for 30 to 60 minutes with its needs paused, and comes home with one of 8 stories and a small reward. A Call back button brings it home early, with no story | v1.30 |
 | 44 | Wild encounters and catching: a Tall Grass tile on the map, one free encounter a day plus one per 500 steps, three kinds of ball in the shop and bag, and caught Pokemon join the team or box and fill the Pokedex | v1.29 |
 | 43 | Walking rewards: 2 500 steps a day give a snack, 5 000 joy, energy and bond, 10 000 a training reward, each once a day. A rank for lifetime steps, from Beginner to Legend, on the steps panel and in the prize toast | v1.28 |

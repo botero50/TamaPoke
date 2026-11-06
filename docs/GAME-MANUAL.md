@@ -249,6 +249,19 @@ All the steps ever walked earn a **rank**, shown beside the total: Beginner, Str
 (5 000), Walker (10 000), Hiker (25 000), Trekker (50 000), Route Guide (100 000),
 Globetrotter (250 000), Trail Ace (500 000) and Legend (1 000 000).
 
+### Health that stays (v1.31)
+Damage from a fight stays with the Pokemon, the live one and each team member, until the
+**Pokemon Center** heals it. Healing fight damage there is always free, for everyone at
+once, even after the day's free visit and with no coins; curing sickness and the +30 energy
+keep their rule of free once a day, then coins. A Pokemon at 0 health sits out: the next one
+leads, and if nobody can fight a wild or gym fight won't start and says to go to the Center.
+The team screen shows a thin health bar on each slot, empty when it has fainted. Health is
+kept as a percentage, so growing a level keeps a Pokemon as hurt as it was. Moving a Pokemon
+to the box and back keeps it too. A Pokemon you catch, or one that retires, arrives at full
+health. Friendly battles over the radio never change health.
+
+Battle messages show 4 lines at a time: tap to turn the page, and again to clear.
+
 ### The Pokemon trip (phase 45)
 The **Trip** tile, on page 3 of the map, sends it off alone, twice a day, for 30 to 60
 minutes. Its needs pause, as they do for a job, and a sign shows when it will be back. It

@@ -40,6 +40,15 @@ class Party {
 public:
   PartyMon slots[PARTY_SLOTS];
   PartyMon box[BOX_SLOTS];
+  // How much health each one has left, in percent (0 = fainted). Kept beside the
+  // records, not inside them, so the stored team format does not change. They move
+  // together with their Pokemon between the team and the box.
+  uint8_t hpPct[PARTY_SLOTS];
+  uint8_t boxHpPct[BOX_SLOTS];
+
+  Party() { for (auto &p : hpPct) p = 100; for (auto &p : boxHpPct) p = 100; }
+  bool anyHurt() const;          // anyone in the team or the box below full health
+  void healAll();                // everyone back to full: the Pokemon Center
 
   void begin();                 // load from NVS
   uint8_t count() const;

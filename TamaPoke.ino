@@ -45,7 +45,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.47"
+#define FW_VERSION "3.14-funpack.48"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -252,6 +252,8 @@ uint8_t albumIdx = 0, albumShown = 255;   // the photo asked for, and the one in
 uint8_t albumDlg = 0;        // 0 none, 1 delete: this one / all / cancel, 2 "all but the favourites?"
 uint8_t mapPage = 0;         // the map has three pages of places
 bool tripCallAsk = false;    // "call it back?" is showing over the sign
+bool centerHpOnly = false;   // the Center healed her Pokemon but the rest costs coins
+bool fitToFight();           // somebody who is not fainted
 #define TRIP_CALL_W 170
 #define TRIP_CALL_H 48
 #define TRIP_CALL_Y 266
@@ -598,8 +600,10 @@ int8_t btlSwapWho = -1;        // 0 = your side, 1 = the foe's, -1 = nothing due
 uint8_t btlMenu = 0;
 #define BTL_LUNGE_MS 260
 #define BTL_HIT_MS 420
-char btlMsg[6][40];
-uint8_t btlMsgCount = 0;   // queued lines; a tap shows the next
+#define BTL_MSG_MAX 12
+char btlMsg[BTL_MSG_MAX][40];
+uint8_t btlMsgCount = 0;   // queued lines, shown 4 at a time: a tap shows the next page
+uint8_t btlMsgPage = 0;
 #define BTL_CELL_W 160
 #define BTL_CELL_H 44
 #define BTL_GRID_X 69
@@ -1601,6 +1605,7 @@ void handleSerial() {
     Serial.printf("steps=%lu hist=%u,%u,%u,%u,%u,%u,%u total=%lu adv=%u/%u goals=%u rank=%u\n", (unsigned long)pet.stepsToday(), pet.stepsDaysAgo(0), pet.stepsDaysAgo(1), pet.stepsDaysAgo(2), pet.stepsDaysAgo(3), pet.stepsDaysAgo(4), pet.stepsDaysAgo(5), pet.stepsDaysAgo(6), (unsigned long)pet.stepTotal, (unsigned)pet.advSteps, (unsigned)Pet::advNeed(pet.advStop), (unsigned)pet.stepGoalsDone, (unsigned)pet.walkRank());
     Serial.printf("wild=%u balls=%u/%u/%u bank=%u\n", pet.wildCount(), pet.wildBalls[0], pet.wildBalls[1], pet.wildBalls[2], pet.wildStepBank);
     Serial.printf("trip left=%u away=%d tale=%u\n", pet.tripsLeft(), pet.onTrip(), pet.tripTale);
+    Serial.printf("hp live=%u party=%u/%u/%u/%u/%u/%u\n", pet.hpPct, party.hpPct[0], party.hpPct[1], party.hpPct[2], party.hpPct[3], party.hpPct[4], party.hpPct[5]);
     { int8_t gi = pet.gymChallengeIdx(); Serial.printf("gym=%u/%u next=%d region=%u ready=%d\n", pet.gymSteps, gi >= 0 ? Pet::gymStepsNeed((uint8_t)gi) : 0, gi, pet.gymChallengeRegion(), pet.gymChallengeReady()); }
     Serial.printf("nursery=%d+%d since=%lu egg=%d bred=%d\n", pet.nursery.aDex, pet.nursery.bDex,
                   (unsigned long)pet.nursery.since, pet.nursery.eggDex, pet.eggBred);
@@ -1970,7 +1975,10 @@ void partyTap(int16_t x, int16_t y) {
     if (releaseConfirm) { monSheetConfirmTap(x, y, false); return; }
     if (monSheetBtn(x, y, true)) {           // BRING BACK
       if (!pet.isEgg() || pet.awaitingStarter()) { sfxPlay(SFX_DENY); return; }
+      uint8_t keepHp = party.hpPct[partyDetail - 1];   // it comes back as hurt as it was banked
       pet.reviveFrom(party.slots[partyDetail - 1]);
+      pet.hpPct = keepHp;
+      pet.saveNow();
       party.releaseAt(partyDetail - 1);      // it is alive now, not banked
       partyDetail = 0;
       boxSwapFrom = 0;
@@ -2273,6 +2281,7 @@ void onTap(int16_t x, int16_t y) {
         return;
       }
       sfxPlay(SFX_TAP);
+      if (!fitToFight()) { sfxPlay(SFX_DENY); fpShowToast(S_NEEDS_CENTER, UI_BAR_WARN); return; }
       gymOpen = false;
       pickTrainer = idx;
       pickHard = gymHard;
@@ -5793,7 +5802,7 @@ static void btlFreeSprites() {
 }
 
 static void btlSay(const char *fmt, ...) {
-  if (btlMsgCount >= 6) return;
+  if (btlMsgCount >= BTL_MSG_MAX) return;
   va_list ap;
   va_start(ap, fmt);
   vsnprintf(btlMsg[btlMsgCount], sizeof(btlMsg[0]), fmt, ap);
@@ -5854,23 +5863,74 @@ static void foeFromSpecies(Combatant &c, int16_t dex, uint8_t lvl, uint8_t iv) {
 // leader's, so Brock is two-on-two. The caps are applied while BUILDING the
 // combatants, so nothing is ever written back to the stored creature, exactly
 // like ailments.
+// Health that stays (see Pet::hpPct and Party::hpPct). Who each fighter is, and how
+// much health it began with, so that what is written back is only what changed.
+static uint8_t btlSquadSrc[TRAINER_TEAM_MAX + 1];    // 0 = the live pet, n = party slot n-1
+static uint16_t btlSquadHp0[TRAINER_TEAM_MAX + 1];
+
+static void btlApplyHp(Combatant &c, uint8_t pct) {
+  if (pct >= 100) return;
+  uint32_t hp = ((uint32_t)c.maxHp * pct + 50) / 100;
+  c.hp = (uint16_t)(hp < 1 ? 1 : hp);
+}
+
+static uint8_t btlPctOf(const Combatant &c) {
+  if (!c.hp) return 0;
+  if (c.hp >= c.maxHp) return 100;
+  uint32_t p = ((uint32_t)c.hp * 100 + c.maxHp - 1) / c.maxHp;
+  return (uint8_t)(p < 1 ? 1 : (p > 99 ? 99 : p));   // a living one never reads 0, nor a hurt one 100
+}
+
+bool fitToFight() {
+  if (!pet.isEgg() && pet.hpPct > 0) return true;
+  for (int i = 0; i < PARTY_SLOTS; i++)
+    if (!party.slots[i].empty() && party.hpPct[i] > 0) return true;
+  return false;
+}
+
+// Called the moment a fight ends, whichever way, so an unplug cannot undo it.
+// Friendly fights over the radio never change anyone's health.
+static void btlCommitHp() {
+  if (btlLink || !btlSquadN) return;
+  if (btlSquadAt < btlSquadN) btlSquad[btlSquadAt] = btlYou;
+  bool petChanged = false, partyChanged = false;
+  for (uint8_t i = 0; i < btlSquadN; i++) {
+    if (btlSquad[i].hp == btlSquadHp0[i]) continue;       // untouched: keep exactly what was stored
+    uint8_t pct = btlPctOf(btlSquad[i]);
+    uint8_t src = btlSquadSrc[i];
+    if (src == 0) { if (pet.hpPct != pct) { pet.hpPct = pct; petChanged = true; } }
+    else if (src <= PARTY_SLOTS && party.hpPct[src - 1] != pct) { party.hpPct[src - 1] = pct; partyChanged = true; }
+    btlSquadHp0[i] = btlSquad[i].hp;
+  }
+  if (petChanged) pet.saveNow();
+  if (partyChanged) party.save();
+}
+
 static void buildSquad(uint8_t maxLvl, uint8_t maxCount, uint16_t mask) {
   btlSquadN = 0;
   btlSquadAt = 0;
   btlPetIn = false;
   if (maxCount > TRAINER_TEAM_MAX) maxCount = TRAINER_TEAM_MAX;
-  if (!pet.isEgg() && btlSquadN < maxCount && (mask & 1)) {
+  if (!pet.isEgg() && btlSquadN < maxCount && (mask & 1) && pet.hpPct > 0) {   // a fainted one sits out
     Pet tmp = pet;                       // a copy: the real pet is untouched
     if (maxLvl && tmp.level() > maxLvl)
       tmp.ageMinutes = (uint32_t)(maxLvl - 1) * MINUTES_PER_LEVEL;
-    combatantFromPet(btlSquad[btlSquadN++], tmp);
+    combatantFromPet(btlSquad[btlSquadN], tmp);
+    btlApplyHp(btlSquad[btlSquadN], pet.hpPct);
+    btlSquadSrc[btlSquadN] = 0;
+    btlSquadHp0[btlSquadN] = btlSquad[btlSquadN].hp;
+    btlSquadN++;
     btlPetIn = true;      // the training reward goes to whoever fought for it
   }
   for (int i = 0; i < PARTY_SLOTS && btlSquadN < maxCount; i++) {
-    if (party.slots[i].empty() || !(mask & (1 << (i + 1)))) continue;
+    if (party.slots[i].empty() || !(mask & (1 << (i + 1))) || party.hpPct[i] == 0) continue;
     PartyMon m = party.slots[i];
     if (maxLvl && m.level > maxLvl) m.level = maxLvl;
-    combatantFromParty(btlSquad[btlSquadN++], m);
+    combatantFromParty(btlSquad[btlSquadN], m);
+    btlApplyHp(btlSquad[btlSquadN], party.hpPct[i]);
+    btlSquadSrc[btlSquadN] = (uint8_t)(i + 1);
+    btlSquadHp0[btlSquadN] = btlSquad[btlSquadN].hp;
+    btlSquadN++;
   }
   if (btlSquadN) btlYou = btlSquad[0];
 }
@@ -5913,7 +5973,7 @@ void startLinkBattle() {
   btlSwapWho = -1;
   btlFaintUntil[0] = btlFaintUntil[1] = 0;
   btlEnterUntil[0] = btlEnterUntil[1] = 0;
-  btlHpShown[0] = btlYou.maxHp;
+  btlHpShown[0] = btlYou.hp;
   btlHpShown[1] = btlFoe.maxHp;
   btlSyncSprite(0, btlYou);
   btlSyncSprite(1, btlFoe);
@@ -5933,7 +5993,10 @@ void startTrainerBattle(uint8_t idx, bool hard) {
   // walks every trainer at 100% and the type chart never matters. Hard adds the
   // size cap on top, plus a smarter AI and better opposing IVs.
   buildSquad(top, hard ? tr.count : TRAINER_TEAM_MAX, squadMask);
-  if (!btlSquadN) return;
+  if (!btlSquadN) {
+    if (!fitToFight()) { sfxPlay(SFX_DENY); fpShowToast(S_NEEDS_CENTER, UI_BAR_WARN); }
+    return;
+  }
   btlTrainer = (int8_t)idx;
   btlWild = false;
   btlHard = hard;
@@ -5948,7 +6011,7 @@ void startTrainerBattle(uint8_t idx, bool hard) {
   btlSwapWho = -1;
   btlFaintUntil[0] = btlFaintUntil[1] = 0;
   btlEnterUntil[0] = btlEnterUntil[1] = 0;
-  btlHpShown[0] = btlYou.maxHp;
+  btlHpShown[0] = btlYou.hp;
   btlHpShown[1] = btlFoe.maxHp;
   btlSyncSprite(0, btlYou);
   btlSyncSprite(1, btlFoe);
@@ -5977,7 +6040,18 @@ static bool startBattleAs(int16_t dex, uint8_t lvl, bool shiny, const uint8_t *i
   foe.ivHp = ivs ? ivs[3] : 20;
   foe.ageMinutes = (uint32_t)(lvl ? lvl - 1 : 0) * MINUTES_PER_LEVEL;
   foe.relearnFromLevel();
+  {                                           // a foe that knows no attack would never fight back
+    bool attacks = false;
+    for (int i = 0; i < MOVE_SLOTS; i++)
+      if (foe.moves[i] && foe.moves[i] < MOVE_COUNT && MOVE_TBL[foe.moves[i]].cat != MC_STATUS) attacks = true;
+    if (!attacks) {
+      int slot = 0;
+      for (int i = 0; i < MOVE_SLOTS; i++) if (!foe.moves[i]) { slot = i; break; }
+      foe.moves[slot] = MV_TACKLE;
+    }
+  }
   combatantFromPet(btlFoe, foe);
+  btlMsgPage = 0;
   btlWildMon = PartyMon();
   btlWildMon.dex = dex;
   btlWildMon.level = foe.level();
@@ -5992,7 +6066,7 @@ static bool startBattleAs(int16_t dex, uint8_t lvl, bool shiny, const uint8_t *i
   btlSwapWho = -1;
   btlFaintUntil[0] = btlFaintUntil[1] = 0;
   btlEnterUntil[0] = btlEnterUntil[1] = 0;
-  btlHpShown[0] = btlYou.maxHp;
+  btlHpShown[0] = btlYou.hp;
   btlHpShown[1] = btlFoe.maxHp;
   btlSyncSprite(0, btlYou);
   btlSyncSprite(1, btlFoe);
@@ -6016,6 +6090,7 @@ bool startWildBattle() {
   if (pet.isEgg() || pet.ceremony != CER_NONE || pet.awaitingStarter()) { sfxPlay(SFX_DENY); return false; }
   if (pet.sleeping) { sfxPlay(SFX_DENY); fpShowToast(S_WILD_ASLEEP, UI_BAR_WARN); return false; }
   if (fpBlockedBySick()) return false;
+  if (!fitToFight()) { sfxPlay(SFX_DENY); fpShowToast(S_NEEDS_CENTER, UI_BAR_WARN); return false; }
   if (!pet.wildCount()) {
     sfxPlay(SFX_DENY);
     fpShowToast(S_WILD_WALK_FMT, UI_BAR_WARN);
@@ -6130,6 +6205,7 @@ void btlThrowWith(uint8_t kind, uint8_t roll) {
   pet.registerCaught(btlWildMon.dex, btlWildMon.shiny);
   btlOver = true;
   btlWon = true;
+  btlCommitHp();
   audioMusic(MUS_VICTORY);
   sfxPlay(SFX_MEDAL);
   btlSay(T(S_WILD_CAUGHT), btlFoe.name);
@@ -6320,6 +6396,7 @@ static void btlResolve(uint8_t yourMove) {
   if (btlFoe.fainted() || btlYou.fainted()) {
     btlOver = true;
     btlWon = btlFoe.fainted();
+    btlCommitHp();
     btlNewBadge = false;
     btlTrainGain = 0;
     if (btlWon && btlTrainer >= 0 && !pet.hasBadge(btlRegion, btlTrainer, btlHard)) {
@@ -6531,9 +6608,20 @@ void renderBattle() {
     // box is 6 px taller than the move grid so four 16 px lines plus "tap..." fit
     gfx->fillRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H * 2 + 14, 12, UI_WHITE);
     gfx->drawRoundRect(BTL_GRID_X, BTL_GRID_Y, 328, BTL_CELL_H * 2 + 14, 12, UI_INK);
-    for (uint8_t i = 0; i < btlMsgCount && i < 4; i++)
-      uiTextFit(UIF_TINY, CX, BTL_GRID_Y + 20 + i * 18, btlMsg[i], UI_INK, 1, 310);
-    uiText(UIF_TINY, CX, BTL_GRID_Y + 92, "tap...", UI_TRACK_TEXT, 1);
+    // Up to 4 lines a page. A turn can say more than that (your move, the foe's reply,
+    // effects), and the lines past the 4th used to be dropped, so a foe's whole turn
+    // could go unseen. A tap now turns the page before it clears the narration.
+    uint8_t pages = (uint8_t)((btlMsgCount + 3) / 4);
+    uint8_t pg = btlMsgPage < pages ? btlMsgPage : (uint8_t)(pages - 1);
+    for (uint8_t i = 0; i < 4 && pg * 4 + i < btlMsgCount; i++)
+      uiTextFit(UIF_TINY, CX, BTL_GRID_Y + 20 + i * 18, btlMsg[pg * 4 + i], UI_INK, 1, 310);
+    if (pages > 1) {
+      char pn[12];
+      snprintf(pn, sizeof(pn), "tap... %u/%u", (unsigned)(pg + 1), (unsigned)pages);
+      uiText(UIF_TINY, CX, BTL_GRID_Y + 92, pn, UI_TRACK_TEXT, 1);
+    } else {
+      uiText(UIF_TINY, CX, BTL_GRID_Y + 92, "tap...", UI_TRACK_TEXT, 1);
+    }
   } else if (btlMenu == 0) {
     // FIGHT across the top, then POKEMON and RUN side by side. Three full-width
     // rows do not fit: the panel is round, and at that depth the chord is only
@@ -6711,6 +6799,7 @@ static bool btlBackTap(int16_t x, int16_t y) {
 // another device the peer is told, so it does not sit waiting for a move that
 // will never come.
 static void btlRun() {
+  btlCommitHp();
   sfxPlay(SFX_DENY);
   btlFreeSprites();
   audioMusic(MUS_NONE);
@@ -6728,7 +6817,9 @@ void battleTap(int16_t x, int16_t y) {
     if (btlLink) { btlLink = false; lanOpen = true; }
     return;
   }
-  if (btlMsgCount) {          // a tap clears the narration and returns the menu
+  if (btlMsgCount) {          // a tap shows the next page, and on the last one clears the narration
+    if ((btlMsgPage + 1) * 4 < btlMsgCount) { btlMsgPage++; sfxPlay(SFX_TAP); return; }
+    btlMsgPage = 0;
     btlMsgCount = 0;
     if (btlOver) {
       btlFreeSprites();
@@ -7051,8 +7142,9 @@ void renderSpeed() {
 
 // candidate n: 0 = the live pet, 1..PARTY_SLOTS = banked members
 bool pickExists(uint8_t n) {
-  if (n == 0) return !pet.isEgg();
-  return n <= PARTY_SLOTS && !party.slots[n - 1].empty();
+  bool lan = pickTrainer == PICK_LAN;          // a friendly fight does not care about health
+  if (n == 0) return !pet.isEgg() && (lan || pet.hpPct > 0);
+  return n <= PARTY_SLOTS && !party.slots[n - 1].empty() && (lan || party.hpPct[n - 1] > 0);
 }
 uint8_t pickChosen() {
   uint8_t c = 0;
@@ -7910,6 +8002,14 @@ void drawPartySlot(int i, int x, int y) {
   snprintf(lv, sizeof(lv), T(S_LVL_FMT), (unsigned)m.level);
   uiText(UIF_SMALL, x + 62, y + 50, lv, UI_INK, 0);
   if (m.shiny) uiText(UIF_SMALL, x + 62 + uiTextWidth(UIF_SMALL, lv) + 6, y + 50, "*", UI_BAR_WARN, 0);
+  {                                          // how much health it has left; empty means fainted
+    uint8_t pct = party.hpPct[i];
+    int bw = PARTY_CELL_W - 28;
+    gfx->fillRoundRect(x + 14, y + PARTY_CELL_H - 11, bw, 6, 3, UI_TRACK_TEXT);
+    int fw = bw * pct / 100;
+    if (pct && fw < 3) fw = 3;
+    if (fw) gfx->fillRoundRect(x + 14, y + PARTY_CELL_H - 11, fw, 6, 3, pct > 50 ? UI_BAR_OK : pct > 25 ? UI_BAR_WARN : UI_BAR_BAD);
+  }
 }
 
 void renderParty() {
@@ -10491,6 +10591,7 @@ void gymCardTap(int16_t x, int16_t y) {
   uint8_t rg = pet.gymChallengeRegion();
   int8_t i = pet.gymChallengeIdx();
   if (rg >= GYM_REGIONS || i < 0) { gymCardOpen = false; return; }
+  if (!fitToFight()) { sfxPlay(SFX_DENY); fpShowToast(S_NEEDS_CENTER, UI_BAR_WARN); return; }
   sfxPlay(SFX_TAP);
   gymCardOpen = false;
   gymRegion = rg; gymPick = false; gymHard = false; gymPage = (uint8_t)(i / GYM_ROWS);
@@ -11668,7 +11769,7 @@ static void drawPlaceFx() {
   uint32_t now = millis(), e = now - placeFxAt;
   switch (placeFx) {
     case FX_HEAL: {                     // sparkles and hearts rise around it; the machine is in the scene
-      if (e >= HEAL_MS) { placeFx = FX_NONE; placeSay(T(S_HEALED)); return; }
+      if (e >= HEAL_MS) { placeFx = FX_NONE; placeSay(T(centerHpOnly ? S_CENTER_HP_ONLY : S_HEALED)); centerHpOnly = false; return; }
       if (e > 1700) {
         float t = (e - 1700) / 1800.0f;
         for (int k = 0; k < 7; k++) {
@@ -12008,7 +12109,8 @@ void placeTap(int16_t x, int16_t y) {
       if (placeFx == FX_HEAL) break;                 // already healing
       CenterResult r = pet.centerHeal();
       if (r == CENTER_NO_COINS) { sfxPlay(SFX_DENY); placeSay(T(S_NOT_ENOUGH)); }
-      else { sfxPlay(SFX_HEAL); placeMsgUntil = 0; fxStart(FX_HEAL); }   // "Healed!" comes when the machine is done
+      else {
+        centerHpOnly = (r == CENTER_HP_ONLY); sfxPlay(SFX_HEAL); placeMsgUntil = 0; fxStart(FX_HEAL); }   // "Healed!" comes when the machine is done
       break;
     }
     case PLACE_GARDEN: {

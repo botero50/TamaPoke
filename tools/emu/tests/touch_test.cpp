@@ -1046,6 +1046,7 @@ int main(int argc, char **argv) {
   // ---- a trainer fight: the foe's squad must chain, and winning awards a badge
   pet.ageMinutes = 100 * MINUTES_PER_LEVEL;   // strong enough to sweep Brock
   pet.relearnFromLevel();
+  pet.hpPct = 100;                            // and healed at the Center first: damage stays after a fight now
   while (pet.hasLearnOffer()) pet.declineLearn();
   bool hadBadge = pet.hasBadge(0, 0, false);
   startTrainerBattle(0, false);

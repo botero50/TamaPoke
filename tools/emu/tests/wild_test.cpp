@@ -28,8 +28,9 @@ extern Pet pet;
 extern Party party;
 extern bool battleOpen, btlOver, btlWon, btlWild, mapOpen;
 extern int8_t btlTrainer;
-extern uint8_t btlMenu, btlMsgCount, mapPage, gymRegion;
+extern uint8_t btlMenu, btlMsgCount, btlMsgPage, mapPage, gymRegion;
 extern Combatant btlFoe, btlYou;
+extern char btlMsg[12][40];
 extern PartyMon btlWildMon;
 extern uint32_t fpToastUntil, lastInteract;
 bool startWildBattle();
@@ -300,6 +301,48 @@ static void flowTests() {
   ck(btlOver && btlWon, "a win ends the fight");
   ck(pet.coins == coins, "with no coins");
   closeBattle();
+
+  // a foe always has something to attack with, even at the lowest levels
+  {
+    bool allAttack = true;
+    int fights = 0;
+    uint8_t keepAge = 0;
+    (void)keepAge;
+    for (uint8_t r = 0; r < 7; r++) {
+      pet.region = r;
+      for (int i = 0; i < 40; i++) {
+        readyBall();
+        pet.wildFreeDay = 0;
+        if (!startWildBattle()) continue;
+        fights++;
+        bool attacks = false;
+        for (int k = 0; k < MOVE_SLOTS; k++)
+          if (btlFoe.moves[k] && MOVE_TBL[btlFoe.moves[k]].cat != MC_STATUS) attacks = true;
+        if (!attacks) allAttack = false;
+        closeBattle();
+      }
+    }
+    pet.region = 0;
+    ck(fights > 200 && allAttack, "every wild foe has an attack, across all 7 regions");
+  }
+
+  // a long turn is shown in full: 4 lines a page, and a tap turns the page
+  {
+    readyBall();
+    startWildBattle();
+    btlMsgCount = 0; btlMsgPage = 0;
+    for (int i = 0; i < 9; i++) { snprintf(btlMsg[i], sizeof(btlMsg[0]), "line %d", i); btlMsgCount++; }
+    battleTap(233, 300);
+    ck(btlMsgCount == 9 && btlMsgPage == 1, "a tap turns to the second page, and keeps the lines");
+    battleTap(233, 300);
+    ck(btlMsgCount == 9 && btlMsgPage == 2, "and the third");
+    battleTap(233, 300);
+    ck(btlMsgCount == 0 && btlMsgPage == 0, "the last page clears the narration, and starts over");
+    btlMsgCount = 3; btlMsgPage = 0;
+    battleTap(233, 300);
+    ck(btlMsgCount == 0, "a short turn still clears on one tap");
+    closeBattle();
+  }
 
   // gym fights keep the plain menu
   readyBall();

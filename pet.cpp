@@ -322,6 +322,7 @@ void Pet::reviveFrom(const PartyMon &m) {
   if (m.empty()) return;
   ceremony = CER_NONE;
   neglectTicks = 0;
+  hpPct = 100;
   speciesId = m.dex;
   prevSpeciesId = -1;
   eggTaps = 0;
@@ -1205,6 +1206,7 @@ void Pet::release() {
 
 void Pet::hatch() {
   speciesId = eggTarget;
+  hpPct = 100;                   // a new one starts well
   bornDay = today();             // its birthday: a party every month from now
   wishKind = WISH_NONE;
   shiny = eggShiny;
@@ -2103,9 +2105,18 @@ ParkResult Pet::parkWalk() {
 }
 
 CenterResult Pet::centerHeal() {
+  // Fight damage is always healed, for nothing: it is what the Center is for after a
+  // fight. The rest (sickness, energy) keeps its rule of free once a day, then coins.
+  bool hurt = hpPct < 100 || party.anyHurt();
+  if (hurt) { hpPct = 100; party.healAll(); }
   CenterResult res = CENTER_FREE;
   if (!centerFreeToday()) {
-    if (!spendCoins(CENTER_PRICE)) return CENTER_NO_COINS;
+    if (!spendCoins(CENTER_PRICE)) {
+      if (!hurt) return CENTER_NO_COINS;
+      heartUntil = millis() + HEART_MS;
+      save();
+      return CENTER_HP_ONLY;            // not counted for the daily mission: nothing else was done
+    }
     res = CENTER_PAID;
   }
   centerDay = today();
@@ -3307,6 +3318,7 @@ void Pet::save() {
   prefs.putUShort("wstp", wildStepBank);
   prefs.putUInt("wfre", wildFreeDay);
   prefs.putUChar("wkit", wildKit);
+  prefs.putUChar("hpp", hpPct);
   prefs.putUChar("tpn", tripsToday);
   prefs.putUInt("tpd", tripDay);
   prefs.putUChar("tpt", tripTale);
@@ -3520,6 +3532,8 @@ void Pet::load() {
   wildStepBank = prefs.getUShort("wstp", 0);
   wildFreeDay = prefs.getUInt("wfre", 0);
   wildKit = prefs.getUChar("wkit", 0);
+  hpPct = prefs.getUChar("hpp", 100);
+  if (hpPct > 100) hpPct = 100;
   tripsToday = prefs.getUChar("tpn", 0);
   tripDay = prefs.getUInt("tpd", 0);
   tripTale = prefs.getUChar("tpt", 0);

@@ -143,7 +143,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 44
     "Hierba alta", "BALLS", "Poke Ball", "Super Ball", "Ultra Ball", "Un %s salvaje!", "Atrapaste a %s!", "Se fue a la caja.", "%s salio de la bola!", "Equipo y caja llenos", "Sin bolas: hay en la tienda", "Encontraste una Poke Ball!", "Algo se mueve en la hierba!", "Camina %u pasos mas", "Ahora esta durmiendo", "No hay nadie en la hierba", "Se usan en la hierba alta",
     // phase 45
-    "Excursion", "De excursion", "De vuelta!", "%s se fue de excursion!", "Ya no hay excursiones hoy", "Es tarde: manana sera", "Llamar", "Llamarlo? Sin historia", "%s fue al rio", "y encontro %u monedas!", "%s busco entre los arbustos", "y encontro una Poke Ball!", "%s conocio a %s", "y compartieron un bocadillo!", "%s paseo por el pueblo", "y le dieron una galleta!", "%s jugo en el jardin", "y encontro una semilla!", "%s salto en los charcos", "y trajo un jabon!", "%s vio algo moverse", "en la hierba alta!", "%s subio a una colina", "y encontro una Super Ball!", },
+    "Excursion", "De excursion", "De vuelta!", "%s se fue de excursion!", "Ya no hay excursiones hoy", "Es tarde: manana sera", "Llamar", "Llamarlo? Sin historia", "%s fue al rio", "y encontro %u monedas!", "%s busco entre los arbustos", "y encontro una Poke Ball!", "%s conocio a %s", "y compartieron un bocadillo!", "%s paseo por el pueblo", "y le dieron una galleta!", "%s jugo en el jardin", "y encontro una semilla!", "%s salto en los charcos", "y trajo un jabon!", "%s vio algo moverse", "en la hierba alta!", "%s subio a una colina", "y encontro una Super Ball!",
+    // battle damage that stays
+    "Necesita el Centro Pokemon", "Salud curada. Lo demas cuesta", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -281,7 +283,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 44
     "Tall Grass", "BALLS", "Poke Ball", "Great Ball", "Ultra Ball", "A wild %s!", "You caught %s!", "It went to the box.", "%s broke free!", "Team and box are full", "No balls: buy some in the shop", "You found a Poke Ball!", "Something stirs in the grass!", "Walk %u more steps", "It's asleep right now", "Nobody is in the grass", "Use them in the Tall Grass",
     // phase 45
-    "Trip", "On a trip", "Back home!", "%s set off on a trip!", "No more trips today", "Too late: try tomorrow", "Call back", "Call it back? No story", "%s went to the river", "and found %u coins!", "%s looked under a bush", "and found a Poke Ball!", "%s met %s", "and they shared a snack!", "%s walked through town", "and was given a cookie!", "%s played in a garden", "and found a seed!", "%s splashed in puddles", "and brought home soap!", "%s saw something move", "in the tall grass!", "%s climbed a hill", "and found a Great Ball!", },
+    "Trip", "On a trip", "Back home!", "%s set off on a trip!", "No more trips today", "Too late: try tomorrow", "Call back", "Call it back? No story", "%s went to the river", "and found %u coins!", "%s looked under a bush", "and found a Poke Ball!", "%s met %s", "and they shared a snack!", "%s walked through town", "and was given a cookie!", "%s played in a garden", "and found a seed!", "%s splashed in puddles", "and brought home soap!", "%s saw something move", "in the tall grass!", "%s climbed a hill", "and found a Great Ball!",
+    // battle damage that stays
+    "Needs the Pokemon Center", "HP healed! The rest costs coins", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -418,7 +422,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 44
     "Hautes herbes", "BALLS", "Poke Ball", "Super Ball", "Hyper Ball", "Un %s sauvage !", "%s est capture !", "Il va dans la boite.", "%s s'est libere !", "Equipe et boite pleines", "Plus de balls: voir la boutique", "Tu trouves une Poke Ball !", "Ca bouge dans les herbes !", "Encore %u pas", "Il dort pour l'instant", "Personne dans les herbes", "A utiliser dans les herbes",
     // phase 45
-    "Balade", "En balade", "De retour !", "%s part en balade !", "Plus de balade aujourd'hui", "Trop tard: a demain", "Rappeler", "Rappeler ? Pas d'histoire", "%s est alle a la riviere", "et trouve %u pieces !", "%s a fouille un buisson", "et trouve une Poke Ball !", "%s a rencontre %s", "et ils ont goute ensemble !", "%s a traverse la ville", "et a recu un biscuit !", "%s a joue au jardin", "et trouve une graine !", "%s a saute dans les flaques", "et rapporte du savon !", "%s a vu bouger quelque chose", "dans les hautes herbes !", "%s a grimpe une colline", "et trouve une Super Ball !", },
+    "Balade", "En balade", "De retour !", "%s part en balade !", "Plus de balade aujourd'hui", "Trop tard: a demain", "Rappeler", "Rappeler ? Pas d'histoire", "%s est alle a la riviere", "et trouve %u pieces !", "%s a fouille un buisson", "et trouve une Poke Ball !", "%s a rencontre %s", "et ils ont goute ensemble !", "%s a traverse la ville", "et a recu un biscuit !", "%s a joue au jardin", "et trouve une graine !", "%s a saute dans les flaques", "et rapporte du savon !", "%s a vu bouger quelque chose", "dans les hautes herbes !", "%s a grimpe une colline", "et trouve une Super Ball !",
+    // battle damage that stays
+    "Va au Centre Pokemon", "PV soignes ! Le reste coute", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -555,7 +561,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 44
     "Hohes Gras", "BAELLE", "Pokeball", "Superball", "Hyperball", "Ein wildes %s!", "%s gefangen!", "Es kommt in die Box.", "%s hat sich befreit!", "Team und Box sind voll", "Keine Baelle: im Laden kaufen", "Du findest einen Pokeball!", "Es raschelt im Gras!", "Noch %u Schritte", "Es schlaeft gerade", "Niemand ist im Gras", "Fuer das hohe Gras",
     // phase 45
-    "Ausflug", "Auf Ausflug", "Wieder da!", "%s macht einen Ausflug!", "Heute keine Ausfluege mehr", "Zu spaet: morgen wieder", "Zurueckrufen", "Zurueckrufen? Keine Story", "%s war am Fluss", "und fand %u Muenzen!", "%s suchte im Gebuesch", "und fand einen Pokeball!", "%s traf %s", "und sie teilten einen Snack!", "%s lief durch die Stadt", "und bekam einen Keks!", "%s spielte im Garten", "und fand einen Samen!", "%s sprang in Pfuetzen", "und brachte Seife mit!", "%s sah etwas sich bewegen", "im hohen Gras!", "%s stieg auf einen Huegel", "und fand einen Superball!", },
+    "Ausflug", "Auf Ausflug", "Wieder da!", "%s macht einen Ausflug!", "Heute keine Ausfluege mehr", "Zu spaet: morgen wieder", "Zurueckrufen", "Zurueckrufen? Keine Story", "%s war am Fluss", "und fand %u Muenzen!", "%s suchte im Gebuesch", "und fand einen Pokeball!", "%s traf %s", "und sie teilten einen Snack!", "%s lief durch die Stadt", "und bekam einen Keks!", "%s spielte im Garten", "und fand einen Samen!", "%s sprang in Pfuetzen", "und brachte Seife mit!", "%s sah etwas sich bewegen", "im hohen Gras!", "%s stieg auf einen Huegel", "und fand einen Superball!",
+    // battle damage that stays
+    "Braucht das Pokemon-Center", "KP geheilt! Rest kostet Muenzen", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -692,7 +700,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 44
     "Erba alta", "BALL", "Poke Ball", "Mega Ball", "Ultra Ball", "Un %s selvatico!", "Hai preso %s!", "Va nel box.", "%s si e liberato!", "Squadra e box pieni", "Niente ball: vai al negozio", "Hai trovato una Poke Ball!", "Qualcosa si muove nell'erba!", "Ancora %u passi", "Ora sta dormendo", "Nessuno nell'erba", "Da usare nell'erba alta",
     // phase 45
-    "Gita", "In gita", "Di ritorno!", "%s parte per una gita!", "Niente piu gite oggi", "Troppo tardi: a domani", "Richiama", "Richiamarlo? Niente storia", "%s e andato al fiume", "e ha trovato %u monete!", "%s ha frugato un cespuglio", "e ha trovato una Poke Ball!", "%s ha incontrato %s", "e hanno fatto merenda!", "%s ha girato in citta", "e ha avuto un biscotto!", "%s ha giocato in giardino", "e ha trovato un seme!", "%s ha saltato nelle pozzanghere", "e ha portato del sapone!", "%s ha visto muoversi qualcosa", "nell'erba alta!", "%s e salito su una collina", "e ha trovato una Mega Ball!", },
+    "Gita", "In gita", "Di ritorno!", "%s parte per una gita!", "Niente piu gite oggi", "Troppo tardi: a domani", "Richiama", "Richiamarlo? Niente storia", "%s e andato al fiume", "e ha trovato %u monete!", "%s ha frugato un cespuglio", "e ha trovato una Poke Ball!", "%s ha incontrato %s", "e hanno fatto merenda!", "%s ha girato in citta", "e ha avuto un biscotto!", "%s ha giocato in giardino", "e ha trovato un seme!", "%s ha saltato nelle pozzanghere", "e ha portato del sapone!", "%s ha visto muoversi qualcosa", "nell'erba alta!", "%s e salito su una collina", "e ha trovato una Mega Ball!",
+    // battle damage that stays
+    "Serve il Centro Pokemon", "PS curati! Il resto costa", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -829,7 +839,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 44
     "Mato alto", "BOLAS", "Poke Bola", "Grande Bola", "Ultra Bola", "Um %s selvagem!", "Pegou %s!", "Foi para a caixa.", "%s escapou!", "Equipe e caixa cheias", "Sem bolas: compre na loja", "Achou uma Poke Bola!", "Algo se mexe no mato!", "Ande mais %u passos", "Esta dormindo agora", "Ninguem no mato", "Use no mato alto",
     // phase 45
-    "Passeio", "Em passeio", "De volta!", "%s saiu em passeio!", "Sem passeios hoje", "Tarde: so amanha", "Chamar", "Chamar? Sem historia", "%s foi ao rio", "e achou %u moedas!", "%s olhou num arbusto", "e achou uma Poke Bola!", "%s conheceu %s", "e dividiram um lanche!", "%s andou pela cidade", "e ganhou um biscoito!", "%s brincou no jardim", "e achou uma semente!", "%s pulou em pocas", "e trouxe sabao!", "%s viu algo se mexer", "no mato alto!", "%s subiu um morro", "e achou uma Grande Bola!", },
+    "Passeio", "Em passeio", "De volta!", "%s saiu em passeio!", "Sem passeios hoje", "Tarde: so amanha", "Chamar", "Chamar? Sem historia", "%s foi ao rio", "e achou %u moedas!", "%s olhou num arbusto", "e achou uma Poke Bola!", "%s conheceu %s", "e dividiram um lanche!", "%s andou pela cidade", "e ganhou um biscoito!", "%s brincou no jardim", "e achou uma semente!", "%s pulou em pocas", "e trouxe sabao!", "%s viu algo se mexer", "no mato alto!", "%s subiu um morro", "e achou uma Grande Bola!",
+    // battle damage that stays
+    "Precisa do Centro Pokemon", "PS curados! O resto custa", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -968,7 +980,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 44
     "草丛", "精灵球", "精灵球", "超级球", "高级球", "野生的 %s!", "抓到了 %s!", "送进了箱子.", "%s 挣脱了!", "队伍和箱子都满了", "没有球了: 去商店买", "找到了精灵球!", "草丛里有动静!", "再走 %u 步", "它正在睡觉", "草丛里没有人", "在草丛里使用",
     // phase 45
-    "旅行", "旅行中", "回来了!", "%s 出发旅行了!", "今天不能再旅行了", "太晚了: 明天吧", "叫回来", "叫回来? 没有故事", "%s 去了河边", "找到了 %u 枚金币!", "%s 在灌木下找东西", "找到了精灵球!", "%s 遇见了 %s", "一起吃了点心!", "%s 逛了小镇", "得到了一块饼干!", "%s 在花园里玩", "找到了一颗种子!", "%s 踩了水坑", "带回了肥皂!", "%s 看到有东西在动", "在草丛里!", "%s 爬上了小山", "找到了超级球!", },
+    "旅行", "旅行中", "回来了!", "%s 出发旅行了!", "今天不能再旅行了", "太晚了: 明天吧", "叫回来", "叫回来? 没有故事", "%s 去了河边", "找到了 %u 枚金币!", "%s 在灌木下找东西", "找到了精灵球!", "%s 遇见了 %s", "一起吃了点心!", "%s 逛了小镇", "得到了一块饼干!", "%s 在花园里玩", "找到了一颗种子!", "%s 踩了水坑", "带回了肥皂!", "%s 看到有东西在动", "在草丛里!", "%s 爬上了小山", "找到了超级球!",
+    // battle damage that stays
+    "需要去宝可梦中心", "体力恢复了! 其余要金币", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -1106,7 +1120,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // phase 44
     "풀숲", "볼", "몬스터볼", "수퍼볼", "하이퍼볼", "야생의 %s!", "%s 잡았다!", "상자로 보냈어.", "%s 빠져나왔어!", "팀과 상자가 꽉 찼어", "볼이 없어: 상점에서 사자", "몬스터볼을 찾았어!", "풀숲에서 뭔가 움직여!", "%u 걸음 더 걷자", "지금 자고 있어", "풀숲에 아무도 없어", "풀숲에서 쓰자",
     // phase 45
-    "여행", "여행 중", "돌아왔어!", "%s 여행을 떠났어!", "오늘은 여행 끝", "늦었어: 내일 가자", "부르기", "부를까? 이야기 없어", "%s 강에 갔어", "코인 %u개를 찾았어!", "%s 덤불을 뒤졌어", "몬스터볼을 찾았어!", "%s, %s 만났어", "간식을 나눠 먹었어!", "%s 마을을 걸었어", "쿠키를 받았어!", "%s 정원에서 놀았어", "씨앗을 찾았어!", "%s 물웅덩이에서 놀았어", "비누를 가져왔어!", "%s 뭔가 움직이는 걸 봤어", "풀숲에서!", "%s 언덕에 올랐어", "수퍼볼을 찾았어!", },
+    "여행", "여행 중", "돌아왔어!", "%s 여행을 떠났어!", "오늘은 여행 끝", "늦었어: 내일 가자", "부르기", "부를까? 이야기 없어", "%s 강에 갔어", "코인 %u개를 찾았어!", "%s 덤불을 뒤졌어", "몬스터볼을 찾았어!", "%s, %s 만났어", "간식을 나눠 먹었어!", "%s 마을을 걸었어", "쿠키를 받았어!", "%s 정원에서 놀았어", "씨앗을 찾았어!", "%s 물웅덩이에서 놀았어", "비누를 가져왔어!", "%s 뭔가 움직이는 걸 봤어", "풀숲에서!", "%s 언덕에 올랐어", "수퍼볼을 찾았어!",
+    // battle damage that stays
+    "포켓몬 센터에 가야 해", "HP 회복! 나머지는 코인", },
 };
 
 // Medal names in their three lengths [language][medal].

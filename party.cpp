@@ -74,14 +74,37 @@ void Party::begin() {
     if (s.dex < 1 || s.dex > DEX_COUNT) s.dex = 0;
     s.nick[sizeof(s.nick) - 1] = 0;
   }
+  // Health: everyone is at full unless a valid record says otherwise, which is what
+  // a save from before it existed gives.
+  for (auto &p : hpPct) p = 100;
+  for (auto &p : boxHpPct) p = 100;
+  if (prefs.getBytesLength("phpp") == sizeof(hpPct)) prefs.getBytes("phpp", hpPct, sizeof(hpPct));
+  if (prefs.getBytesLength("phbx") == sizeof(boxHpPct)) prefs.getBytes("phbx", boxHpPct, sizeof(boxHpPct));
+  for (auto &p : hpPct) if (p > 100) p = 100;
+  for (auto &p : boxHpPct) if (p > 100) p = 100;
+}
+
+bool Party::anyHurt() const {
+  for (int i = 0; i < PARTY_SLOTS; i++) if (!slots[i].empty() && hpPct[i] < 100) return true;
+  for (int i = 0; i < BOX_SLOTS; i++) if (!box[i].empty() && boxHpPct[i] < 100) return true;
+  return false;
+}
+
+void Party::healAll() {
+  for (auto &p : hpPct) p = 100;
+  for (auto &p : boxHpPct) p = 100;
+  save();
+  boxSave();
 }
 
 void Party::save() {
   prefs.putBytes("party", slots, sizeof(slots));
+  prefs.putBytes("phpp", hpPct, sizeof(hpPct));
 }
 
 void Party::boxSave() {
   prefs.putBytes("box", box, sizeof(box));
+  prefs.putBytes("phbx", boxHpPct, sizeof(boxHpPct));
 }
 
 uint8_t Party::boxCount() const {
@@ -101,6 +124,7 @@ bool Party::boxAdd(const PartyMon &m) {
   int i = boxFirstFree();
   if (i < 0) return false;
   box[i] = m;
+  boxHpPct[i] = 100;
   boxSave();
   return true;
 }
@@ -108,6 +132,7 @@ bool Party::boxAdd(const PartyMon &m) {
 void Party::boxReleaseAt(uint8_t i) {
   if (i >= BOX_SLOTS) return;
   box[i] = PartyMon();
+  boxHpPct[i] = 100;
   boxSave();
 }
 
@@ -116,6 +141,9 @@ void Party::swapPartyBox(uint8_t partyIdx, uint8_t boxIdx) {
   PartyMon t = slots[partyIdx];
   slots[partyIdx] = box[boxIdx];
   box[boxIdx] = t;
+  uint8_t h = hpPct[partyIdx];                 // and each one takes its health with it
+  hpPct[partyIdx] = boxHpPct[boxIdx];
+  boxHpPct[boxIdx] = h;
   save();
   boxSave();
 }
@@ -137,6 +165,7 @@ bool Party::add(const PartyMon &m) {
   int i = firstFree();
   if (i < 0) return false;
   slots[i] = m;
+  hpPct[i] = 100;
   save();
   return true;
 }
@@ -144,12 +173,14 @@ bool Party::add(const PartyMon &m) {
 void Party::replaceAt(uint8_t i, const PartyMon &m) {
   if (i >= PARTY_SLOTS) return;
   slots[i] = m;
+  hpPct[i] = 100;
   save();
 }
 
 void Party::releaseAt(uint8_t i) {
   if (i >= PARTY_SLOTS) return;
   slots[i] = PartyMon();
+  hpPct[i] = 100;
   save();
 }
 
