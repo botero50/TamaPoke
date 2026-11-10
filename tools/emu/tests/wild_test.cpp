@@ -34,6 +34,7 @@ extern char btlMsg[12][40];
 extern PartyMon btlWildMon;
 extern uint32_t fpToastUntil, lastInteract;
 bool startWildBattle();
+uint8_t audioMusicNow();
 void btlThrowWith(uint8_t kind, uint8_t roll);
 void battleTap(int16_t x, int16_t y);
 void startTrainerBattle(uint8_t idx, bool hard);
@@ -258,6 +259,10 @@ static void flowTests() {
   ck(btlOver && btlWon, "a catch ends the fight");
   ck(party.count() == team + 1 && party.boxCount() == boxN, "it joins the team");
   ck(pet.isRegistered(dex), "and the Pokedex");
+  ck(audioMusicNow() == MUS_VICTORY, "the win tune plays");
+  battleTap(233, 330);
+  while (btlMsgCount && battleOpen) battleTap(233, 330);
+  ck(!battleOpen && audioMusicNow() == MUS_NONE, "tapping out of a won fight stops the music");
   closeBattle();
 
   // team full: to the box, and shiny in the Pokedex

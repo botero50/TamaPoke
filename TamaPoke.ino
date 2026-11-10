@@ -46,7 +46,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.49"
+#define FW_VERSION "3.14-funpack.50"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -1194,9 +1194,15 @@ void loop() {
   // large sprites drawing takes longer, so a cushion is left)
   static uint32_t lastTimerSweep = 0;
   if (now - lastTimerSweep >= 60000) { lastTimerSweep = now; sweepOldTimers(now); }
-  if (!screenOff && now - lastRender >= (uint32_t)((gameOpen || sackOpen || spdOpen || fpOpen || scrubOpen || placeScene) ? 85 : 100)) {
+  uint32_t renderGap = (gameOpen || sackOpen || spdOpen || fpOpen || scrubOpen || placeScene) ? 85 : 100;
+  if (!screenOff && now - lastRender >= renderGap) {
     lastRender = now;
     render();
+    // The gap counts from the START of a frame, so a slow frame (the big sprite while
+    // scrubbing) left almost none before the next one began painting over the buffer
+    // the previous flush was still sending: the screen flickered. Keep 55 ms clear.
+    uint32_t end = millis();
+    if (end - now > renderGap - 55) lastRender = end - (renderGap - 55);
   }
   delay(1);   // the other tasks get a turn on every pass
 }
@@ -6877,6 +6883,7 @@ void battleTap(int16_t x, int16_t y) {
     btlMsgCount = 0;
     if (btlOver) {
       btlFreeSprites();
+      audioMusic(MUS_NONE);   // the win tune used to play on over the main screen, with no way to stop it
       battleOpen = false;
       // Back to the LAN screen rather than all the way out: that is where a
       // rematch is offered, and re-pairing for every fight would be tedious.
