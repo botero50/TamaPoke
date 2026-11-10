@@ -46,7 +46,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.50"
+#define FW_VERSION "3.14-funpack.51"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -2393,6 +2393,7 @@ void onTap(int16_t x, int16_t y) {
   }
   if (galleryOpen) {
     if (galleryPick) {
+      if (exitHit(x, y)) { galleryOpen = false; sfxPlay(SFX_TAP); return; }
       int r = regionPickTap(x, y, RPICK_FOR_DEX);
       if (r >= 0) {
         galleryRegion = (uint8_t)r;
@@ -7693,6 +7694,7 @@ static void renderRegionPick(uint8_t mode) {
   else if (forGyms) snprintf(ttl, sizeof(ttl), "%s", T(S_GYMS));
   else snprintf(ttl, sizeof(ttl), T(S_POKEDEX_FMT), pet.registeredCount(), DEX_COUNT);
   uiTextFit(UIF_MID, CX, 70, ttl, UI_INK, 1, 280);
+  if (mode == RPICK_FOR_DEX) drawExitBtn();     // the Pokedex: the same marked X as the games
 
   // The subtitle a row shows. At first boot there is none: naming the starter here
   // would give away the next screen, and the counts the other two modes show would
@@ -8277,6 +8279,7 @@ void renderGallery() {
   char pg[12];
   snprintf(pg, sizeof(pg), "%d/%d", galleryPage + 1, (int)GAL_PAGES);
   uiText(UIF_SMALL, CX, 442, pg, UI_TRACK_TEXT, 1);
+  drawExitBtn();                                // the way out was a tap on the title, with nothing to show it
   gfx->flush();
 }
 
@@ -8287,7 +8290,7 @@ void galleryTap(int16_t x, int16_t y) {
     galleryDirty = true;
     return;
   }
-  if (y < 72) {  // tap the header = quit
+  if (y < 72 || exitHit(x, y)) {  // the X, or the header = quit
     galleryOpen = false;
     galleryPmd.unload();
     return;

@@ -56,6 +56,9 @@ void mergeSwipe(uint8_t dir);
 void shakeToPlay(uint32_t now);
 int funMenuHit(int16_t x, int16_t y);
 void clockTap(int16_t x, int16_t y);
+void onTap(int16_t x, int16_t y);
+extern bool galleryOpen, galleryPick, galleryDirty;
+extern uint8_t galleryRegion;
 uint8_t uiCurrentScreen();
 
 static int bad = 0;
@@ -446,6 +449,22 @@ static void gameTests() {
   fpOpen = false; fpOverUntil = 0;
 }
 
+static void galleryTests() {
+  readyPet();
+  galleryOpen = true; galleryPick = true; galleryDirty = true;
+  pumpMs(150);
+  onTap(233, 22);
+  ck(!galleryOpen, "the Pokedex region list closes with the X");
+  galleryOpen = true; galleryPick = false; galleryRegion = 0; galleryDirty = true;
+  pumpMs(150);
+  onTap(233, 22);
+  ck(!galleryOpen, "a region page closes with the X");
+  galleryOpen = true; galleryPick = false; galleryDirty = true;
+  onTap(233, 60);
+  ck(!galleryOpen, "and still with a tap on the title");
+  galleryOpen = false; galleryPick = false;
+}
+
 static void swingTests() {
   readyPet();
   pet.wildBalls[0] = 10; pet.wildBalls[1] = 2; pet.wildBalls[2] = 0;
@@ -534,6 +553,7 @@ int main() {
   if (pet.awaitingStarter()) { printf("FAIL: no starter\n"); return 1; }
   pumpMs(120);
   gameTests();
+  galleryTests();
   swingTests();
   shakeTests();
   if (bad) { printf("FAILURES: %d\n", bad); return 1; }
