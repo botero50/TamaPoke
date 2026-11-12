@@ -465,6 +465,39 @@ static void galleryTests() {
   galleryOpen = false; galleryPick = false;
 }
 
+static void tuneTests() {
+  readyPet();
+  extern uint8_t placeScene; uint8_t audioMusicNow();
+  placeScene = 5;   // PLACE_SCHOOL
+  pumpMs(300);
+  ck(audioMusicNow() == MUS_FRERE, "arriving at school starts its tune");
+  pumpMs(5400);
+  ck(audioMusicNow() == MUS_NONE, "and it stops after about 5 seconds, however long she stays");
+  placeScene = 0; pumpMs(200);
+  placeScene = 1;   // PLACE_PARK
+  pumpMs(300);
+  ck(audioMusicNow() == MUS_TWINKLE, "each visit starts it again");
+  placeScene = 0; pumpMs(300);
+  ck(audioMusicNow() == MUS_NONE, "leaving stops it at once");
+}
+
+static void songTests() {
+  readyPet();
+  extern uint8_t placeScene; extern uint32_t songAt; uint8_t audioMusicNow(); void audioMusic(uint8_t);
+  placeScene = 12;   // PLACE_MUSIC
+  pumpMs(200);
+  audioMusic(MUS_BATTLE); songAt = millis();
+  pumpMs(1000);
+  ck(audioMusicNow() == MUS_BATTLE, "a song from the music hall plays");
+  pumpMs(8000);
+  ck(audioMusicNow() == MUS_NONE, "and stops after 8 seconds, even the battle tune that used to loop");
+  audioMusic(MUS_BATTLE); songAt = millis();
+  pumpMs(500);
+  placeScene = 0;
+  pumpMs(400);
+  ck(audioMusicNow() == MUS_NONE, "walking out of the hall stops it at once");
+}
+
 static void swingTests() {
   readyPet();
   pet.wildBalls[0] = 10; pet.wildBalls[1] = 2; pet.wildBalls[2] = 0;
@@ -554,6 +587,8 @@ int main() {
   pumpMs(120);
   gameTests();
   galleryTests();
+  tuneTests();
+  songTests();
   swingTests();
   shakeTests();
   if (bad) { printf("FAILURES: %d\n", bad); return 1; }

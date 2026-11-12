@@ -46,7 +46,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.51"
+#define FW_VERSION "3.14-funpack.52"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -15147,6 +15147,7 @@ void mirrorTap(int16_t x, int16_t y) {
 int16_t shellX[3], shellY[3];     // the shells on the sand right now
 bool shellsDealt = false;
 uint32_t townUntil = 0;           // an animation or a page held on screen until then
+uint32_t songAt = 0;              // when the music hall last started a song (it plays for 8 seconds)
 int16_t townDex = 0;              // the Pokemon in the library book
 uint8_t townRibbon = 0, townScore = 0;
 bool townShowResult = false;
@@ -15475,6 +15476,7 @@ bool placeTapTown(int16_t x, int16_t y) {
         if (!pet.playSong()) { sfxPlay(SFX_DENY); placeSay(T(S_SONGS_DONE)); return true; }
         static const uint8_t TUNE[3] = { MUS_BATTLE, MUS_VICTORY, MUS_LULLABY };
         audioMusic(TUNE[i]);
+        songAt = millis() ? millis() : 1;
         townUntil = millis() + 8000;
         placeMsgUntil = 0;
         return true;
@@ -15797,8 +15799,19 @@ void albumTap(int16_t x, int16_t y) {
 }
 
 // each place hums its own tune, softly, while you are there
+// A place's tune plays for 5 seconds and stops. It used to loop for as long as she stayed,
+// and studying at school can take many minutes.
+#define PLACE_TUNE_MS 5000
 void placeMusicTick() {
   static uint8_t lastScene = 0;
+  static uint32_t tuneAt = 0;
+  if (tuneAt && audioMusicNow() >= MUS_TWINKLE && timeUp(millis(), tuneAt + PLACE_TUNE_MS)) { audioMusic(MUS_NONE); tuneAt = 0; }
+  // A song from the music hall used to play on until it ended or, for the battle tune, for ever,
+  // and leaving the hall did not stop it. It plays 8 seconds, or until she walks out.
+  if (songAt && (timeUp(millis(), songAt + 8000) || placeScene != PLACE_MUSIC)) {
+    if (audioMusicNow() >= MUS_BATTLE && audioMusicNow() <= MUS_LULLABY) audioMusic(MUS_NONE);
+    songAt = 0;
+  }
   if (placeScene == lastScene) return;
   uint8_t tune = MUS_NONE;
   switch (placeScene) {
@@ -15810,8 +15823,8 @@ void placeMusicTick() {
   }
   uint8_t now = audioMusicNow();
   bool placeTune = now >= MUS_TWINKLE;
-  if (tune) audioMusic(tune);
-  else if (placeTune) audioMusic(MUS_NONE);                // left a place: quiet again
+  if (tune) { audioMusic(tune); tuneAt = millis() ? millis() : 1; }
+  else if (placeTune) { audioMusic(MUS_NONE); tuneAt = 0; }   // left a place: quiet again
   lastScene = placeScene;
 }
 
