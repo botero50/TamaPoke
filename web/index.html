@@ -61,7 +61,7 @@
 
   <h2><span class="num">💾</span>Save or restore your pet</h2>
   <div class="step" style="border-left:4px solid var(--ok)">
-    <p>Use <b>Save my pet</b> (or the backup button in step 1) before an update: it
+    <p>Use <b>Save my pet</b> before an update: it
        downloads a small file of your creature, Pokédex,
        coins and items, after checking that the file is complete. If anything goes wrong,
        <b>Restore my pet</b> puts it all back. New board? Skip this.</p>
@@ -103,16 +103,11 @@
 
   <h2><span class="num">1</span>Flash the firmware</h2>
   <div class="step">
-    <p>Plug the board in via USB. There are two separate buttons, and each asks for
-       the port when you press it. The install takes about a minute, with no drivers
-       on any OS.</p>
-    <p><b>1a. Back up (updating a board that has a pet).</b> It saves your pet to a
-       file and checks the file is complete. A new board, or one running something
-       else, has nothing to save: skip this.</p>
-    <div class="row"><button id="backuponly">💾 Back up my pet</button></div>
-    <pre id="installlog"></pre>
-    <p><b>1b. Install the firmware.</b> If you have not taken a backup on this page,
-       it asks you to confirm first.</p>
+    <p>Plug the board in via USB and press <b>Install now</b>. Pick the port when
+       asked. The install takes about a minute, with no drivers on any OS. Updating a
+       board that has a pet? Press <b>Save my pet</b> in the section above first. A
+       new board, or one running something else, has nothing to save. If you have not
+       saved on this page, it asks you to confirm before it installs.</p>
     <esp-web-install-button id="installer" manifest="manifest.json">
       <button slot="activate">⚡ Install now</button>
       <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
@@ -129,7 +124,7 @@
        They shipped one image covering the whole start of flash, the save
        included, and were configured to wipe the chip before writing. Both are
        fixed here. Even so, a backup is the only real safety net, which is why
-       step 1a is there (it is the same as typing <code>EXPORT</code> on
+       <b>Save my pet</b> is there (it is the same as typing <code>EXPORT</code> on
        the serial console).<br><br>
        A fresh board with nothing on it can be erased safely, and on a board
        that has never run TamaPoke it makes no difference either way.</p>
@@ -382,24 +377,9 @@ document.getElementById('petsave').onclick = () => withPort(async (send, line) =
   if (got === 'saved') backupDone = true;
 });
 
-// ---------- step 1: back up, and install, as two separate buttons ----------
-// They used to be one flow that refused to install without a backup, which failed on a
-// board with no pet to back up. Now each does its own job; installing with no backup taken
-// on this page asks first, so a board that does have a pet is not overwritten by accident.
-const ilog = (m) => { const el = document.getElementById('installlog'); el.style.display = 'block';
-  el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
-document.getElementById('backuponly').onclick = async () => {
-  let got = null;
-  await withPort(async (send, line) => { got = await takeBackup(send, line, ilog); });
-  if (got === 'saved') {
-    backupDone = true;
-    ilog('Backup done. Now press Install now below, and leave "Erase device" unticked.');
-  } else if (got === 'bad') {
-    ilog('The backup never came through complete, so nothing was saved. Check the cable and try again.');
-  } else if (got === 'none') {
-    ilog('Nothing answered, so there was nothing to back up. That is normal for a new board, or one running something else. You can press Install now.');
-  }
-};
+// ---------- step 1: install ----------
+// Backing up is the Save my pet button above, a separate step. Installing with no backup
+// taken on this page asks first, so a board that does have a pet is not overwritten by accident.
 // In the capture phase, so it runs before the install button's own handler and can stop it.
 document.getElementById('installer').addEventListener('click', (ev) => {
   if (backupDone) return;
