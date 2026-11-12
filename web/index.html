@@ -383,7 +383,7 @@ document.getElementById('petsave').onclick = () => withPort(async (send, line) =
 // In the capture phase, so it runs before the install button's own handler and can stop it.
 document.getElementById('installer').addEventListener('click', (ev) => {
   if (backupDone) return;
-  if (!confirm('No backup was taken on this page.\n\nIf this board has a pet on it, press Cancel and use "Back up my pet" first.\n\nInstall anyway?')) {
+  if (!confirm('No backup was taken on this page.\n\nIf this board has a pet on it, press Cancel and use "Save my pet" in the section above first. Updating does not erase the pet; this is only a safety net.\n\nInstall anyway?')) {
     ev.stopPropagation();
     ev.preventDefault();
   }
