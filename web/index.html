@@ -107,7 +107,9 @@
        asked. The install takes about a minute, with no drivers on any OS. Updating a
        board that has a pet? Press <b>Save my pet</b> in the section above first. A
        new board, or one running something else, has nothing to save. If you have not
-       saved on this page, it asks you to confirm before it installs.</p>
+       saved on this page, tick the box below first.</p>
+    <p><label><input id="nopetsave" type="checkbox"> I saved my pet above, or this board has no pet to save</label></p>
+    <p class="note" id="installhint" style="display:none;color:#e8503a"><b>Tick the box above first.</b> Updating does not erase the pet; this is only a safety net.</p>
     <esp-web-install-button id="installer" manifest="manifest.json">
       <button slot="activate">⚡ Install now</button>
       <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
@@ -381,12 +383,13 @@ document.getElementById('petsave').onclick = () => withPort(async (send, line) =
 // Backing up is the Save my pet button above, a separate step. Installing with no backup
 // taken on this page asks first, so a board that does have a pet is not overwritten by accident.
 // In the capture phase, so it runs before the install button's own handler and can stop it.
+// No confirm() box here: a dialog uses up the click, and the browser then refuses to show the
+// port picker ("Must be handling a user gesture"). A tick box keeps the click intact.
 document.getElementById('installer').addEventListener('click', (ev) => {
-  if (backupDone) return;
-  if (!confirm('No backup was taken on this page.\n\nIf this board has a pet on it, press Cancel and use "Save my pet" in the section above first. Updating does not erase the pet; this is only a safety net.\n\nInstall anyway?')) {
-    ev.stopPropagation();
-    ev.preventDefault();
-  }
+  if (backupDone || document.getElementById('nopetsave').checked) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  document.getElementById('installhint').style.display = 'block';
 }, true);
 
 document.getElementById('petload').onclick = () => document.getElementById('petfile').click();
