@@ -61,8 +61,8 @@
 
   <h2><span class="num">💾</span>Save or restore your pet</h2>
   <div class="step" style="border-left:4px solid var(--ok)">
-    <p>Step 1 below takes a backup for you before it installs. Use <b>Save my pet</b>
-       to take one any other time: it downloads a small file of your creature, Pokédex,
+    <p>Use <b>Save my pet</b> (or the backup button in step 1) before an update: it
+       downloads a small file of your creature, Pokédex,
        coins and items, after checking that the file is complete. If anything goes wrong,
        <b>Restore my pet</b> puts it all back. New board? Skip this.</p>
     <div class="row">
@@ -103,22 +103,21 @@
 
   <h2><span class="num">1</span>Flash the firmware</h2>
   <div class="step">
-    <p>Plug the board in via USB and press <b>Back up, then install</b>. Pick the port
-       when asked. It saves your pet to a file and checks the file is complete, and only
-       then shows <b>Install now</b>. Press that and pick the port again, because the
-       browser asks once for each. The install takes about a minute, with no drivers
+    <p>Plug the board in via USB. There are two separate buttons, and each asks for
+       the port when you press it. The install takes about a minute, with no drivers
        on any OS.</p>
-    <div class="row"><button id="backupinstall">💾 Back up, then install</button></div>
-    <div id="installgate" hidden>
-      <p><b>Ready to install.</b></p>
-      <esp-web-install-button manifest="manifest.json">
-        <button slot="activate">⚡ Install now</button>
-        <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
-        <span slot="not-allowed">Needs HTTPS.</span>
-      </esp-web-install-button>
-    </div>
+    <p><b>1a. Back up (updating a board that has a pet).</b> It saves your pet to a
+       file and checks the file is complete. A new board, or one running something
+       else, has nothing to save: skip this.</p>
+    <div class="row"><button id="backuponly">💾 Back up my pet</button></div>
     <pre id="installlog"></pre>
-    <p class="note">New board with nothing to save? <a href="#" id="skipbackup">Install without a backup</a>.</p>
+    <p><b>1b. Install the firmware.</b> If you have not taken a backup on this page,
+       it asks you to confirm first.</p>
+    <esp-web-install-button id="installer" manifest="manifest.json">
+      <button slot="activate">⚡ Install now</button>
+      <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
+      <span slot="not-allowed">Needs HTTPS.</span>
+    </esp-web-install-button>
     <p class="note" style="border-left:4px solid #e8503a;padding-left:10px">
        🔄 <b>Updating? Leave "Erase device" unchecked.</b> The installer asks
        once, with the box already unchecked — click <b>Next</b> without ticking
@@ -130,7 +129,7 @@
        They shipped one image covering the whole start of flash, the save
        included, and were configured to wipe the chip before writing. Both are
        fixed here. Even so, a backup is the only real safety net, which is why
-       this step takes one first (it is the same as typing <code>EXPORT</code> on
+       step 1a is there (it is the same as typing <code>EXPORT</code> on
        the serial console).<br><br>
        A fresh board with nothing on it can be erased safely, and on a board
        that has never run TamaPoke it makes no difference either way.</p>
@@ -304,6 +303,7 @@ document.getElementById('sendover').onclick = (ev) => {
 const slog = (m) => { const el = document.getElementById('savelog'); el.style.display = 'block';
   el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+let backupDone = false;     // a checked backup was taken on this page, so Install now needs no question
 
 async function withPort(job) {
   if (port && port.readable) { slog('Close the board connection in step 2 first (reload the page).'); return; }
@@ -379,36 +379,35 @@ document.getElementById('petsave').onclick = () => withPort(async (send, line) =
   const got = await takeBackup(send, line, slog);
   if (got === 'none') slog('No save came back. Is TamaPoke running on the board? Try again.');
   if (got === 'bad') slog('The backup never came through complete, so nothing was saved. Check the cable and try again.');
+  if (got === 'saved') backupDone = true;
 });
 
-// ---------- step 1: back up, then install ----------
-// The install button appears only once there is a good backup or the player has said
-// there is nothing to save. It takes its own click because a browser only shows the
-// port picker straight after one, and reading the save takes longer than that allows.
+// ---------- step 1: back up, and install, as two separate buttons ----------
+// They used to be one flow that refused to install without a backup, which failed on a
+// board with no pet to back up. Now each does its own job; installing with no backup taken
+// on this page asks first, so a board that does have a pet is not overwritten by accident.
 const ilog = (m) => { const el = document.getElementById('installlog'); el.style.display = 'block';
   el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
-function showInstall() {
-  const gate = document.getElementById('installgate');
-  gate.hidden = false;
-  gate.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-document.getElementById('backupinstall').onclick = async () => {
+document.getElementById('backuponly').onclick = async () => {
   let got = null;
   await withPort(async (send, line) => { got = await takeBackup(send, line, ilog); });
-  if (got === 'saved') {          // the port is closed again by now, so the installer can have it
-    ilog('Now press Install now, and leave "Erase device" unticked.');
-    showInstall();
+  if (got === 'saved') {
+    backupDone = true;
+    ilog('Backup done. Now press Install now below, and leave "Erase device" unticked.');
   } else if (got === 'bad') {
-    ilog('The backup never came through complete, so nothing will be installed. Check the cable and try again.');
+    ilog('The backup never came through complete, so nothing was saved. Check the cable and try again.');
   } else if (got === 'none') {
-    ilog('Nothing answered, so there was nothing to back up.');
-    if (confirm('No pet answered on this board. That is normal for a new board.\n\nIf this board has a pet on it, press Cancel and check the cable. Install without a backup?')) showInstall();
+    ilog('Nothing answered, so there was nothing to back up. That is normal for a new board, or one running something else. You can press Install now.');
   }
 };
-document.getElementById('skipbackup').onclick = (ev) => {
-  ev.preventDefault();
-  if (confirm('Install without a backup? If this board has a pet on it, take a backup first.')) showInstall();
-};
+// In the capture phase, so it runs before the install button's own handler and can stop it.
+document.getElementById('installer').addEventListener('click', (ev) => {
+  if (backupDone) return;
+  if (!confirm('No backup was taken on this page.\n\nIf this board has a pet on it, press Cancel and use "Back up my pet" first.\n\nInstall anyway?')) {
+    ev.stopPropagation();
+    ev.preventDefault();
+  }
+}, true);
 
 document.getElementById('petload').onclick = () => document.getElementById('petfile').click();
 document.getElementById('petfile').onchange = async (ev) => {
