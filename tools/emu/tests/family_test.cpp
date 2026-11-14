@@ -412,7 +412,8 @@ int main(){
     ck(!p.nurseryReady() && p.nurseryLeft() == 60, "a minute to go");
     p.lastSeenEpoch += 60;
     ck(p.nurseryReady() && p.nurseryCollect() && p.nurseryHasEgg() && !p.nurseryBusy(), "a day later: the egg");
-    ck(p.nursery.eggDex == 1 || p.nursery.eggDex == p.lineBase(26), "the egg is one parent's line");
+    ck(p.nursery.eggDex >= 1 && (DEX_TBL[p.nursery.eggDex].rarity == R_COMUN || DEX_TBL[p.nursery.eggDex].rarity == R_RARO), "the egg is a random common or rare Pokemon, never a legendary");
+    ck(!p.isRegistered(p.nursery.eggDex) || p.lineHasUnregistered(p.nursery.eggDex), "and not a repeat of one the Pokedex already has");
     int fromBest = 0;
     const uint8_t best[4] = { 30, 28, 25, 27 };
     for (int k = 0; k < 4; k++) if (p.nursery.eggIv[k] == best[k]) fromBest++;
@@ -426,7 +427,7 @@ int main(){
     p.setRegion((uint8_t)((p.region + 1) % REGION_COUNT));
     ck(p.eggPeek() == want, "a region change keeps the bred egg");
     p.eggTap(); p.eggTap(); p.eggTap();
-    ck(!p.isEgg() && p.speciesId == want && !p.eggBred && !p.nurseryHasEgg(), "it hatches into the parents' line");
+    ck(!p.isEgg() && p.speciesId == want && !p.eggBred && !p.nurseryHasEgg(), "it hatches into that Pokemon");
     if (!wantShiny) ck(p.ivAtk == wantIv[0] && p.ivDef == wantIv[1] && p.ivSpe == wantIv[2] && p.ivHp == wantIv[3], "with the inherited strengths");
     p.newEgg();
     ck(!p.eggBred, "the egg after that is random again");

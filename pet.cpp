@@ -139,7 +139,7 @@ void Pet::syncClock(uint32_t nowEpoch) {
   for (uint32_t i = 0; i < mins; i++) {
     ageMinutes++;
     if (isEgg()) {
-      if (ageMinutes >= 3) hatch();  // hatches while you are away
+      if (ageMinutes >= 3) { recheckEgg(); hatch(); }  // hatches while you are away
       continue;
     }
     if (sleeping && napEnd && ageMinutes >= napEnd) { napEnd = 0; wakeUp(); sleepAuto = SLEEP_NONE; }
@@ -203,7 +203,7 @@ void Pet::tick() {
   if (!frozen) ageMinutes++;   // a revived companion does not age
 
   if (isEgg()) {
-    if (ageMinutes >= 3) hatch();  // if you do not touch it, it hatches by itself after 3 min
+    if (ageMinutes >= 3) { recheckEgg(); hatch(); }  // if you do not touch it, it hatches by itself after 3 min
     return;
   }
 
@@ -486,6 +486,54 @@ static uint8_t eggRegionFallback(uint8_t want) {
   return want;                      // no art anywhere: behave as we always did
 }
 
+// Which species an egg of this tier may hold. Eggs never hold an evolved form (R_EVO is tier 0), so
+// every candidate is the first form of a line, and "repeat" means the Pokedex already has it.
+//   pass 0: a species the Pokedex does not have, in this tier or a lower one
+//   pass 1: one it has, but whose line still has an evolution it has not seen
+//   pass 2: anything (the Pokedex is complete for these tiers)
+// Returns 0 if the region has nothing at all.
+int16_t Pet::eggRoll(uint8_t use, uint8_t tier) const {
+  const RegionInfo &rg = REGIONS[use % REGION_COUNT];
+  for (int pass = 0; pass < 3; pass++) {
+    for (int t = tier; t >= R_COMUN; t--) {
+      int16_t cand[CAND_MAX];
+      int n = 0;
+      for (int16_t d = rg.lo; d <= rg.hi && n < CAND_MAX; d++) {
+        if (DEX_TBL[d].rarity != t) continue;
+        if (pass == 0 && isRegistered(d)) continue;
+        if (pass == 1 && (!isRegistered(d) || !lineHasUnregistered(d))) continue;
+        // ALL spans every region, so filter per species: a missing Sinnoh pack
+        // must not put a Sinnoh creature in a mixed egg.
+        if (!regionAvailable(regionOfDex(d))) continue;
+        // And a species with no art ANYWHERE never hatches, pack or no pack --
+        // it would be a creature that can only ever draw as a number. It keeps
+        // its dex slot; it is simply not something an egg can contain.
+        if (!speciesHasArt(d)) continue;
+        cand[n++] = d;
+      }
+      if (n > 0) return cand[random(n)];
+    }
+  }
+  return 0;
+}
+
+// The egg's species is chosen when the egg appears and the Pokedex can change before it
+// cracks, so it is looked at again just before. Only a repeat with a finished line is
+// rolled again, in the same tier; a bred egg keeps its parents' strengths either way.
+void Pet::recheckEgg() {
+  if (!isEgg() || starterPick || registeredCount() == 0) return;
+  int16_t d = eggTarget;
+  if (d < 1 || d > DEX_COUNT) return;
+  if (!isRegistered(d) || lineHasUnregistered(d)) return;
+  uint8_t tier = DEX_TBL[d].rarity;
+  if (tier < R_COMUN) tier = R_COMUN;
+  int16_t n = eggRoll(eggRegionFallback(region % REGION_COUNT), tier);
+  if (n && (!isRegistered(n) || lineHasUnregistered(n))) {
+    eggTarget = n;
+    eggByRegion[region % REGION_COUNT] = n;
+  }
+}
+
 int16_t Pet::pickEggSpecies() {
   const uint8_t use = eggRegionFallback(region % REGION_COUNT);
   const RegionInfo &rg = REGIONS[use];
@@ -505,27 +553,9 @@ int16_t Pet::pickEggSpecies() {
     else if (r < leg + rare) tier = R_RARO;
   }
 
-  // candidates of the tier with an incomplete line; if none, drop a tier;
-  // if the tier's pokedex is complete, any of the tier will do
-  for (int pass = 0; pass < 2; pass++) {
-    for (int t = tier; t >= R_COMUN; t--) {
-      int16_t cand[CAND_MAX];
-      int n = 0;
-      for (int16_t d = rg.lo; d <= rg.hi && n < CAND_MAX; d++) {
-        if (DEX_TBL[d].rarity != t) continue;
-        if (pass == 0 && !lineHasUnregistered(d)) continue;
-        // ALL spans every region, so filter per species: a missing Sinnoh pack
-        // must not put a Sinnoh creature in a mixed egg.
-        if (!regionAvailable(regionOfDex(d))) continue;
-        // And a species with no art ANYWHERE never hatches, pack or no pack --
-        // it would be a creature that can only ever draw as a number. It keeps
-        // its dex slot; it is simply not something an egg can contain.
-        if (!speciesHasArt(d)) continue;
-        cand[n++] = d;
-      }
-      if (n > 0) return cand[random(n)];
-    }
-  }
+  // a species the Pokedex lacks first; failing that one with a missing evolution; failing that anything
+  int16_t pick = eggRoll(use, tier);
+  if (pick) return pick;
   return rg.starters[random(rg.starterCount)];  // unreachable, just in case
 }
 
@@ -533,16 +563,10 @@ int16_t Pet::pickEggSpecies() {
 // region while an egg is waiting: the rarity they were granted is kept and only
 // the region changes, so switching cannot be farmed for a legendary.
 int16_t Pet::rollInRegion(uint8_t r, uint8_t tier) {
-  const RegionInfo &rg = REGIONS[eggRegionFallback(r % REGION_COUNT)];
-  for (int t = tier; t >= R_COMUN; t--) {
-    int16_t cand[CAND_MAX];
-    int n = 0;
-    for (int16_t d = rg.lo; d <= rg.hi && n < CAND_MAX; d++)
-      if (DEX_TBL[d].rarity == t && regionAvailable(regionOfDex(d)) &&
-          speciesHasArt(d)) cand[n++] = d;
-    if (n) return cand[random(n)];
-  }
-  return rg.starters[0];      // a region with nothing in it cannot happen
+  const uint8_t use = eggRegionFallback(r % REGION_COUNT);
+  int16_t pick = eggRoll(use, tier);        // the same rule as any egg: no repeats
+  if (pick) return pick;
+  return REGIONS[use].starters[0];      // a region with nothing in it cannot happen
 }
 
 // Changing region swaps the WAITING egg to that region's creature.
@@ -2607,9 +2631,13 @@ uint8_t Pet::nurseryDrop(const PartyMon &a, const PartyMon &b) {
 bool Pet::nurseryCollect() {
   if (!nurseryReady() || nurseryHasEgg()) return false;
   int16_t ba = lineBase(nursery.aDex), bb = lineBase(nursery.bDex);
-  int16_t pick = random(2) ? ba : bb;
-  if (!pick) pick = ba ? ba : bb;
-  if (!pick) { nursery.aDex = nursery.bDex = 0; save(); return false; }   // a pack went missing
+  if (!ba && !bb) { nursery.aDex = nursery.bDex = 0; save(); return false; }   // a pack went missing
+  // The species is no longer a parent's first form (that was a repeat by design). It is a
+  // random one under the egg rule, common or rare and never legendary, from the player's
+  // region. What the parents hand down is the strengths and the shine, below.
+  uint8_t tier = (random(100) < 27 + careBonus()) ? R_RARO : R_COMUN;
+  int16_t pick = eggRoll(eggRegionFallback(region % REGION_COUNT), tier);
+  if (!pick) pick = random(2) ? (ba ? ba : bb) : (bb ? bb : ba);   // nothing to roll: the old way
   // the better parent's value for each strength, except one rolled fresh
   uint8_t fresh = random(4);
   for (uint8_t k = 0; k < 4; k++) {
@@ -3260,7 +3288,7 @@ void Pet::caress() {
 
 void Pet::eggTap() {
   if (!isEgg()) return;
-  if (++eggTaps >= 3) hatch();
+  if (++eggTaps >= 3) { recheckEgg(); hatch(); }
   else save();
 }
 

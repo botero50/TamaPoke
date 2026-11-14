@@ -382,8 +382,8 @@ Map page two, NURSERY. LEAVE TWO picks two creatures from the party or the box
 and becomes the **next** egg, when the current creature finishes -- the live pet
 is never replaced. GIVE BACK drops it again, and random eggs return.
 
-- **Species:** the first form of one parent's line, 50/50 (Venusaur gives a
-  Bulbasaur, every Eeveelution an Eevee).
+- **Species:** a random common or rare Pokémon under the no-repeat rule above, never a
+  legendary. It is no longer the parents' baby.
 - **IVs:** three of the four come from the better parent, the fourth is rolled.
 - **Shiny:** 1 in 12 with a shiny parent, otherwise the usual 1 in 48.
 - Legendaries cannot go, nor branch forms no egg can hold (Bellossom, Slowking...).
@@ -490,8 +490,12 @@ shop once (2 930 coins) in about 52 days.
   \* Legendaries only start appearing once you've **registered ≥ 25** Pokémon.
 - A daily **streak** and high **bond** push rare/legendary odds higher.
 - A clean **goodbye blesses** the next egg; a **run-away curses** it (forces Common).
-- Within a tier it favors species whose **evolution line you haven't finished** (so
-  all 386 are completable).
+- **No repeats.** An egg never holds a Pokémon the Pokédex already has, unless one of its
+  evolutions is still missing. A species you don't have comes first; a repeat with an
+  evolution to find is used only when none are left in the tier, and only a finished
+  Pokédex gives plain repeats. The same rule applies when you change region while an egg
+  waits, and the species is checked once more just before the egg cracks. (So all 386 are
+  completable.)
 - **Shiny:** base **1 / 48** (→ **1 / 24** right after a goodbye), improved by
   streak/bond down to a best of **1 / 8**. Tracked separately in the dex.
 - Every hatch rolls unique **IVs** (see below) — no two are identical.
