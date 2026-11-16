@@ -498,6 +498,22 @@ static void songTests() {
   ck(audioMusicNow() == MUS_NONE, "walking out of the hall stops it at once");
 }
 
+static void clock24Tests() {
+  readyPet();
+  extern uint8_t gClock24; extern int clockH;
+  clockOpen = true; settingsPage = 0;   // the time page
+  gClock24 = 0;
+  pumpMs(150);
+  clockTap(233, 300);
+  ck(gClock24 == 1, "the 12 h / 24 h pill switches to 24 h");
+  { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("h24", 0) == 1, "and it is saved"); pr.end(); }
+  pumpMs(150);
+  clockTap(233, 300);
+  ck(gClock24 == 0, "and back to 12 h");
+  { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("h24", 1) == 0, "and that is saved too"); pr.end(); }
+  clockOpen = false;
+}
+
 static void swingTests() {
   readyPet();
   pet.wildBalls[0] = 10; pet.wildBalls[1] = 2; pet.wildBalls[2] = 0;
@@ -588,6 +604,7 @@ int main() {
   gameTests();
   galleryTests();
   tuneTests();
+  clock24Tests();
   songTests();
   swingTests();
   shakeTests();
