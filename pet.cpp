@@ -445,7 +445,7 @@ uint8_t Pet::eggRarity() const {
 // farewell, penalised by a runaway) and a bias toward incomplete lines
 // Room for the candidate list. A whole rarity tier of a 386-species dex is far
 // more than the 80 the Kanto-only build needed.
-#define CAND_MAX 260
+#define CAND_MAX 820   // ALL spans the whole Pokedex: a smaller cap left the later regions out of the pool
 
 uint16_t gRegionArt = 0xFFFF;   // everything, until the SD narrows it
 
@@ -484,6 +484,14 @@ static uint8_t eggRegionFallback(uint8_t want) {
   for (uint8_t i = 0; i < REGION_COUNT; i++)
     if (i != REGION_ALL && regionAvailable(i)) return i;
   return want;                      // no art anywhere: behave as we always did
+}
+
+// Where eggs come from: EVERY region whose sprite pack is on the card, mixed, whatever region
+// the player picked at the start (that only chooses the starter). A card with no pack at all
+// falls back as before.
+static uint8_t eggPool(uint8_t want) {
+  if (regionAvailable(REGION_ALL)) return REGION_ALL;
+  return eggRegionFallback(want);
 }
 
 // Which species an egg of this tier may hold. Eggs never hold an evolved form (R_EVO is tier 0), so
@@ -527,7 +535,7 @@ void Pet::recheckEgg() {
   if (!isRegistered(d) || lineHasUnregistered(d)) return;
   uint8_t tier = DEX_TBL[d].rarity;
   if (tier < R_COMUN) tier = R_COMUN;
-  int16_t n = eggRoll(eggRegionFallback(region % REGION_COUNT), tier);
+  int16_t n = eggRoll(eggPool(region % REGION_COUNT), tier);
   if (n && (!isRegistered(n) || lineHasUnregistered(n))) {
     eggTarget = n;
     eggByRegion[region % REGION_COUNT] = n;
@@ -535,8 +543,8 @@ void Pet::recheckEgg() {
 }
 
 int16_t Pet::pickEggSpecies() {
-  const uint8_t use = eggRegionFallback(region % REGION_COUNT);
-  const RegionInfo &rg = REGIONS[use];
+  const uint8_t use = eggPool(region % REGION_COUNT);
+  const RegionInfo &rg = REGIONS[eggRegionFallback(region % REGION_COUNT)];   // the first egg is the chosen region's starter
   // first game: classic starter -- from the chosen region, so a Johto run
   // starts with a Johto starter rather than a Kanto one
   if (registeredCount() == 0) {
@@ -563,7 +571,7 @@ int16_t Pet::pickEggSpecies() {
 // region while an egg is waiting: the rarity they were granted is kept and only
 // the region changes, so switching cannot be farmed for a legendary.
 int16_t Pet::rollInRegion(uint8_t r, uint8_t tier) {
-  const uint8_t use = eggRegionFallback(r % REGION_COUNT);
+  const uint8_t use = eggPool(r % REGION_COUNT);
   int16_t pick = eggRoll(use, tier);        // the same rule as any egg: no repeats
   if (pick) return pick;
   return REGIONS[use].starters[0];      // a region with nothing in it cannot happen
@@ -2519,7 +2527,6 @@ void Pet::payTale(uint8_t tale, uint8_t coinRoll, uint32_t friendRoll) {
       break;
     case TALE_FRIEND: {
       uint16_t lo = 1, hi = DEX_COUNT;
-      if (region < REGION_COUNT && region != REGION_ALL) { lo = REGIONS[region].lo; hi = REGIONS[region].hi; }
       tripFriend = wildPickSpecies(lo, hi, R_COMUN, friendRoll, tripFriendOk);
       if (!tripFriend) tripFriend = speciesId;  // nobody about: it played with its reflection
       joy = clamp100((int)joy + 10);
@@ -2636,7 +2643,7 @@ bool Pet::nurseryCollect() {
   // random one under the egg rule, common or rare and never legendary, from the player's
   // region. What the parents hand down is the strengths and the shine, below.
   uint8_t tier = (random(100) < 27 + careBonus()) ? R_RARO : R_COMUN;
-  int16_t pick = eggRoll(eggRegionFallback(region % REGION_COUNT), tier);
+  int16_t pick = eggRoll(eggPool(region % REGION_COUNT), tier);
   if (!pick) pick = random(2) ? (ba ? ba : bb) : (bb ? bb : ba);   // nothing to roll: the old way
   // the better parent's value for each strength, except one rolled fresh
   uint8_t fresh = random(4);

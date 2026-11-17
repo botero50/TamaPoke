@@ -228,24 +228,20 @@ int main(){
     while (!pet.isEgg()) pet.newEgg();
     uint8_t wasRegion = pet.region;
     int changed = 0, hatched = 0;
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 1; i++) {   // one round only: three taps on the egg hatch it
       // checked after EVERY tap, so no number of taps can cancel out again
       onTap((int16_t)(gx + gw / 2), (int16_t)(gy + gh + band));  // just below
       if (pet.region != wasRegion) changed++;
       if (!pet.isEgg()) hatched++;
-      onTap((int16_t)(gx - band), (int16_t)(gy + gh / 2));       // just left
-      if (pet.region != wasRegion) changed++;
-      if (!pet.isEgg()) hatched++;
     }
-    ck(hatched == 0, "a near miss on the pill does NOT hatch the egg");
-    ck(changed == 0, "and does not silently change the region either");
+    (void)hatched;   // there is no pill any more: these taps are plain taps on the egg
+    ck(changed == 0, "taps around where the pill was do not change the region");
     ck(band > (gx - hx) && band > (gy - hy),
        "and those taps really were outside the hit area, not on the pill");
 
     // on the pill: it cycles
     onTap((int16_t)(gx + gw / 2), (int16_t)(gy + gh / 2));
-    ck(pet.region != wasRegion, "tapping the pill really does change the region");
-    ck(pet.isEgg(), "and never cracks the egg while doing it");
+    ck(pet.region == wasRegion, "and the old pill spot does nothing to the region");
 
     // and the egg itself still hatches when you actually tap the egg
     for (int i = 0; i < 4; i++) onTap(233, 200);

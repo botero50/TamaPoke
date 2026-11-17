@@ -4,6 +4,7 @@
 #include "Arduino.h"
 #include "Preferences.h"
 #include "pet.h"
+#include "noart.h"
 #include "party.h"
 #include <cstdio>
 uint32_t g_seed = 53; FakeSerial Serial; FakeESP ESP; FakeWire Wire;
@@ -72,6 +73,25 @@ int main() {
     bool ok = true;
     for (int i = 0; i < 300; i++) if (p.rollInRegion(johto, R_RARO) != 152) ok = false;
     ck(ok, "a region switch rolls the species the Pokedex lacks, not a repeat");
+  }
+  // eggs come from every region on the card, whatever region was picked at the start
+  {
+    Pet p; fresh(p);
+    p.region = 0;                                      // Kanto
+    int alolaDex = 0;                                  // the first common first-form of Alola
+    for (int d = REGIONS[6].lo; d <= REGIONS[6].hi && !alolaDex; d++) if (DEX_TBL[d].rarity == R_COMUN && speciesHasArt(d)) alolaDex = d;
+    unreg(p, 1); unreg(p, alolaDex);                   // Bulbasaur (Kanto) and that one
+    int kanto = 0, alola = 0, other = 0;
+    for (int i = 0; i < 600; i++) {
+      int16_t e = p.pickEggSpecies();
+      if (e == 1) kanto++; else if (e == alolaDex) alola++; else other++;
+    }
+    ck(kanto > 100 && alola > 100, "a Kanto player's eggs also give the Alola species that is new");
+    ck(other == 0, "and nothing that the Pokedex already has");
+    reg(p, 1);
+    bool onlyAlola = true;
+    for (int i = 0; i < 300; i++) if (p.pickEggSpecies() != alolaDex) onlyAlola = false;
+    ck(onlyAlola, "with Kanto finished, the egg is the one new species from another region");
   }
   // just before it cracks, an egg that has become a repeat is rolled again
   {

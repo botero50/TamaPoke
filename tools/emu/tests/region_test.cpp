@@ -33,20 +33,21 @@ static void seed(Pet &p, int upto=60){
 }
 
 int main(){
-  // --- the lottery stays inside the chosen region
+  // --- eggs no longer stay inside the chosen region: every pack on the card is in the pool
   {
     Pet p; seed(p);
-    for (uint8_t r=0; r<REGION_COUNT; r++){
+    for (uint8_t r=0; r<REGION_COUNT-1; r++){
       p.setRegion(r);
       const RegionInfo &ri = REGIONS[r];
-      int out=0;
+      int out=0, bad=0;
       for (int i=0;i<400;i++){
         int16_t d = p.pickEggSpecies();
         if (d < ri.lo || d > ri.hi) out++;
+        if (d < 1 || d > DEX_COUNT) bad++;
       }
       char msg[80];
-      snprintf(msg,sizeof(msg),"%s eggs stay within %u..%u", ri.name, ri.lo, ri.hi);
-      ck(out==0, msg);
+      snprintf(msg,sizeof(msg),"with %s chosen, eggs also come from other regions", ri.name);
+      ck(out>0 && bad==0, msg);
     }
   }
 
@@ -88,11 +89,11 @@ int main(){
     p.newEgg();
     ck(p.isEgg(), "an egg is waiting");
     int16_t k = p.eggPeek();
-    ck(k>=1 && k<=151, "and it is a Kanto creature");
+    ck(k>=1 && k<=DEX_COUNT, "and it is a creature of the pool");
     p.setRegion(1);
-    ck(p.eggPeek()>=152 && p.eggPeek()<=251, "switching to Johto moves the egg there");
+    ck(p.isEgg() && p.eggPeek()>=1 && p.eggPeek()<=DEX_COUNT, "switching the starter region leaves a valid egg");
     p.setRegion(2);
-    ck(p.eggPeek()>=252 && p.eggPeek()<=386, "and on to Hoenn");
+    ck(p.isEgg() && p.eggPeek()>=1 && p.eggPeek()<=DEX_COUNT, "and on to Hoenn");
   }
 
   // --- RULE 1: the rarity it was granted is kept

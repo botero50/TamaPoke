@@ -46,7 +46,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.55"
+#define FW_VERSION "3.14-funpack.56"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -6187,8 +6187,7 @@ bool startWildBattle() {
     fpToastNum = (int16_t)pet.wildStepsLeft();
     return false;
   }
-  uint16_t lo = 1, hi = DEX_COUNT;
-  if (pet.region < REGION_COUNT && pet.region != REGION_ALL) { lo = REGIONS[pet.region].lo; hi = REGIONS[pet.region].hi; }
+  uint16_t lo = 1, hi = DEX_COUNT;   // every region with its sprite pack on the card (wildSpeciesOk filters)
   uint8_t tier = wildTierForRoll((uint8_t)random(100));
   int16_t dex = wildPickSpecies(lo, hi, tier, (uint32_t)random(100000), wildSpeciesOk);
   if (!dex) dex = wildPickSpecies(lo, hi, R_COMUN, (uint32_t)random(100000), wildSpeciesOk);
@@ -7616,6 +7615,7 @@ void renderGyms() {
 #define EGGREG_GUARD 14
 
 static void drawEggRegion() {
+  return;   // no region pill any more: eggs come from every pack on the card
   char l[24];
   snprintf(l, sizeof(l), "%s >", pet.regionName());
   gfx->fillRoundRect(EGGREG_X, EGGREG_Y, EGGREG_W, EGGREG_H, 10, UI_WHITE);
@@ -7639,6 +7639,7 @@ void uiEggPillRect(int *x, int *y, int *w, int *h, bool hitArea) {
 // 1 = cycled the region, -1 = a near miss that must NOT reach the egg, 0 = not
 // ours at all.
 static int eggRegionTap(int16_t x, int16_t y) {
+  return 0;   // no region pill any more
   if (!pet.isEgg()) return 0;
   if (pet.eggBred) return 0;   // no chooser: the parents decided
   int inset = EGGREG_PAD, guard = EGGREG_PAD + EGGREG_GUARD;

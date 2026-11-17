@@ -564,9 +564,9 @@ After any ending, a **new egg** appears.
 - **Pokédex:** raising a species registers it; **809 + shinies** to complete.
   Browsed **one region at a time** — swipe vertically between regions,
   horizontally to page within it, so nothing is more than ten pages from the front.
-- **Region:** the pill under a waiting egg picks which generation it comes from —
-  **Kanto / Johto / Hoenn / Sinnoh / Unova / Kalos / Alola / All**. A first egg gives that
-  region's starter. A handful of species have no sprite art anywhere (13 of
+- **Region:** eggs, nursery eggs and wild encounters come from **every region whose sprite pack
+  is on the card**, mixed; there is no region pill any more. The region picked at the very start
+  only chooses the starter. A first egg gives that region's starter. A handful of species have no sprite art anywhere (13 of
   Unova's 156, and Pyroar); they keep their dex numbers but never hatch, since the egg would
   give a creature that could only ever draw as a number.
   A region whose **sprite pack is not on the card** shows as locked and is kept
@@ -648,7 +648,7 @@ three early retires in a row still cost one day. The creature's card says
 "evolves a day later" while it carries the debt, and the confirm dialog says the
 price before you accept it.
 
-### Choosing your egg's region
+### Choosing your egg's region (before v1.39; eggs now draw from every pack on the card)
 
 The species is decided when the egg **appears**, not when it cracks, so changing
 region moves the egg you are holding. Two rules stop that being a re-roll button:
