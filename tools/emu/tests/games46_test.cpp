@@ -514,6 +514,26 @@ static void clock24Tests() {
   clockOpen = false;
 }
 
+static void tapWakeTests() {
+  readyPet();
+  extern uint8_t gTapWake; extern bool screenOff;
+  clockOpen = true; settingsPage = 2;   // the brightness page
+  gTapWake = 1;
+  pumpMs(150);
+  clockTap(233, 300);
+  ck(gTapWake == 0, "the tap-wake pill switches it off");
+  { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("twk", 1) == 0, "and it is saved"); pr.end(); }
+  clockOpen = false;
+  screenOff = true; pumpMs(200);
+  g_touchX = 233; g_touchY = 233; g_touchDown = true; emuFireInterrupt(); pumpMs(120); g_touchDown = false; emuFireInterrupt(); pumpMs(120);
+  ck(screenOff, "with tap wake off, a touch does not wake the screen");
+  g_touchX = 233; g_touchY = 233; g_touchDown = true; emuFireInterrupt(); pumpMs(120); g_touchDown = false; emuFireInterrupt(); pumpMs(120);
+  ck(screenOff, "not even a second one");
+  gTapWake = 1;
+  g_touchX = 233; g_touchY = 233; g_touchDown = true; emuFireInterrupt(); pumpMs(120); g_touchDown = false; emuFireInterrupt(); pumpMs(120);
+  ck(!screenOff, "with tap wake on, a touch wakes it as before");
+}
+
 static void swingTests() {
   readyPet();
   pet.wildBalls[0] = 10; pet.wildBalls[1] = 2; pet.wildBalls[2] = 0;
@@ -605,6 +625,7 @@ int main() {
   galleryTests();
   tuneTests();
   clock24Tests();
+  tapWakeTests();
   songTests();
   swingTests();
   shakeTests();

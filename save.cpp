@@ -86,7 +86,7 @@ const SaveField SAVE_FIELDS[] = {
   // settings, so a restored device plays the way it did
   { "lang", SK_U8 },    { "snd", SK_BOOL },   { "vol", SK_U8 },
   { "vol2", SK_U8 },
-  { "bri", SK_U8 }, { "h24", SK_U8 },
+  { "bri", SK_U8 }, { "h24", SK_U8 }, { "twk", SK_U8 },
   // this board's own bookkeeping: listed so the table stays complete, but never
   // carried in a backup (see isLocalKey)
   { SAVE_CUT_KEY, SK_BOOL }, { SAVE_RECOVERED_KEY, SK_U16 },

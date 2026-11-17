@@ -46,7 +46,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.54"
+#define FW_VERSION "3.14-funpack.55"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -186,6 +186,7 @@ int clockH = 12, clockM = 0;  // hora en edicion
 // settings pages, swiped left/right
 enum { SET_TIME, SET_VOLUME, SET_BRIGHT, SET_LANG, SET_ALARM, SET_PARENT, SET_ABOUT, SET_PAGES };
 uint8_t gBright = 7;           // screen brightness 1..10, saved under "bri"
+uint8_t gTapWake = 1;          // 0 = with the screen off, only the PWR button wakes it (saved under "twk")
 uint8_t gClock24 = 0;          // 1 = show the time as 13:05, not 1:05 PM (saved under "h24")
 uint8_t settingsPage = 0;
 
@@ -899,6 +900,7 @@ void setup() {
     bp.begin("tamapoke", true);
     gBright = bp.getUChar("bri", 7);
     gClock24 = bp.getUChar("h24", 0) ? 1 : 0;
+    gTapWake = bp.getUChar("twk", 1) ? 1 : 0;
     bp.end();
     if (gBright < 1 || gBright > 10) gBright = 7;
   }
@@ -1656,6 +1658,9 @@ void handleTouch() {
   i2cLock();                                   // shared with the IMU task
   bool pressed = touch.getPoint(&x, &y, 1) > 0;
   i2cUnlock();
+
+  // screen off and tap-to-wake switched off: a touch (a pocket) does nothing, only PWR wakes it
+  if (screenOff && !gTapWake) { wasPressed = false; return; }
 
   // punching bag: every touch counts instantly (rapid mashing)
   if (sackOpen) {
@@ -5174,6 +5179,10 @@ void renderClock() {
     snprintf(bl, sizeof(bl), "%u/10", gBright);
     uiText(UIF_BIG, CX, 158, bl, UI_INK, 1);
     drawSlider(gBright, 1, 10);
+    // tap to wake: ON = a touch wakes the screen, OFF = only the PWR button does
+    gfx->fillRoundRect(CX - 95, 286, 190, 30, 15, gTapWake ? UI_BAR_OK : UI_WHITE);
+    gfx->drawRoundRect(CX - 95, 286, 190, 30, 15, UI_INK);
+    uiText(UIF_SMALL, CX, uiMidY(UIF_SMALL, 286, 30), gTapWake ? "Tap wake: ON" : "Tap wake: OFF", gTapWake ? UI_BG_DAY : UI_INK, 1);
   } else if (settingsPage == SET_LANG) {
     settingsTitle(T(S_SET_LANG));
     const char *ln[LANG_COUNT]; int lwid[LANG_COUNT];
@@ -5249,6 +5258,13 @@ void saveBright() {
   bp.end();
 }
 
+void saveTapWake() {
+  Preferences bp;
+  bp.begin("tamapoke", false);
+  bp.putUChar("twk", gTapWake);
+  bp.end();
+}
+
 void saveClock24() {
   Preferences bp;
   bp.begin("tamapoke", false);
@@ -5303,6 +5319,11 @@ void clockTap(int16_t x, int16_t y) {
       sfxPlay(SFX_TAP);                        // so the new level is audible
     }
   } else if (settingsPage == SET_BRIGHT) {
+    if (y >= 280 && y <= 322 && x >= CX - 100 && x <= CX + 100) {   // the tap-to-wake pill
+      gTapWake = gTapWake ? 0 : 1;
+      saveTapWake();
+      sfxPlay(SFX_TAP);
+    }
     if (y >= BRI_ROW_Y && y < BRI_ROW_Y + VOL_BTN_H) {
       int nb = gBright;
       if (x >= VOLS_MINUS_X && x < VOLS_MINUS_X + VOL_BTN_W) nb--;

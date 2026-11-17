@@ -705,7 +705,7 @@ If one bottoms out it counts as a *slip-up*.
   "Train strength" button opens the bag).
 - **Settings** (menu row): clock, sound + volume, brightness, language, about (swipe
   left/right between the pages). On the clock page the **12 h / 24 h** pill switches the
-  time on the main screen and on that page between 1:05 PM and 13:05; it is kept. Swipe down = the **player card**.
+  time on the main screen and on that page between 1:05 PM and 13:05; it is kept. On the brightness page the **Tap wake** pill chooses what wakes a dark screen: ON (the default) = a touch or the PWR button, OFF = only the PWR button, so a ball in a pocket cannot light up by itself; it is kept. Swipe down = the **player card**.
 - Long press (3 s) on the creature = **release** dialog.
 
 **Physical PWR button:** short = screen on/off · long (4 s) = full power-off

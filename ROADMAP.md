@@ -34,6 +34,7 @@ _Last updated: 6 November 2026, with the battle fixes._
 | 39 | A sturdier ball, from the fork review: the date never goes back after a power cut, safety copies of the save on the SD card to recover a save cut off midway, nothing drawn with the screen off, a sound task that cannot spin | v1.24 |
 | 40 | Steps that cannot be lost: a clock change never erases them, and they are saved every 20 steps. A warning beep when a need is very low, quiet nights from 21:00 to 07:00, and coins for lifetime steps | v1.25 |
 | 46f | A 12 h / 24 h switch on the clock page: the time on the main screen and in Settings shows as 13:05 instead of 1:05 PM, kept in the save and in backups | v1.37 |
+| 46g | A **Tap wake** switch on the brightness page: with it OFF, a touch cannot wake a screen that was turned off, only the PWR button can (stops pocket wake-ups draining the battery); kept in the save | v1.38 |
 | 46e | No repeats from eggs: an egg never holds a Pokemon the Pokedex already has unless one of its evolutions is missing, for random eggs, region switches, a last check before hatching, and the Nursery (whose egg is now a random Pokemon with the parents' strengths and shine) | v1.36 |
 | 46d | Sounds that end: a place's tune (school, park, garden, lake, beach) plays 5 seconds and stops, and a song from the music hall plays 8 seconds or until she walks out, where before they played on for as long as she stayed | v1.35 |
 | 46c | The Pokedex gets the same marked X as the games, on the region list and on each region page, so the way out is visible | v1.34 |
