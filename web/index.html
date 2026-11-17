@@ -59,60 +59,15 @@
        computer</b> rather than through a hub.</p>
   </div>
 
-  <h2><span class="num">💾</span>Save or restore your pet</h2>
-  <div class="step" style="border-left:4px solid var(--ok)">
-    <p>Use <b>Save my pet</b> before an update: it
-       downloads a small file of your creature, Pokédex,
-       coins and items, after checking that the file is complete. If anything goes wrong,
-       <b>Restore my pet</b> puts it all back. New board? Skip this.</p>
-    <div class="row">
-      <button id="petsave">💾 Save my pet</button>
-      <button id="petload">♻️ Restore my pet</button>
-      <input id="petfile" type="file" accept=".txt" hidden>
-    </div>
-    <div class="row" id="petgorow" hidden>
-      <button id="petgo"></button>
-    </div>
-    <p class="note">Pick the board's port when asked. Close any other tab or program
-       using the board first: only one can use the port at a time.</p>
-    <pre id="savelog"></pre>
-  </div>
-
-  <h2><span class="num">📶</span>Optional: Wi-Fi for the real time and the weather</h2>
-  <div class="step">
-    <p>The board's clock has no battery of its own, so it forgets the time when the
-       power runs out. With your Wi-Fi it sets the time from the internet by itself
-       (every few hours, for a few seconds) and can show the weather outside: grey
-       skies, rain, snow and the temperature. Do this <b>after</b> installing.</p>
-    <div class="row" style="flex-wrap:wrap;gap:8px">
-      <input id="wssid" placeholder="Wi-Fi name" maxlength="32" autocomplete="off">
-      <input id="wpass" type="password" placeholder="Wi-Fi password" maxlength="64" autocomplete="off">
-    </div>
-    <p><label><input id="wgeo" type="checkbox" checked> Show the weather (asks for this
-       computer's location, rounded to about 1 km)</label></p>
-    <p><label><input id="wny" type="checkbox" checked> Snow from New York: when it never
-       snows where you live, the ball shows New York's snow on days it snows there</label></p>
-    <div class="row">
-      <button id="wsend">📶 Send to the board</button>
-      <button id="wforget">Forget Wi-Fi</button>
-    </div>
-    <p class="note">Only 2.4 GHz networks work (the board has no 5 GHz radio). The
-       password stays on the board: it is not in <b>Save my pet</b> backups and is not
-       sent anywhere else. The weather comes from
-       <a href="https://open-meteo.com/">Open-Meteo</a>, which gets only the rounded
-       location.</p>
-    <pre id="wifilog"></pre>
-  </div>
-
   <h2><span class="num">1</span>Flash the firmware</h2>
   <div class="step">
     <p>Plug the board in via USB and press <b>Install now</b>. Pick the port when
        asked. The install takes about a minute, with no drivers on any OS. Updating a
-       board that has a pet? Press <b>Save my pet</b> in the section above first. A
+       board that has a pet? Press <b>Save my pet</b> in step 3, below, first. A
        new board, or one running something else, has nothing to save. If you have not
        saved on this page, tick the box below first.</p>
-    <p><label><input id="nopetsave" type="checkbox"> I saved my pet above, or this board has no pet to save</label></p>
-    <p class="note" id="installhint" style="display:none;color:#e8503a"><b>Tick the box above first.</b> Updating does not erase the pet; this is only a safety net.</p>
+    <p><label><input id="nopetsave" type="checkbox"> I saved my pet (step 3), or this board has no pet to save</label></p>
+    <p class="note" id="installhint" style="display:none;color:#e8503a"><b>Tick the box first.</b> Updating does not erase the pet; this is only a safety net.</p>
     <esp-web-install-button id="installer" manifest="manifest.json">
       <button slot="activate">⚡ Install now</button>
       <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
@@ -146,6 +101,11 @@
        tab open and the card in. The progress bar moves the whole time.</p>
     <p class="note">Close the step-1 install tab first (only one program can use
        the port at a time).</p>
+    <p class="note" style="border-left:4px solid #e8503a;padding-left:10px">💳 <b>You need a microSD card</b>
+       in the board for this step.<br>
+       <b>If it fails or cannot connect:</b> restart the board by <b>long-pressing the
+       power button</b> until it powers off, then press it again to power it on.
+       Then <b>refresh this page</b> and try again.</p>
     <div class="row">
       <button id="connect">🔌 Connect board</button>
       <button id="auto" data-region="kanto" disabled>⬇️ Kanto sprites (~40 MB)</button>
@@ -161,6 +121,51 @@
     <p class="note">If the sending stops, press the same button again: it carries on from where it was. Changed the card since? <a href="#" id="sendover">Send everything again</a>.</p>
     <div class="bar" id="bar"><div></div></div>
     <pre id="log"></pre>
+  </div>
+
+  <h2><span class="num">3</span>Restore your pet (or save it before an update)</h2>
+  <div class="step" style="border-left:4px solid var(--ok)">
+    <p>Use <b>Save my pet</b> before an update: it
+       downloads a small file of your creature, Pokédex,
+       coins and items, after checking that the file is complete. If anything goes wrong,
+       <b>Restore my pet</b> puts it all back. New board? Skip this.</p>
+    <div class="row">
+      <button id="petsave">💾 Save my pet</button>
+      <button id="petload">♻️ Restore my pet</button>
+      <input id="petfile" type="file" accept=".txt" hidden>
+    </div>
+    <div class="row" id="petgorow" hidden>
+      <button id="petgo"></button>
+    </div>
+    <p class="note">Pick the board's port when asked. Close any other tab or program
+       using the board first: only one can use the port at a time.</p>
+    <pre id="savelog"></pre>
+  </div>
+
+  <h2><span class="num">4</span>Optional: Wi-Fi for the real time and the weather</h2>
+  <div class="step">
+    <p>The board's clock has no battery of its own, so it forgets the time when the
+       power runs out. With your Wi-Fi it sets the time from the internet by itself
+       (every few hours, for a few seconds) and can show the weather outside: grey
+       skies, rain, snow and the temperature. Do this <b>after</b> installing (step 1).</p>
+    <div class="row" style="flex-wrap:wrap;gap:8px">
+      <input id="wssid" placeholder="Wi-Fi name" maxlength="32" autocomplete="off">
+      <input id="wpass" type="password" placeholder="Wi-Fi password" maxlength="64" autocomplete="off">
+    </div>
+    <p><label><input id="wgeo" type="checkbox" checked> Show the weather (asks for this
+       computer's location, rounded to about 1 km)</label></p>
+    <p><label><input id="wny" type="checkbox" checked> Snow from New York: when it never
+       snows where you live, the ball shows New York's snow on days it snows there</label></p>
+    <div class="row">
+      <button id="wsend">📶 Send to the board</button>
+      <button id="wforget">Forget Wi-Fi</button>
+    </div>
+    <p class="note">Only 2.4 GHz networks work (the board has no 5 GHz radio). The
+       password stays on the board: it is not in <b>Save my pet</b> backups and is not
+       sent anywhere else. The weather comes from
+       <a href="https://open-meteo.com/">Open-Meteo</a>, which gets only the rounded
+       location.</p>
+    <pre id="wifilog"></pre>
   </div>
 
   <h2>How to play</h2>
