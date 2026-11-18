@@ -87,9 +87,9 @@ Stat gains still stop at the IV ceiling (`trMaxFor`), like the trainers.
   tastes bad: −10 JOY.
 - 💡 **Lights left on:** from **21:00 to 06:00**, awake, on the main screen and
   untouched for **20 min** with the screen on, it dozes off **with the light on**
-  (ENE only +3/min). The light button turns the light off and it sleeps on; the
-  next press wakes it. The power button turning the screen off also counts as
-  switching the light off.
+  (ENE only +3/min). One tap on the moon wakes it (while asleep, nothing else
+  can be tapped). The power button turning the screen off counts as switching
+  the light off, so it then sleeps properly.
 - 😠 **Grumpy:** woken after **30+ min** asleep with the light on: −15 JOY, ENE
   capped at 70, and minigame JOY is halved until it plays once.
 - 😐 **Bored:** **8 h** awake without any minigame: −1 JOY extra per minute.

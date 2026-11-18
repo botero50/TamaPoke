@@ -3242,9 +3242,10 @@ void Pet::setScreenOff(bool off) {
 void Pet::toggleLight() {
   if (ceremony != CER_NONE) return;
   if (isEgg()) return;
-  if (sleeping && lightOn) {   // dozed off by itself: light off, keeps sleeping
-    lightOn = false;
-  } else if (sleeping) {
+  // One tap wakes it, whether it was put to bed or dozed off with the light on.
+  // (A doze used to take two taps: the first only switched the light off, which
+  // looked like a Pokemon that would not wake up.)
+  if (sleeping) {
     wakeUp();
     napEnd = 0;
   } else {

@@ -36,6 +36,7 @@ _Last updated: 6 November 2026, with the battle fixes._
 | 46f | A 12 h / 24 h switch on the clock page: the time on the main screen and in Settings shows as 13:05 instead of 1:05 PM, kept in the save and in backups | v1.37 |
 | 46g | A **Tap wake** switch on the brightness page: with it OFF, a touch cannot wake a screen that was turned off, only the PWR button can (stops pocket wake-ups draining the battery); kept in the save | v1.38 |
 | 46h | No region pill: eggs, nursery eggs and wild encounters draw from every region whose sprite pack is on the SD card | v1.39 |
+| 46i | One tap on the moon wakes a Pokemon that dozed off with the light on (it used to take two) | v1.40 |
 | 46e | No repeats from eggs: an egg never holds a Pokemon the Pokedex already has unless one of its evolutions is missing, for random eggs, region switches, a last check before hatching, and the Nursery (whose egg is now a random Pokemon with the parents' strengths and shine) | v1.36 |
 | 46d | Sounds that end: a place's tune (school, park, garden, lake, beach) plays 5 seconds and stops, and a song from the music hall plays 8 seconds or until she walks out, where before they played on for as long as she stayed | v1.35 |
 | 46c | The Pokedex gets the same marked X as the games, on the region list and on each region page, so the way out is visible | v1.34 |

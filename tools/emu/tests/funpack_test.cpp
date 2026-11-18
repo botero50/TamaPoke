@@ -153,11 +153,10 @@ int main(){
     ck(p.sleeping, "the screen coming back on does not wake it");
     for (int i = 0; i < LIGHT_GRUMPY_TICKS; i++) p.dbgTick();
     ck(p.lightOnTicks >= LIGHT_GRUMPY_TICKS, "it counts the time with the light on");
-    p.toggleLight();
-    ck(p.sleeping && !p.lightOn, "the light button turns the light off and it sleeps on");
     p.joy = 80; p.energy = 100;
     p.toggleLight();
-    ck(!p.sleeping && p.grumpy, "woken after 30 min of light: grumpy");
+    ck(!p.sleeping && !p.lightOn, "one tap on the moon wakes it, even when it dozed off with the light on");
+    ck(p.grumpy, "woken after 30 min of light: grumpy");
     ck(p.joy == 65 && p.energy == 70, "-15 joy and energy capped at 70");
 
     fresh(p, 22);
