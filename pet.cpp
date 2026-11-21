@@ -1690,6 +1690,15 @@ bool Pet::isDozeHour() const {
   return h >= DOZE_START || h < DOZE_END;
 }
 
+// Dozing off with the light on starts at the hour the player picked (Settings >
+// Parent): 21, 22, 23 or 0 (midnight), and ends at DOZE_END like the evening.
+bool Pet::dozeWindow() const {
+  if (!lastSeenEpoch) return false;
+  int h = (int)((lastSeenEpoch / 3600) % 24);
+  if (dozeStart == 0) return h < DOZE_END;
+  return h >= dozeStart || h < DOZE_END;
+}
+
 void Pet::statusTick() {
   if (ageMinutes % 30 == 0 && overfeed) overfeed--;
   // dirty for too long -> a cold
@@ -3160,7 +3169,7 @@ GiftKind Pet::claimHolidayGift() {
 }
 
 void Pet::dozeOff() {
-  if (isEgg() || ceremony != CER_NONE || sleeping || screenIsOff || !isDozeHour()) return;
+  if (isEgg() || ceremony != CER_NONE || sleeping || screenIsOff || !dozeWindow()) return;
   sleeping = true;
   sleepAuto = SLEEP_PLAYER;
   lightOn = true;
@@ -3452,6 +3461,7 @@ void Pet::save() {
   prefs.putUChar("stdn", studyToday);
   prefs.putUChar("qzhi", quizHi);
   prefs.putUChar("pbed", parentBed);
+  prefs.putUChar("dzs", dozeStart);
   prefs.putUChar("pgam", parentGames);
   prefs.putUChar("gmtd", gamesToday);
   prefs.putUChar("advR", advRoute);
@@ -3736,6 +3746,8 @@ void Pet::load() {
   quizHi = prefs.getUChar("qzhi", 0);
   parentBed = prefs.getUChar("pbed", 0);
   if (parentBed && (parentBed < PARENT_BED_MIN || parentBed > PARENT_BED_MAX)) parentBed = 0;
+  dozeStart = prefs.getUChar("dzs", 21);
+  if (dozeStart != 0 && (dozeStart < 21 || dozeStart > 23)) dozeStart = 21;
   parentGames = prefs.getUChar("pgam", 0);
   gamesToday = prefs.getUChar("gmtd", 0);
   advRoute = prefs.getUChar("advR", 0) % ROUTE_COUNT;

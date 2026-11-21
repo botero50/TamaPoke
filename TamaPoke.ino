@@ -46,7 +46,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.57"
+#define FW_VERSION "3.14-funpack.58"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -1696,6 +1696,15 @@ void handleTouch() {
     tStart = millis();
     holdFired = false;
     swallowGesture = (dimStage > 0) || screenOff;  // si estaba a oscuras, solo despierta
+    // ...except the moon of a sleeping pet: a dim screen there is only the night
+    // dimming, and swallowing the touch made the first tap "do nothing" (the pet
+    // stayed asleep and it looked stuck). The moon is the only live icon asleep.
+    if (swallowGesture && !screenOff && pet.sleeping) {
+      int mcx = 0, mcy = 0;
+      uiSleepButton(&mcx, &mcy);
+      int mdx = x - mcx, mdy = y - mcy;
+      if (mdx * mdx + mdy * mdy <= BTN_HIT * BTN_HIT) swallowGesture = false;
+    }
     sliderDrag = !swallowGesture && clockSliderHit(x, y);
     if (sliderDrag) { swallowGesture = true; clockSliderSet(x); }
     if (screenOff) pet.setScreenOff(false);        // waking the screen wakes it
@@ -12717,39 +12726,45 @@ bool parentBlocksPlay() {
 
 #define PAR_ROW_X 83
 #define PAR_ROW_W 300
-#define PAR_ROW_H 64
-#define PAR_ROW_Y(i) (130 + (i) * 84)
+#define PAR_ROW_H 52
+#define PAR_ROW_Y(i) (130 + (i) * 60)
 
 void renderParentPage() {
   settingsTitle(T(S_SET_PARENT));
   char v[16];
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 3; i++) {
     int y = PAR_ROW_Y(i);
     gfx->fillRoundRect(PAR_ROW_X, y, PAR_ROW_W, PAR_ROW_H, 14, UI_WHITE);
     gfx->drawRoundRect(PAR_ROW_X, y, PAR_ROW_W, PAR_ROW_H, 14, UI_INK);
-    uiTextFit(UIF_SMALL, PAR_ROW_X + 16, y + 26, T(i == 0 ? S_PARENT_BED : S_PARENT_GAMES), UI_INK, 0, 190);
+    if (i == 2) {                      // the evening doze: 21:00, 22:00, 23:00 or 00:00
+      uiTextFit(UIF_SMALL, PAR_ROW_X + 16, y + 22, "Dozes off at", UI_INK, 0, 190);
+      snprintf(v, sizeof(v), "%02u:00", (unsigned)pet.dozeStart);
+      uiText(UIF_MID, PAR_ROW_X + PAR_ROW_W - 16, y + 38, v, UI_BAR_OK, 2);
+      continue;
+    }
+    uiTextFit(UIF_SMALL, PAR_ROW_X + 16, y + 22, T(i == 0 ? S_PARENT_BED : S_PARENT_GAMES), UI_INK, 0, 190);
     uint8_t val = i == 0 ? pet.parentBed : pet.parentGames;
     if (!val) snprintf(v, sizeof(v), "%s", T(S_OFF_LBL));
     else if (i == 0) snprintf(v, sizeof(v), "%u:00", (unsigned)val);
     else snprintf(v, sizeof(v), "%u", (unsigned)val);
-    uiText(UIF_MID, PAR_ROW_X + PAR_ROW_W - 16, y + 44, v, val ? UI_BAR_OK : UI_TRACK_TEXT, 2);
+    uiText(UIF_MID, PAR_ROW_X + PAR_ROW_W - 16, y + 38, v, val ? UI_BAR_OK : UI_TRACK_TEXT, 2);
     if (i == 1 && pet.parentGames) {
       char t[16];
       snprintf(t, sizeof(t), "%u/%u", (unsigned)pet.gamesToday, (unsigned)pet.parentGames);
-      uiText(UIF_TINY, PAR_ROW_X + 16, y + 52, t, UI_TRACK_TEXT, 0);
+      uiText(UIF_TINY, PAR_ROW_X + 16, y + 42, t, UI_TRACK_TEXT, 0);
     }
   }
-  uiTextFit(UIF_TINY, CX, PAR_ROW_Y(2) + 4, T(S_PARENT_HINT), UI_TRACK_TEXT, 1, 260);
 }
 
 void parentPageTap(int16_t x, int16_t y) {
   if (x < PAR_ROW_X || x > PAR_ROW_X + PAR_ROW_W) return;
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 3; i++) {
     int ry = PAR_ROW_Y(i);
     if (y < ry || y > ry + PAR_ROW_H) continue;
     sfxPlay(SFX_TAP);
     if (i == 0) pet.parentBed = !pet.parentBed ? PARENT_BED_MIN : pet.parentBed >= PARENT_BED_MAX ? 0 : pet.parentBed + 1;
-    else pet.parentGames = pet.parentGames >= 30 ? 0 : pet.parentGames + 10;
+    else if (i == 1) pet.parentGames = pet.parentGames >= 30 ? 0 : pet.parentGames + 10;
+    else pet.dozeStart = pet.dozeStart == 21 ? 22 : pet.dozeStart == 22 ? 23 : pet.dozeStart == 23 ? 0 : 21;
     pet.saveParentLimits();
     return;
   }

@@ -534,6 +534,63 @@ static void tapWakeTests() {
   ck(!screenOff, "with tap wake on, a touch wakes it as before");
 }
 
+void rtcSetEpoch(uint32_t e);
+int uiSleepButton(int *cx, int *cy);
+static void moonRepro() {
+  readyPet();
+  int lx = 0, ly = 0; uiSleepButton(&lx, &ly);
+  uint32_t night = 20000 * DAY + 21 * 3600 + 30 * 60;
+  rtcSetEpoch(night); pet.setClock(night, true); screenOff = false;
+  pumpMs(200);
+  lastInteract = millis() - 21UL * 60 * 1000;
+  pumpMs(200);
+  ck(pet.sleeping && pet.lightOn, "it dozed off with the light on, and the screen dimmed with the idle time");
+  ck(dimStage == 2, "(the screen is in its deepest idle dim)");
+  click(lx, ly);
+  ck(!pet.sleeping, "the FIRST tap on the moon wakes it, even on a screen dimmed by idling");
+
+  // a touch elsewhere on a dimmed screen still only lights it, as before
+  readyPet();
+  pet.setClock(night, true);
+  lastInteract = millis() - 21UL * 60 * 1000;
+  pumpMs(200);
+  ck(pet.sleeping, "asleep again");
+  click(233, 120);
+  ck(pet.sleeping && dimStage == 0, "a touch away from the moon on a dim screen only lights it up");
+
+  // the doze hour: 21 by default, or 22, 23, midnight
+  readyPet();
+  ck(pet.dozeStart == 21, "the doze hour is 21:00 by default");
+  auto dozesAt = [&](uint8_t start, int hour) {
+    readyPet();
+    pet.dozeStart = start;
+    uint32_t t = 20000 * DAY + hour * 3600 + 30 * 60;
+    rtcSetEpoch(t); pet.setClock(t, true); screenOff = false;
+    pet.sleeping = false;
+    pet.dozeOff();
+    return pet.sleeping;
+  };
+  ck(dozesAt(21, 21), "start 21: dozes at 21:30");
+  ck(!dozesAt(23, 21) && !dozesAt(23, 22), "start 23: not at 21:30 nor 22:30");
+  ck(dozesAt(23, 23), "start 23: dozes at 23:30");
+  ck(!dozesAt(0, 23), "start 00: not at 23:30");
+  ck(dozesAt(0, 1) && dozesAt(23, 3), "start 00 dozes at 01:30 and start 23 still at 03:30");
+  ck(!dozesAt(23, 7), "and none of them after 06:00");
+  ck(!dozesAt(22, 12), "never in the afternoon");
+
+  // the Settings > Parent row cycles 21 -> 22 -> 23 -> 00 -> 21 and is saved
+  readyPet();
+  pet.dozeStart = 21;
+  clockOpen = true; settingsPage = 5;
+  pumpMs(150);
+  extern void clockTap(int16_t x, int16_t y);
+  uint8_t seen[5]; seen[0] = pet.dozeStart;
+  for (int i = 1; i < 5; i++) { clockTap(233, 276); seen[i] = pet.dozeStart; }
+  ck(seen[1] == 22 && seen[2] == 23 && seen[3] == 0 && seen[4] == 21, "the Parent page row cycles 21, 22, 23, 00 and back");
+  { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("dzs", 99) == 21, "and it is saved under dzs"); pr.end(); }
+  clockOpen = false;
+}
+
 static void swingTests() {
   readyPet();
   pet.wildBalls[0] = 10; pet.wildBalls[1] = 2; pet.wildBalls[2] = 0;
@@ -626,6 +683,7 @@ int main() {
   tuneTests();
   clock24Tests();
   tapWakeTests();
+  moonRepro();
   songTests();
   swingTests();
   shakeTests();

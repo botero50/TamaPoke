@@ -821,6 +821,7 @@ public:
   uint8_t quizHi = 0;
   uint8_t quizDone(uint8_t correct);    // coins paid
   uint8_t parentBed = 0;        // 0 off, else the hour games stop (until 6:00)
+  uint8_t dozeStart = 21;       // the hour it may doze off with the light on: 21, 22, 23 or 0 (midnight)
   uint8_t parentGames = 0;      // 0 off, else games a day
   uint8_t gamesToday = 0;
   ParentBlock parentBlock() const;
@@ -867,6 +868,7 @@ public:
   void diaryFlag(uint8_t f) { diaryRoll(); diary[0].flags |= f; pendingSave = true; }
   uint16_t diaryCoins(uint8_t i) const { return i == 0 ? (uint16_t)(coinsEarned - diaryCoinBase) : diary[i].coins; }
   bool isDozeHour() const;
+  bool dozeWindow() const;              // is it the hour the player chose (or later) for dozing off
 
   // combat stats: real gen 1 base + level + IV + training
   uint16_t atkStat() const;

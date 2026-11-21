@@ -238,8 +238,11 @@ in December-February). Only the sky changes.
   it loves you.
 - **Parents** (settings, swipe down, the fifth page): a bedtime (19:00-22:00)
   after which games, training and battles are refused until 6:00, and a limit of
-  10/20/30 games a day. Tap a row to change it. It is not locked: it is a
-  reminder for the family, not a security feature.
+  10/20/30 games a day, and **Dozes off at**: the hour from which a Pokemon left
+  alone on the main screen for 20 min dozes off with the light on (21:00 by
+  default; 22:00, 23:00 or 00:00 move it later, until 06:00). Tap a row to
+  change it. It is not locked: it is a reminder for the family, not a security
+  feature.
 
 ### Walking rewards (phase 43)
 Three goals a day care for the Pokemon, each paid once and marked on the bar in the
