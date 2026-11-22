@@ -38,6 +38,9 @@ _Last updated: 6 November 2026, with the battle fixes._
 | 46h | No region pill: eggs, nursery eggs and wild encounters draw from every region whose sprite pack is on the SD card | v1.39 |
 | 46i | One tap on the moon wakes a Pokemon that dozed off with the light on (it used to take two) | v1.40 |
 | 46j | The moon of a sleeping Pokemon works on the first touch even when the screen has dimmed from idling (it used to only light the screen); and a Parent-page row "Dozes off at" (21:00, 22:00, 23:00, 00:00) for when it dozes off with the light on | v1.41 |
+| 46k | A Care page in Settings: "Care pace" (Normal / Relaxed (default) / Slow) slows how fast food, energy, poop, hygiene and joy move while awake (also the catch-up after being off) | v1.42 |
+| 46l | Screen-off power saver (on by default, switch on the Care page): with the screen off the chip runs at 80 MHz and the loop sleeps 40 ms a pass; steps still count because the accelerometer has its own task | v1.42 |
+| 46m | Fix: the idle timer wrapped to ~49 days when a touch stamped it a few ms after the loop read the clock: the screen blinked to its idle dim after every tap and a Pokemon woken at night dozed straight off again (the moon "did nothing"); the new Care/Parent/Tap wake labels are translated in all 8 languages | v1.42 |
 | 46e | No repeats from eggs: an egg never holds a Pokemon the Pokedex already has unless one of its evolutions is missing, for random eggs, region switches, a last check before hatching, and the Nursery (whose egg is now a random Pokemon with the parents' strengths and shine) | v1.36 |
 | 46d | Sounds that end: a place's tune (school, park, garden, lake, beach) plays 5 seconds and stops, and a song from the music hall plays 8 seconds or until she walks out, where before they played on for as long as she stayed | v1.35 |
 | 46c | The Pokedex gets the same marked X as the games, on the region list and on each region page, so the way out is visible | v1.34 |

@@ -23,6 +23,11 @@ inline void sweepTimer(uint32_t &t, uint32_t now) { if (t && (int32_t)(t - now) 
 // Game minutes per level. With 60, CHARMANDER evolves at ~16 h
 // of play with perfect care. Drop to 1 to see evolutions instantly.
 #define MINUTES_PER_LEVEL 60
+// The care pace a save starts with when it has none (every save made before the setting existed).
+// 1 = relaxed. The emulator tests build with -DCARE_PACE_DEFAULT=0 so they keep the original rates.
+#ifndef CARE_PACE_DEFAULT
+#define CARE_PACE_DEFAULT 1
+#endif
 #define MAX_LEVEL 100              // reached at 4d 3h; see level()
 #define EAT_ANIM_MS 2500UL
 #define HEART_MS 1500UL
@@ -821,7 +826,10 @@ public:
   uint8_t quizHi = 0;
   uint8_t quizDone(uint8_t correct);    // coins paid
   uint8_t parentBed = 0;        // 0 off, else the hour games stop (until 6:00)
-  uint8_t dozeStart = 21;       // the hour it may doze off with the light on: 21, 22, 23 or 0 (midnight)
+  uint8_t carePace = CARE_PACE_DEFAULT;   // 0 normal, 1 relaxed (needs every 2nd minute), 2 slow (every 4th)
+  uint8_t careEvery() const { return carePace == 1 ? 2 : carePace == 2 ? 4 : 1; }
+  bool careDue() const { return ageMinutes % careEvery() == 0; }
+  uint8_t dozeStart = 21;      // the hour it may doze off with the light on: 21, 22, 23 or 0 (midnight)
   uint8_t parentGames = 0;      // 0 off, else games a day
   uint8_t gamesToday = 0;
   ParentBlock parentBlock() const;

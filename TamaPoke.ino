@@ -46,7 +46,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.58"
+#define FW_VERSION "3.14-funpack.60"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -184,8 +184,9 @@ char partyBannerName[14] = "";
 bool clockOpen = false;       // pantalla de ajuste de hora (deslizar abajo)
 int clockH = 12, clockM = 0;  // hora en edicion
 // settings pages, swiped left/right
-enum { SET_TIME, SET_VOLUME, SET_BRIGHT, SET_LANG, SET_ALARM, SET_PARENT, SET_ABOUT, SET_PAGES };
+enum { SET_TIME, SET_VOLUME, SET_BRIGHT, SET_LANG, SET_ALARM, SET_PARENT, SET_CARE, SET_ABOUT, SET_PAGES };
 uint8_t gBright = 7;           // screen brightness 1..10, saved under "bri"
+uint8_t gScreenOffSaver = 1;   // 1 = with the screen off the chip runs slower and the loop sleeps (steps still count); saved under "sos"
 uint8_t gTapWake = 1;          // 0 = with the screen off, only the PWR button wakes it (saved under "twk")
 uint8_t gClock24 = 0;          // 1 = show the time as 13:05, not 1:05 PM (saved under "h24")
 uint8_t settingsPage = 0;
@@ -775,6 +776,14 @@ uint32_t lastRender = 0;
 // AMOLED protection: dimmed on inactivity
 uint32_t lastInteract = 0;
 uint32_t lastTouchAt = 0;    // a real touch, unlike lastInteract, which events also move
+// Milliseconds since a stamp, never negative. loop() reads the clock once at its top and a
+// touch handled later in the same pass stamps lastInteract a few ms AFTER that, so
+// "now - stamp" wrapped to ~49 days: the screen dipped to its idle dim for a frame (the
+// blink after every tap) and a Pokemon just woken at night dozed straight off again.
+static inline uint32_t msSince(uint32_t now, uint32_t stamp) {
+  int32_t d = (int32_t)(now - stamp);
+  return d < 0 ? 0 : (uint32_t)d;
+}
 uint32_t gClockJumps = 0;    // RTC reads thrown out as glitches (STATS)
 uint8_t dimStage = 0;        // 0 despierto, 1 atenuado (90s), 2 casi apagado (5min)
 bool swallowGesture = false; // el toque que despierta no acciona nada
@@ -817,7 +826,7 @@ void drawSplash() {
 // one, everything sounds; otherwise nothing does. Music is never held back.
 #define SOUND_TOUCH_MS 60000UL
 bool soundQuietNow(uint32_t now) {
-  return pet.quietHours() && now - lastTouchAt > SOUND_TOUCH_MS;
+  return pet.quietHours() && msSince(now, lastTouchAt) > SOUND_TOUCH_MS;
 }
 
 // ---------- surviving a power cut (phase 39) ----------
@@ -901,6 +910,7 @@ void setup() {
     gBright = bp.getUChar("bri", 7);
     gClock24 = bp.getUChar("h24", 0) ? 1 : 0;
     gTapWake = bp.getUChar("twk", 1) ? 1 : 0;
+    gScreenOffSaver = bp.getUChar("sos", 1) ? 1 : 0;
     bp.end();
     if (gBright < 1 || gBright > 10) gBright = 7;
   }
@@ -1146,7 +1156,7 @@ void loop() {
   // Fun Pack: nobody has touched it for a while in the evening and the screen
   // is still on -- it nods off with the light on (Pet::dozeOff checks the hour)
   if (!screenOff && !pet.sleeping && uiCurrentScreen() == SCR_MAIN &&
-      now - lastInteract > DOZE_IDLE_MS)
+      msSince(now, lastInteract) > DOZE_IDLE_MS)
     pet.dozeOff();
 
   // flush the periodic autosave ONLY with the screen dimmed/off or
@@ -1208,7 +1218,15 @@ void loop() {
     uint32_t end = millis();
     if (end - now > renderGap - 55) lastRender = end - (renderGap - 55);
   }
-  delay(1);   // the other tasks get a turn on every pass
+  // Screen-off power saver. With the screen dark nothing needs the loop at 1 kHz: the
+  // accelerometer task keeps its own 10 ms poll and its 128-sample queue (~2 s), so the
+  // loop can sleep 40 ms a pass and the chip can run at 80 MHz, and steps still count
+  // the same. Back to full speed the moment the screen is on, or a link game is live.
+  static uint8_t cpuMhz = 0;
+  const bool saver = screenOff && gScreenOffSaver && !lan.live() && !linkNowUp();
+  const uint8_t wantMhz = saver ? 80 : 240;
+  if (wantMhz != cpuMhz) { setCpuFrequencyMhz(wantMhz); cpuMhz = wantMhz; }
+  delay(saver ? 40 : 1);   // the other tasks get a turn on every pass
 }
 
 // brightness according to sleep + inactivity (AMOLED protection)
@@ -1217,7 +1235,7 @@ void updateBrightness(uint32_t now) {
   if (pet.evolving() || pet.ceremony || pet.eating() || pet.showHeart()) {
     lastInteract = now;
   }
-  uint32_t idle = now - lastInteract;
+  uint32_t idle = msSince(now, lastInteract);
   dimStage = (idle > 300000) ? 2 : (idle > 90000) ? 1 : 0;
   // the player's level (1..10) sets the awake brightness; the sleep and idle
   // dim levels below it only ever go DOWN from it, never above
@@ -5191,7 +5209,8 @@ void renderClock() {
     // tap to wake: ON = a touch wakes the screen, OFF = only the PWR button does
     gfx->fillRoundRect(CX - 95, 286, 190, 30, 15, gTapWake ? UI_BAR_OK : UI_WHITE);
     gfx->drawRoundRect(CX - 95, 286, 190, 30, 15, UI_INK);
-    uiText(UIF_SMALL, CX, uiMidY(UIF_SMALL, 286, 30), gTapWake ? "Tap wake: ON" : "Tap wake: OFF", gTapWake ? UI_BG_DAY : UI_INK, 1);
+    char twl[40]; snprintf(twl, sizeof(twl), "%s: %s", T(S_TAP_WAKE), T(gTapWake ? S_SND_ON : S_SND_OFF));
+    uiTextFit(UIF_SMALL, CX, uiMidY(UIF_SMALL, 286, 30), twl, gTapWake ? UI_BG_DAY : UI_INK, 1, 176);
   } else if (settingsPage == SET_LANG) {
     settingsTitle(T(S_SET_LANG));
     const char *ln[LANG_COUNT]; int lwid[LANG_COUNT];
@@ -5210,6 +5229,8 @@ void renderClock() {
     renderAlarmPage();
   } else if (settingsPage == SET_PARENT) {
     renderParentPage();
+  } else if (settingsPage == SET_CARE) {
+    renderCarePage();
   } else {
     settingsTitle(T(S_ABOUT));
     drawLogo(196);
@@ -5264,6 +5285,13 @@ void saveBright() {
   Preferences bp;
   bp.begin("tamapoke", false);
   bp.putUChar("bri", gBright);
+  bp.end();
+}
+
+void saveScreenOffSaver() {
+  Preferences bp;
+  bp.begin("tamapoke", false);
+  bp.putUChar("sos", gScreenOffSaver);
   bp.end();
 }
 
@@ -5359,6 +5387,8 @@ void clockTap(int16_t x, int16_t y) {
     alarmPageTap(x, y);
   } else if (settingsPage == SET_PARENT) {
     parentPageTap(x, y);
+  } else if (settingsPage == SET_CARE) {
+    carePageTap(x, y);
   } else if (settingsPage == SET_ABOUT) {
     if (y >= 236 && y <= 276 && x >= CX - 100 && x <= CX + 100) {   // five taps on the version wake the secret game
       static uint8_t taps = 0;
@@ -12737,7 +12767,7 @@ void renderParentPage() {
     gfx->fillRoundRect(PAR_ROW_X, y, PAR_ROW_W, PAR_ROW_H, 14, UI_WHITE);
     gfx->drawRoundRect(PAR_ROW_X, y, PAR_ROW_W, PAR_ROW_H, 14, UI_INK);
     if (i == 2) {                      // the evening doze: 21:00, 22:00, 23:00 or 00:00
-      uiTextFit(UIF_SMALL, PAR_ROW_X + 16, y + 22, "Dozes off at", UI_INK, 0, 190);
+      uiTextFit(UIF_SMALL, PAR_ROW_X + 16, y + 22, T(S_DOZE_AT), UI_INK, 0, 190);
       snprintf(v, sizeof(v), "%02u:00", (unsigned)pet.dozeStart);
       uiText(UIF_MID, PAR_ROW_X + PAR_ROW_W - 16, y + 38, v, UI_BAR_OK, 2);
       continue;
@@ -12766,6 +12796,45 @@ void parentPageTap(int16_t x, int16_t y) {
     else if (i == 1) pet.parentGames = pet.parentGames >= 30 ? 0 : pet.parentGames + 10;
     else pet.dozeStart = pet.dozeStart == 21 ? 22 : pet.dozeStart == 22 ? 23 : pet.dozeStart == 23 ? 0 : 21;
     pet.saveParentLimits();
+    return;
+  }
+}
+
+// The Care page: how fast the needs move, and the screen-off power saver. Same rows
+// as the Parent page; tapping a row cycles it.
+static const char *carePaceName() {
+  return T(pet.carePace == 1 ? S_PACE_RELAXED : pet.carePace == 2 ? S_PACE_SLOW : S_PACE_NORMAL);
+}
+
+void renderCarePage() {
+  settingsTitle(T(S_CARE_TITLE));
+  for (int i = 0; i < 2; i++) {
+    int y = PAR_ROW_Y(i);
+    gfx->fillRoundRect(PAR_ROW_X, y, PAR_ROW_W, PAR_ROW_H, 14, UI_WHITE);
+    gfx->drawRoundRect(PAR_ROW_X, y, PAR_ROW_W, PAR_ROW_H, 14, UI_INK);
+    if (i == 0) {
+      uiTextFit(UIF_SMALL, PAR_ROW_X + 16, y + 22, T(S_CARE_PACE), UI_INK, 0, 150);
+      uiText(UIF_MID, PAR_ROW_X + PAR_ROW_W - 16, y + 38, carePaceName(), pet.carePace ? UI_BAR_OK : UI_TRACK_TEXT, 2);
+    } else {
+      uiTextFit(UIF_SMALL, PAR_ROW_X + 16, y + 22, T(S_SAVER), UI_INK, 0, 205);
+      uiText(UIF_MID, PAR_ROW_X + PAR_ROW_W - 16, y + 38, T(gScreenOffSaver ? S_SND_ON : S_SND_OFF), gScreenOffSaver ? UI_BAR_OK : UI_TRACK_TEXT, 2);
+    }
+  }
+}
+
+void carePageTap(int16_t x, int16_t y) {
+  if (x < PAR_ROW_X || x > PAR_ROW_X + PAR_ROW_W) return;
+  for (int i = 0; i < 2; i++) {
+    int ry = PAR_ROW_Y(i);
+    if (y < ry || y > ry + PAR_ROW_H) continue;
+    sfxPlay(SFX_TAP);
+    if (i == 0) {
+      pet.carePace = (uint8_t)((pet.carePace + 1) % 3);
+      pet.saveParentLimits();
+    } else {
+      gScreenOffSaver = gScreenOffSaver ? 0 : 1;
+      saveScreenOffSaver();
+    }
     return;
   }
 }

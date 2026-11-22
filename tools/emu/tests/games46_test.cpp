@@ -351,7 +351,7 @@ static void gameTests() {
   pet.secretRun = 0;
 
   // the About page: five taps on the version
-  clockOpen = true; settingsPage = 6;
+  clockOpen = true; settingsPage = 7;
   for (int i = 0; i < 4; i++) clockTap(233, 256);
   ck(pet.secretRun == 0, "four taps on the version do nothing");
   clockTap(233, 256);
@@ -591,6 +591,81 @@ static void moonRepro() {
   clockOpen = false;
 }
 
+// A touch stamps lastInteract a few ms after loop() read the clock. That stamp used to make
+// "now - lastInteract" wrap to ~49 days: a one-frame dip to the idle dim (the blink after
+// every tap) and, at night, a Pokemon just woken dozing straight off again.
+static void idleWrapTest() {
+  readyPet();
+  uint32_t night = 20000 * DAY + 23 * 3600 + 57 * 60;
+  rtcSetEpoch(night); pet.setClock(night, true); screenOff = false;
+  pumpMs(120);
+  lastInteract = millis() + 300;            // stamped after the clock the loop is about to read
+  for (int i = 0; i < 4; i++) { pumpMs(30); lastInteract = millis() + 300; }
+  ck(dimStage == 0, "a stamp just ahead of the clock does not read as a long idle (no dim blink)");
+  ck(!pet.sleeping, "and does not doze a Pokemon off at night");
+}
+
+static void carePaceTests() {
+  // awake needs: 20 minutes of ticks from a full belly
+  auto after20 = [&](uint8_t pace, bool sleep) {
+    readyPet();
+    pet.carePace = pace;
+    pet.fullness = 100; pet.energy = 100; pet.hygiene = 100; pet.joy = 100;
+    pet.sleeping = sleep; pet.lightOn = false;
+    for (int i = 0; i < 20; i++) pet.dbgTick();
+    return (int)pet.fullness;
+  };
+  ck(after20(0, false) == 60, "normal pace: food falls 2 a minute, as always (100 -> 60 in 20 min)");
+  ck(after20(1, false) == 80, "relaxed pace: half as fast (100 -> 80)");
+  ck(after20(2, false) == 90, "slow pace: a quarter as fast (100 -> 90)");
+  int s0 = after20(0, true), s2 = after20(2, true);
+  ck(s0 == s2, "asleep, the pace changes nothing");
+
+  // away for an hour: the same pace applies to the catch-up
+  auto away = [&](uint8_t pace) {
+    readyPet();
+    pet.carePace = pace;
+    pet.fullness = 100; pet.energy = 100; pet.hygiene = 100; pet.joy = 100;
+    pet.sleeping = false; pet.poops = 0;
+    pet.setClock(D0);
+    pet.syncClock(D0 + 3600);
+    return (int)pet.fullness;
+  };
+  int f0 = away(0), f1 = away(1), f2 = away(2);
+  printf("      away fullness: normal %d relaxed %d slow %d\n", f0, f1, f2);
+  ck(f0 < f1 && f1 < f2, "after an hour away, a slower pace comes back less hungry");
+
+  // the pace and its page
+  readyPet();
+  pet.carePace = 0;
+  clockOpen = true; settingsPage = 6;                // SET_CARE
+  pumpMs(150);
+  uint8_t seen[4]; seen[0] = pet.carePace;
+  for (int i = 1; i < 4; i++) { clockTap(233, 156); seen[i] = pet.carePace; }
+  ck(seen[1] == 1 && seen[2] == 2 && seen[3] == 0, "the Care page row cycles Normal, Relaxed, Slow and back");
+  { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("cpc", 9) == 0, "and the pace is saved under cpc"); pr.end(); }
+  extern uint8_t gScreenOffSaver;
+  gScreenOffSaver = 1;
+  clockTap(233, 216);
+  ck(gScreenOffSaver == 0, "the screen-off saver row switches it off");
+  { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("sos", 9) == 0, "and it is saved under sos"); pr.end(); }
+  clockTap(233, 216);
+  ck(gScreenOffSaver == 1, "and on again");
+  clockOpen = false;
+
+  // the saver: slower chip only with the screen off and the switch on
+  screenOff = false; pumpMs(150);
+  ck(emuCpuMhz() == 240, "screen on: full speed");
+  screenOff = true; pumpMs(150);
+  ck(emuCpuMhz() == 80, "screen off with the saver: 80 MHz");
+  gScreenOffSaver = 0; pumpMs(150);
+  ck(emuCpuMhz() == 240, "screen off with the saver switched off: full speed");
+  gScreenOffSaver = 1; pumpMs(150);
+  ck(emuCpuMhz() == 80, "and slow again");
+  screenOff = false; pumpMs(150);
+  ck(emuCpuMhz() == 240, "waking the screen restores full speed");
+}
+
 static void swingTests() {
   readyPet();
   pet.wildBalls[0] = 10; pet.wildBalls[1] = 2; pet.wildBalls[2] = 0;
@@ -684,6 +759,8 @@ int main() {
   clock24Tests();
   tapWakeTests();
   moonRepro();
+  idleWrapTest();
+  carePaceTests();
   songTests();
   swingTests();
   shakeTests();

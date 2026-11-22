@@ -236,6 +236,8 @@ enum StrId : uint16_t {
   S_NEEDS_CENTER, S_CENTER_HP_ONLY,
   // phase 46: new games, swing to throw, the secret game
   S_GAME_MERGE, S_GAME_BRICK, S_GAME_ROLL, S_GAME_RUN, S_MERGE_HINT, S_BRICK_HINT, S_ROLL_HINT, S_RUN_HINT, S_SWING_THROW, S_SWING_OR_TAP, S_SECRET_FOUND,
+  // care page, doze hour, tap wake
+  S_TAP_WAKE, S_DOZE_AT, S_CARE_TITLE, S_CARE_PACE, S_PACE_NORMAL, S_PACE_RELAXED, S_PACE_SLOW, S_SAVER,
   STR_COUNT
 };
 

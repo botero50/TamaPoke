@@ -30,6 +30,8 @@ inline void delay(uint32_t ms) {
   // the sketch relies on it for correctness, only for boot-time settling
   (void)ms;
 }
+inline uint8_t &emuCpuMhz() { static uint8_t m = 240; return m; }   // what the sketch last asked for
+inline bool setCpuFrequencyMhz(uint32_t mhz) { emuCpuMhz() = (uint8_t)mhz; return true; }
 inline void pinMode(int, int) {}
 inline int digitalPinToInterrupt(int p) { return p; }
 

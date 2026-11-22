@@ -163,15 +163,17 @@ void Pet::syncClock(uint32_t nowEpoch) {
       if (ageMinutes % 3 == 0) hygiene = dropTo(hygiene, 1, 45);
       continue;
     }
-    fullness = dropTo(fullness, 2, 15);
-    energy = dropTo(energy, 1, 15);
-    hygiene = dropTo(hygiene, 1, 15);
-    joy = dropTo(joy, 1, 15);
+    if (careDue()) {                         // the care pace slows the awake needs here too
+      fullness = dropTo(fullness, 2, 15);
+      energy = dropTo(energy, 1, 15);
+      hygiene = dropTo(hygiene, 1, 15);
+      joy = dropTo(joy, 1, 15);
+    }
     if (boredTicks < 0xFFFF) boredTicks++;  // nobody played with it meanwhile
   }
   if (!isEgg()) {
     if (!sleeping) {  // does not get dirty while sleeping
-      uint8_t p = poops + mins / 240;
+      uint8_t p = poops + mins / (240u * careEvery());
       poops = p > 3 ? 3 : p;
     }
     // evolution is NOT applied offline: it is left ready and the user triggers it
@@ -265,21 +267,28 @@ void Pet::tick() {
 
   if (ageMinutes % MINUTES_PER_LEVEL == 0) sfxPlay(SFX_LEVEL);  // levelled up (awake)
 
-  fullness = clamp100(fullness - 2);
-  energy = clamp100(energy - 1);
-  if (fullness > 40 && poops < 3 && random(100) < 15) poops++;
+  // The needs (food, energy, poop, hygiene, joy) move only on every Nth minute, N set
+  // by the care pace (1 = as always, 2 relaxed, 4 slow); everything else ticks as before.
+  const bool careNow = careDue();
+  if (careNow) {
+    fullness = clamp100(fullness - 2);
+    energy = clamp100(energy - 1);
+    if (fullness > 40 && poops < 3 && random(100) < 15) poops++;
 
-  hygiene = clamp100(hygiene - 1 - POOP_DRAIN_PER_PILE * poops);
-  // overweight makes it lazy: energy falls twice as fast
-  if (weight > 50) energy = clamp100(energy - 1);
+    hygiene = clamp100(hygiene - 1 - POOP_DRAIN_PER_PILE * poops);
+    // overweight makes it lazy: energy falls twice as fast
+    if (weight > 50) energy = clamp100(energy - 1);
+  }
   if (weight > 0 && ageMinutes % 3 == 0) weight--;
 
   defTick(false);  // calm forges defence
 
-  int dJoy = -1;
-  if (fullness < 30) dJoy -= 2;
-  if (hygiene < 30) dJoy -= 2;
-  joy = clamp100(joy + dJoy);
+  if (careNow) {
+    int dJoy = -1;
+    if (fullness < 30) dJoy -= 2;
+    if (hygiene < 30) dJoy -= 2;
+    joy = clamp100(joy + dJoy);
+  }
 
   statusTick();  // Fun Pack: sickness, boredom, dozing off with the light on
 
@@ -3462,6 +3471,7 @@ void Pet::save() {
   prefs.putUChar("qzhi", quizHi);
   prefs.putUChar("pbed", parentBed);
   prefs.putUChar("dzs", dozeStart);
+  prefs.putUChar("cpc", carePace);
   prefs.putUChar("pgam", parentGames);
   prefs.putUChar("gmtd", gamesToday);
   prefs.putUChar("advR", advRoute);
@@ -3748,6 +3758,8 @@ void Pet::load() {
   if (parentBed && (parentBed < PARENT_BED_MIN || parentBed > PARENT_BED_MAX)) parentBed = 0;
   dozeStart = prefs.getUChar("dzs", 21);
   if (dozeStart != 0 && (dozeStart < 21 || dozeStart > 23)) dozeStart = 21;
+  carePace = prefs.getUChar("cpc", CARE_PACE_DEFAULT);
+  if (carePace > 2) carePace = CARE_PACE_DEFAULT;
   parentGames = prefs.getUChar("pgam", 0);
   gamesToday = prefs.getUChar("gmtd", 0);
   advRoute = prefs.getUChar("advR", 0) % ROUTE_COUNT;
