@@ -74,6 +74,7 @@ Huge thanks to that whole community for an enormous amount of work.
 | XPowersLib (AXP2101 PMU) | [Lewis He / lewisxhe](https://github.com/lewisxhe/XPowersLib) |
 | Board and pinout | [Waveshare ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) |
 | UI font (`uifont.h`, via `tools/gen_font.py`) | [Fredoka](https://fonts.google.com/specimen/Fredoka) and [Nunito](https://fonts.google.com/specimen/Nunito), SIL Open Font License 1.1; the TTFs are in `tools/fonts/` |
+| Standby clock, self-care on USB and (planned) light sleep, battery curve and tournament | Ideas and reference from [Mu-Muu/TamaPoke](https://github.com/Mu-Muu/TamaPoke) (MIT, Copyright (c) 2026 Quique Tortosa and the fork's contributors); re-implemented here for this engine, with the MIT notice kept where code is adapted |
 | Web installer | [ESP Web Tools](https://esphome.github.io/esp-web-tools/) (Nabu Casa) |
 | 5x7 bitmap font in `tools/emu/font.cpp` | [Adafruit_GFX](https://github.com/adafruit/Adafruit-GFX-Library) © 2012 Adafruit Industries, BSD licence |
 

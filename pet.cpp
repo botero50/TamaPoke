@@ -290,6 +290,8 @@ void Pet::tick() {
     joy = clamp100(joy + dJoy);
   }
 
+  if (pluggedIdle) autoCare();   // plugged in and left alone: one low need is quietly seen to
+
   statusTick();  // Fun Pack: sickness, boredom, dozing off with the light on
 
   // Mistake: leaving a stat in the gutter counts as a care
@@ -1706,6 +1708,22 @@ bool Pet::dozeWindow() const {
   int h = (int)((lastSeenEpoch / 3600) % 24);
   if (dozeStart == 0) return h < DOZE_END;
   return h >= dozeStart || h < DOZE_END;
+}
+
+void Pet::autoCare() {
+  if (fullness < AUTO_CARE_FROM) {
+    fullness = AUTO_CARE_LEVEL;
+  } else if (hygiene < AUTO_CARE_FROM || poops >= 2) {
+    if (hygiene < AUTO_CARE_LEVEL) hygiene = AUTO_CARE_LEVEL;
+    poops = 0;
+  } else if (energy < AUTO_CARE_FROM) {
+    energy = AUTO_CARE_LEVEL;
+  } else if (joy < AUTO_CARE_FROM) {
+    joy = AUTO_CARE_LEVEL;
+  } else {
+    return;
+  }
+  pendingSave = true;
 }
 
 void Pet::statusTick() {

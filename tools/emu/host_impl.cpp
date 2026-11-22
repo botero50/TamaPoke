@@ -136,7 +136,8 @@ bool batBegin() { return true; }
 void pmuEnablePanel() {}
 int batPercent() { return 87; }
 bool batCharging() { return false; }
-bool usbPresent() { return true; }
+bool g_emuUsb = false;   // tests set it: the standby clock and self-care need USB power
+bool usbPresent() { return g_emuUsb; }
 void pwrSetup() {}
 bool pwrShortPressed() { return false; }
 

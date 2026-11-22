@@ -36,6 +36,7 @@
 #include "rtcbat.h"
 #include "wifisync.h"
 #include "weather.h"
+#include "standby.h"
 #include "talk.h"
 #include "imu.h"
 #include "steps.h"
@@ -46,7 +47,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.60"
+#define FW_VERSION "3.14-funpack.61"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -776,6 +777,7 @@ uint32_t lastRender = 0;
 // AMOLED protection: dimmed on inactivity
 uint32_t lastInteract = 0;
 uint32_t lastTouchAt = 0;    // a real touch, unlike lastInteract, which events also move
+bool gStandbyOn = false;     // the standby clock is showing (plugged in and untouched, see standby.h)
 // Milliseconds since a stamp, never negative. loop() reads the clock once at its top and a
 // touch handled later in the same pass stamps lastInteract a few ms AFTER that, so
 // "now - stamp" wrapped to ~49 days: the screen dipped to its idle dim for a frame (the
@@ -1097,6 +1099,19 @@ void loop() {
     }
   }
 
+  // Plugged in and left alone: the standby clock after 90 s, and after 10 min it sees to its own
+  // needs. On battery neither happens.
+  {
+    const bool usb = usbPresent();
+    const uint32_t idle = msSince(now, lastInteract);
+    StandbyCtx sc = { usb, !screenOff, uiCurrentScreen() == SCR_MAIN,
+                      pet.ceremony || pet.evolving() || alarmRinging || pet.awaitingStarter() ||
+                      pet.isEgg() || pet.hasLearnOffer(),
+                      idle };
+    gStandbyOn = standbyDue(sc);
+    pet.setPlugged(selfCareDue(usb, idle));
+  }
+
   updateBrightness(now);
 
   // a holiday gift, handed over once on the day
@@ -1209,6 +1224,9 @@ void loop() {
   static uint32_t lastTimerSweep = 0;
   if (now - lastTimerSweep >= 60000) { lastTimerSweep = now; sweepOldTimers(now); }
   uint32_t renderGap = (gameOpen || sackOpen || spdOpen || fpOpen || scrubOpen || placeScene) ? 85 : 100;
+  // Nobody is watching a clock or a dimmed pet screen: draw it at 2-3 frames a second, not 10.
+  if (gStandbyOn) renderGap = 500;
+  else if (dimStage >= 1 && uiCurrentScreen() == SCR_MAIN) renderGap = 300;
   if (!screenOff && now - lastRender >= renderGap) {
     lastRender = now;
     render();
@@ -1242,7 +1260,7 @@ void updateBrightness(uint32_t now) {
   uint8_t base = (uint8_t)(gBright * 255 / 10);
   uint8_t target = pet.sleeping ? 25 : base;
   if (dimStage == 1) target = pet.sleeping ? 10 : (base < 60 ? base : 60);
-  else if (dimStage == 2) target = 8;
+  else if (dimStage == 2) target = gStandbyOn ? (base < 60 ? base : 60) : 8;   // the clock stays readable
   if (screenOff) target = 0;
   static uint8_t current = 255;
   if (target != current) {
@@ -1713,11 +1731,11 @@ void handleTouch() {
     tY0 = tYl = y;
     tStart = millis();
     holdFired = false;
-    swallowGesture = (dimStage > 0) || screenOff;  // si estaba a oscuras, solo despierta
+    swallowGesture = (dimStage > 0) || screenOff || gStandbyOn;  // si estaba a oscuras, solo despierta
     // ...except the moon of a sleeping pet: a dim screen there is only the night
     // dimming, and swallowing the touch made the first tap "do nothing" (the pet
     // stayed asleep and it looked stuck). The moon is the only live icon asleep.
-    if (swallowGesture && !screenOff && pet.sleeping) {
+    if (swallowGesture && !screenOff && !gStandbyOn && pet.sleeping) {
       int mcx = 0, mcy = 0;
       uiSleepButton(&mcx, &mcy);
       int mdx = x - mcx, mdy = y - mcy;
@@ -4386,6 +4404,7 @@ void bootReport() {
 void render() {
   crumbDrop();   // so a crash can name the screen it happened on
   if (alarmRinging) { renderAlarm(); return; }
+  if (gStandbyOn) { renderStandby(); return; }
   if (pet.awaitingStarter()) {  // first game: region, then starter
     if (!starterRegionDone) renderRegionPick(RPICK_FOR_START);
     else renderStarterSelect();
@@ -5132,6 +5151,111 @@ static void drawSlider(int v, int lo, int hi) {
   gfx->fillRoundRect(VOLS_BAR_X, by, kx - VOLS_BAR_X, VOLS_BAR_H, 12, UI_BAR_OK);
   gfx->fillCircle(kx, by + VOLS_BAR_H / 2, VOLS_BAR_H / 2, UI_WHITE);   // the knob
   gfx->drawCircle(kx, by + VOLS_BAR_H / 2, VOLS_BAR_H / 2, UI_INK);
+}
+
+// ---------- the standby clock (plugged in and untouched, see standby.h) ----------
+
+// block text: digits and ':' in b-pixel blocks, x = left edge, y = top edge
+static void standbyBigText(const char *t, int x, int y, int b, uint16_t col) {
+  for (; *t; t++) {
+    if (*t == ':') {
+      gfx->fillRect(x, y + 2 * b, b, b, col);
+      gfx->fillRect(x, y + 4 * b, b, b, col);
+      x += 2 * b;
+    } else if (*t >= '0' && *t <= '9') {
+      const uint8_t *g = STANDBY_DIGIT[*t - '0'];
+      for (int r = 0; r < 7; r++)
+        for (int c = 0; c < 5; c++)
+          if (g[r] & (0x10 >> c)) gfx->fillRect(x + c * b, y + r * b, b, b, col);
+      x += 6 * b;
+    }
+  }
+}
+
+// a small weather icon centred on (cx, cy), about 36 px wide, drawn with primitives
+static void standbyWxIcon(uint8_t kind, int cx, int cy, uint16_t col) {
+  auto cloud = [&](int ox, int oy) {
+    gfx->fillCircle(cx - 9 + ox, cy + 2 + oy, 7, col);
+    gfx->fillCircle(cx + 2 + ox, cy - 4 + oy, 9, col);
+    gfx->fillCircle(cx + 11 + ox, cy + 3 + oy, 6, col);
+    gfx->fillRect(cx - 9 + ox, cy + 2 + oy, 21, 8, col);
+  };
+  switch (kind) {
+    case WX_CLEAR:
+      gfx->fillCircle(cx, cy, 8, C565(0xff, 0xd9, 0x4a));
+      for (int i = 0; i < 8; i++) {
+        float a = i * 0.785398f;
+        gfx->drawLine(cx + (int)(cosf(a) * 12), cy + (int)(sinf(a) * 12), cx + (int)(cosf(a) * 17), cy + (int)(sinf(a) * 17), C565(0xff, 0xd9, 0x4a));
+      }
+      break;
+    case WX_FOG:
+      for (int i = 0; i < 4; i++) gfx->fillRect(cx - 16 + (i & 1) * 4, cy - 10 + i * 7, 28, 3, col);
+      break;
+    case WX_RAIN:
+      cloud(0, -4);
+      for (int i = 0; i < 3; i++) gfx->drawLine(cx - 10 + i * 10, cy + 10, cx - 13 + i * 10, cy + 17, C565(0x6a, 0xb4, 0xff));
+      break;
+    case WX_SNOW:
+    case WX_SNOW_NY:
+      cloud(0, -4);
+      for (int i = 0; i < 3; i++) gfx->fillCircle(cx - 10 + i * 10, cy + 14, 2, C565(0xff, 0xff, 0xff));
+      break;
+    case WX_STORM:
+      cloud(0, -4);
+      gfx->fillTriangle(cx + 2, cy + 6, cx - 5, cy + 15, cx, cy + 15, C565(0xff, 0xd9, 0x4a));
+      gfx->fillTriangle(cx - 2, cy + 13, cx + 5, cy + 13, cx - 3, cy + 21, C565(0xff, 0xd9, 0x4a));
+      break;
+    default:   // cloudy
+      cloud(0, 0);
+      break;
+  }
+}
+
+void renderStandby() {
+  uint32_t now = millis();
+  gfx->fillScreen(RGB565_BLACK);
+  const uint16_t white = C565(0xf2, 0xf4, 0xf8), dim = C565(0x8a, 0x92, 0xa4);
+  const uint32_t e = pet.lastSeenEpoch;          // the local time, in seconds
+  int dx = 0, dy = 0;
+  standbyShift(e / 60, dx, dy);
+
+  if (e) {
+    const int mins = (int)((e / 60) % 1440), hour = mins / 60, minute = mins % 60;
+    // the date: weekday and day/month, numbers only so every language reads it
+    int yy, mm, dd;
+    Pet::civilDate((uint32_t)(e / 86400), yy, mm, dd);
+    char dl[24];
+    snprintf(dl, sizeof(dl), "%s  %02d/%02d", T((StrId)(S_WD_SUN + weekdayOf((uint32_t)(e / 86400)))), dd, mm);
+    uiTextFit(UIF_MID, CX + dx, 112 + dy, dl, dim, 1, 300);
+
+    // the time, in big blocks (centred as a group with AM/PM)
+    char tt[8]; bool pm = false;
+    standbyTimeText(tt, sizeof(tt), hour, minute, gClock24 != 0, &pm);
+    const int b = 9;
+    const int tw = standbyTextBlocks(tt) * b;
+    const int apw = gClock24 ? 0 : uiTextWidth(UIF_BIG, pm ? "PM" : "AM") + 12;
+    const int x0 = CX - (tw + apw) / 2 + dx;
+    standbyBigText(tt, x0, 134 + dy, b, white);
+    if (!gClock24) uiText(UIF_BIG, x0 + tw + 12, 134 + 7 * b + dy, pm ? "PM" : "AM", dim, 0);
+  }
+
+  // the weather outside, when the Wi-Fi sync has fetched it
+  const uint8_t wx = weatherShown(now);
+  if (wx != WX_NONE) {
+    char tc[8];
+    snprintf(tc, sizeof(tc), "%dC", (int)weatherLast().tempC);
+    const int tw = uiTextWidth(UIF_BIG, tc);
+    const int x0 = CX - (40 + tw) / 2 + dx;
+    standbyWxIcon(wx, x0 + 18, 244 + dy, dim);
+    uiText(UIF_BIG, x0 + 40, 254 + dy, tc, white, 0);
+  }
+
+  // the companion, small, at the bottom
+  if (pmd.loaded && !pet.atWork()) {
+    uint8_t act = (pet.mood() == MOOD_SLEEPING && pmd.has(PMD_SLEEP)) ? PMD_SLEEP : PMD_IDLE;
+    drawPmdActZ(pmd, act, CX + dx, 404 + dy, now, true, false, 5, 130, 150);
+  }
+  gfx->flush();
 }
 
 void renderClock() {

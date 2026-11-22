@@ -23,6 +23,8 @@ inline void sweepTimer(uint32_t &t, uint32_t now) { if (t && (int32_t)(t - now) 
 // Game minutes per level. With 60, CHARMANDER evolves at ~16 h
 // of play with perfect care. Drop to 1 to see evolutions instantly.
 #define MINUTES_PER_LEVEL 60
+#define AUTO_CARE_LEVEL 50    // what self-care raises a low need to
+#define AUTO_CARE_FROM 40     // and the level under which it steps in
 // The care pace a save starts with when it has none (every save made before the setting existed).
 // 1 = relaxed. The emulator tests build with -DCARE_PACE_DEFAULT=0 so they keep the original rates.
 #ifndef CARE_PACE_DEFAULT
@@ -827,6 +829,12 @@ public:
   uint8_t quizDone(uint8_t correct);    // coins paid
   uint8_t parentBed = 0;        // 0 off, else the hour games stop (until 6:00)
   uint8_t carePace = CARE_PACE_DEFAULT;   // 0 normal, 1 relaxed (needs every 2nd minute), 2 slow (every 4th)
+  // Self-care while plugged in and untouched for 10 minutes (the sketch reports it each loop):
+  // once a minute, silently, one need under AUTO_CARE_FROM goes back up to AUTO_CARE_LEVEL, in
+  // this order: food, hygiene (and the piles), energy, joy. It is not the player's care (no
+  // streak, bond or care mark) and it never cures sickness. Not while asleep, an egg or a ceremony.
+  bool pluggedIdle = false;
+  void setPlugged(bool idle10) { pluggedIdle = idle10; }
   uint8_t careEvery() const { return carePace == 1 ? 2 : carePace == 2 ? 4 : 1; }
   bool careDue() const { return ageMinutes % careEvery() == 0; }
   uint8_t dozeStart = 21;      // the hour it may doze off with the light on: 21, 22, 23 or 0 (midnight)
@@ -1336,6 +1344,7 @@ private:
   void statusTick();          // per awake minute: sickness, boredom, dozing off
   void tick();
   void applyAutoSleep();
+  void autoCare();                      // one need back up, silently (see pluggedIdle)
   void hatch();
   void registerSpecies(int16_t dex);
   void save();

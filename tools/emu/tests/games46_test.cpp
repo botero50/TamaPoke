@@ -7,6 +7,7 @@
 #include "pet.h"
 #include "audio.h"
 #include "party.h"
+#include "standby.h"
 #include "moves.h"
 #include "battle.h"
 #include "wild.h"
@@ -605,6 +606,73 @@ static void idleWrapTest() {
   ck(!pet.sleeping, "and does not doze a Pokemon off at night");
 }
 
+extern bool g_emuUsb, gStandbyOn;
+
+static void standbyTests() {
+  // the rule
+  StandbyCtx c = { true, true, true, false, STANDBY_IDLE_MS };
+  ck(standbyDue(c), "plugged in, screen on, main screen, untouched 90 s: the clock");
+  c.idleMs = STANDBY_IDLE_MS - 1; ck(!standbyDue(c), "not a millisecond sooner");
+  c.idleMs = STANDBY_IDLE_MS; c.usb = false; ck(!standbyDue(c), "never on battery");
+  c.usb = true; c.screenOn = false; ck(!standbyDue(c), "not with the screen off");
+  c.screenOn = true; c.mainScreen = false; ck(!standbyDue(c), "not over a menu or a game");
+  c.mainScreen = true; c.modal = true; ck(!standbyDue(c), "not during a ceremony, an evolution, the alarm or an egg");
+  ck(selfCareDue(true, SELFCARE_IDLE_MS) && !selfCareDue(true, SELFCARE_IDLE_MS - 1) && !selfCareDue(false, SELFCARE_IDLE_MS * 9), "self-care: plugged in and untouched for 10 minutes");
+
+  // the date and time helpers
+  ck(weekdayOf(10957) == 6, "2000-01-01 was a Saturday");
+  ck(weekdayOf(20779) == 0, "22 Nov 2026 is a Sunday");
+  bool shiftOk = true, moves = false;
+  for (uint32_t m = 0; m < 200; m++) {
+    int dx, dy, nx, ny; standbyShift(m, dx, dy); standbyShift(m + 1, nx, ny);
+    if (dx < -4 || dx > 4 || dy < -4 || dy > 4) shiftOk = false;
+    if (dx != nx || dy != ny) moves = true;
+  }
+  ck(shiftOk && moves, "the burn-in shift stays within 4 px and changes with the minute");
+  char t[8]; bool pm;
+  standbyTimeText(t, sizeof(t), 0, 5, false, &pm);  ck(!strcmp(t, "12:05") && !pm, "12 h: midnight is 12:05 AM");
+  standbyTimeText(t, sizeof(t), 13, 5, false, &pm); ck(!strcmp(t, "1:05") && pm, "12 h: 13:05 is 1:05 PM");
+  standbyTimeText(t, sizeof(t), 13, 5, true, &pm);  ck(!strcmp(t, "13:05"), "24 h: 13:05");
+  ck(standbyTextBlocks("12:05") == 25 && standbyTextBlocks("1:05") == 19, "the block width of the time text");
+
+  // on the real loop: the clock appears, and a touch only leaves it
+  readyPet();
+  extern bool screenOff; extern bool menuOpen;
+  screenOff = false; menuOpen = false;
+  g_emuUsb = true;
+  pumpMs(120); lastInteract = millis(); pumpMs(120);
+  ck(!gStandbyOn, "just touched: no clock");
+  lastInteract = millis() - STANDBY_IDLE_MS - 500; pumpMs(150);
+  ck(gStandbyOn, "plugged in and untouched for 90 s: the standby clock shows");
+  uint8_t foodBefore = pet.fullness;
+  click(233, 330);
+  ck(!gStandbyOn, "a touch leaves the clock");
+  ck(!menuOpen && pet.fullness == foodBefore, "and only leaves it: that touch did nothing else");
+  g_emuUsb = false; lastInteract = millis() - STANDBY_IDLE_MS - 500; pumpMs(150);
+  ck(!gStandbyOn, "unplugged: no clock, however long it has been left");
+  lastInteract = millis();
+
+  // self-care: one low need a minute, in order, silently
+  auto fresh = [&]() { readyPet(); pet.setPlugged(true); pet.sleeping = false; pet.poops = 0; pet.fullness = pet.joy = pet.energy = pet.hygiene = 80; };
+  fresh(); pet.fullness = 20; pet.dbgTick();
+  ck(pet.fullness == 50, "plugged in and idle: a hungry one is fed up to 50");
+  fresh(); pet.poops = 3; pet.hygiene = 30; pet.dbgTick();
+  ck(pet.poops == 0 && pet.hygiene >= 50, "dirty: cleaned up to 50 and the piles gone");
+  fresh(); pet.fullness = 20; pet.energy = 20; pet.dbgTick();
+  ck(pet.fullness == 50 && pet.energy < 40, "one thing a minute: food first, energy waits");
+  pet.dbgTick();
+  ck(pet.energy == 50, "and the next minute energy");
+  fresh(); pet.joy = 20; pet.dbgTick();
+  ck(pet.joy == 50, "sad: cheered up to 50");
+  fresh(); pet.fullness = 20; pet.setPlugged(false); pet.dbgTick();
+  ck(pet.fullness < 40, "unplugged: nothing is done for it");
+  fresh(); pet.fullness = 20; pet.sleeping = true; pet.dbgTick();
+  ck(pet.fullness < 40, "asleep: nothing is done for it either");
+  fresh(); pet.fullness = 20; uint8_t bondBefore = pet.bond; pet.dbgTick();
+  ck(pet.bond == bondBefore, "it is not the player's care: the bond does not move");
+  pet.setPlugged(false);
+}
+
 static void carePaceTests() {
   // awake needs: 20 minutes of ticks from a full belly
   auto after20 = [&](uint8_t pace, bool sleep) {
@@ -760,6 +828,7 @@ int main() {
   tapWakeTests();
   moonRepro();
   idleWrapTest();
+  standbyTests();
   carePaceTests();
   songTests();
   swingTests();
