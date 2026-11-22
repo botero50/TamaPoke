@@ -37,6 +37,9 @@
 #include "wifisync.h"
 #include "weather.h"
 #include "standby.h"
+#include "imu_fifo.h"
+#include <esp_sleep.h>
+#include <driver/gpio.h>
 #include "talk.h"
 #include "imu.h"
 #include "steps.h"
@@ -47,7 +50,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.61"
+#define FW_VERSION "3.14-funpack.62"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -778,6 +781,7 @@ uint32_t lastRender = 0;
 uint32_t lastInteract = 0;
 uint32_t lastTouchAt = 0;    // a real touch, unlike lastInteract, which events also move
 bool gStandbyOn = false;     // the standby clock is showing (plugged in and untouched, see standby.h)
+uint32_t gSleepWakes = 0;    // light-sleep cycles since boot (STATS)
 // Milliseconds since a stamp, never negative. loop() reads the clock once at its top and a
 // touch handled later in the same pass stamps lastInteract a few ms AFTER that, so
 // "now - stamp" wrapped to ~49 days: the screen dipped to its idle dim for a frame (the
@@ -1099,6 +1103,15 @@ void loop() {
     }
   }
 
+  // Battery nearly flat (smoothed voltage under 3.30 V for 30 s, not charging): save the pet and
+  // power off cleanly instead of letting the PMU cut the power mid-save.
+  if (batShouldShutdown()) {
+    Serial.println("battery low: saving and powering off");
+    pet.saveNow();
+    delay(100);
+    batPowerOff();
+  }
+
   // Plugged in and left alone: the standby clock after 90 s, and after 10 min it sees to its own
   // needs. On battery neither happens.
   {
@@ -1241,9 +1254,34 @@ void loop() {
   // loop can sleep 40 ms a pass and the chip can run at 80 MHz, and steps still count
   // the same. Back to full speed the moment the screen is on, or a link game is live.
   static uint8_t cpuMhz = 0;
+  const bool onBattery = !usbPresent();
   const bool saver = screenOff && gScreenOffSaver && !lan.live() && !linkNowUp();
+  // On battery with the screen off the sensor stores the step samples itself (its FIFO), so the poll
+  // task rests and the chip can sleep; if that cannot be set up it stays on the poll task.
+  if (saver && onBattery) { if (!imuFifoActive()) imuFifoEnter(); }
+  else if (imuFifoActive()) imuFifoExit();
   const uint8_t wantMhz = saver ? 80 : 240;
   if (wantMhz != cpuMhz) { setCpuFrequencyMhz(wantMhz); cpuMhz = wantMhz; }
+  const SleepCtx sc = { screenOff, gScreenOffSaver != 0, onBattery, imuFifoActive(),
+                        wifiBusy(), lan.live() || linkNowUp(), audioMusicNow() != MUS_NONE, alarmRinging };
+  if (lightSleepAllowed(sc) && !(gTapWake && digitalRead(TP_INT) == LOW)) {
+    // Light sleep: wakes by the timer (the step samples wait in the sensor, PWR is polled) or, with
+    // tap-to-wake on, by the touch line. Never on USB (see lightSleepAllowed), so the serial port
+    // and the installer are untouched.
+    esp_sleep_enable_timer_wakeup((uint64_t)LIGHT_SLEEP_MS * 1000);
+    if (gTapWake) {
+      gpio_wakeup_enable((gpio_num_t)TP_INT, GPIO_INTR_LOW_LEVEL);
+      esp_sleep_enable_gpio_wakeup();
+    }
+    esp_light_sleep_start();
+    if (gTapWake) {
+      gpio_wakeup_disable((gpio_num_t)TP_INT);
+      gpio_set_intr_type((gpio_num_t)TP_INT, GPIO_INTR_NEGEDGE);   // back to the edge interrupt
+      if (digitalRead(TP_INT) == LOW) gTouchIrq = true;            // a touch that already pulled the line
+    }
+    gSleepWakes++;
+    return;
+  }
   delay(saver ? 40 : 1);   // the other tasks get a turn on every pass
 }
 
@@ -1317,20 +1355,28 @@ void handleSerial() {
     pet.ageMinutes = (uint32_t)(want - 1) * MINUTES_PER_LEVEL;
     pet.saveNow();
     Serial.printf("lvl=%u\n", pet.level());
-  } else if (line == "IMULOG") {
+  } else if (line == "IMULOG" || line == "IMUFIFO") {
     // IMULOG: 4 s of what the accelerometer delivers -- samples per pass, the
     // magnitude's spread, and how many steps a fresh detector would count.
     // Leave the ball still for a phantom-step check, or walk with it.
     static float buf[IMU_BATCH_MAX * 3];
     static uint32_t bms[IMU_BATCH_MAX];
+    // IMUFIFO: the same, with the sensor's own FIFO as the source (what the screen-off saver uses on
+    // battery): the poll task rests for these 4 s, so a walk now is counted here, not in the game.
+    const bool viaFifo = (line == "IMUFIFO") && imuFifoEnter();
     StepDetector sd;
     uint32_t t0 = millis(), passes = 0, n = 0, steps = 0, maxBatch = 0, drop0 = imuDroppedCount();
     float mn = 99.0f, mx = 0.0f, sum = 0.0f, sum2 = 0.0f;
-    Serial.printf("imu fifo=%d\n", imuFifoOn());
+    Serial.printf("imu fifo=%d via_sensor_fifo=%d\n", imuFifoOn(), viaFifo);
     while (millis() - t0 < 4000) {
       uint8_t k = imuReadBatch(buf, bms, IMU_BATCH_MAX);
       passes++;
       if (k > maxBatch) maxBatch = k;
+      if (passes <= 16 && k) {   // the first batches one by one: a start-up transient shows here
+        float bm = 0, bl = 99, bh = 0;
+        for (uint8_t i = 0; i < k; i++) { float m = sqrtf(buf[i*3]*buf[i*3] + buf[i*3+1]*buf[i*3+1] + buf[i*3+2]*buf[i*3+2]); bm += m; if (m < bl) bl = m; if (m > bh) bh = m; }
+        Serial.printf("b%lu k=%u t=%lu |a| mean=%.3f min=%.3f max=%.3f last=%.3f %.3f %.3f\n", (unsigned long)passes, k, (unsigned long)(bms[k-1] - t0), bm / k, bl, bh, buf[(k-1)*3], buf[(k-1)*3+1], buf[(k-1)*3+2]);
+      }
       for (uint8_t i = 0; i < k; i++) {
         float x = buf[i * 3], y = buf[i * 3 + 1], z = buf[i * 3 + 2];
         float m = sqrtf(x * x + y * y + z * z);
@@ -1344,6 +1390,7 @@ void handleSerial() {
       delay(100);
     }
     float mean = n ? sum / n : 0, sd2 = n ? sum2 / n - mean * mean : 0;
+    if (viaFifo) imuFifoExit();
     Serial.printf("passes=%lu samples=%lu per_s=%.1f maxbatch=%lu dropped=%lu mag mean=%.4f sd=%.4f min=%.3f max=%.3f steps=%lu\n",
                   (unsigned long)passes, (unsigned long)n, n / 4.0f, (unsigned long)maxBatch, (unsigned long)(imuDroppedCount() - drop0),
                   mean, sd2 > 0 ? sqrtf(sd2) : 0.0f, mn, mx, (unsigned long)steps);
@@ -1663,6 +1710,8 @@ void handleSerial() {
     { char dg[96]; wifiDiag(dg, sizeof(dg)); Serial.printf("wifidiag %s\n", dg); }
     Serial.printf("tickets=%u today=%u golds=%u\n", pet.tickets, pet.ticketsToday, pet.goldBadges());
     Serial.printf("imu fifo=%d dropped=%lu clockjumps=%lu\n", imuFifoOn(), (unsigned long)imuDroppedCount(), (unsigned long)gClockJumps);
+    Serial.printf("sleep fifo=%d fails=%lu samples=%lu wakes=%lu up=%lus saver=%u\n", imuFifoActive(), (unsigned long)imuFifoFailCount(),
+                  (unsigned long)imuFifoSampleCount(), (unsigned long)gSleepWakes, (unsigned long)(millis() / 1000), gScreenOffSaver);
     Serial.printf("steps=%lu hist=%u,%u,%u,%u,%u,%u,%u total=%lu adv=%u/%u goals=%u rank=%u\n", (unsigned long)pet.stepsToday(), pet.stepsDaysAgo(0), pet.stepsDaysAgo(1), pet.stepsDaysAgo(2), pet.stepsDaysAgo(3), pet.stepsDaysAgo(4), pet.stepsDaysAgo(5), pet.stepsDaysAgo(6), (unsigned long)pet.stepTotal, (unsigned)pet.advSteps, (unsigned)Pet::advNeed(pet.advStop), (unsigned)pet.stepGoalsDone, (unsigned)pet.walkRank());
     Serial.printf("wild=%u balls=%u/%u/%u bank=%u\n", pet.wildCount(), pet.wildBalls[0], pet.wildBalls[1], pet.wildBalls[2], pet.wildStepBank);
     Serial.printf("trip left=%u away=%d tale=%u\n", pet.tripsLeft(), pet.onTrip(), pet.tripTale);

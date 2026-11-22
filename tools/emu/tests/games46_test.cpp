@@ -8,6 +8,7 @@
 #include "audio.h"
 #include "party.h"
 #include "standby.h"
+#include "esp_sleep.h"
 #include "moves.h"
 #include "battle.h"
 #include "wild.h"
@@ -732,6 +733,19 @@ static void carePaceTests() {
   ck(emuCpuMhz() == 80, "and slow again");
   screenOff = false; pumpMs(150);
   ck(emuCpuMhz() == 240, "waking the screen restores full speed");
+
+  // light sleep: only screen off + saver + on battery, with the sensor storing the steps itself
+  extern bool g_emuUsb; bool imuFifoActive();
+  g_emuUsb = false; gScreenOffSaver = 1; screenOff = true; pumpMs(150);
+  int sl0 = emuSleepCalls(); pumpMs(150);
+  ck(emuSleepCalls() > sl0 && imuFifoActive(), "screen off on battery with the saver: the chip sleeps and the sensor's FIFO is on");
+  g_emuUsb = true; pumpMs(90); sl0 = emuSleepCalls(); pumpMs(150);
+  ck(emuSleepCalls() == sl0 && !imuFifoActive(), "plugged in: it never sleeps (the serial port stays) and the FIFO is off");
+  g_emuUsb = false; gScreenOffSaver = 0; pumpMs(90); sl0 = emuSleepCalls(); pumpMs(150);
+  ck(emuSleepCalls() == sl0 && !imuFifoActive(), "saver switched off: no sleep");
+  gScreenOffSaver = 1; screenOff = false; pumpMs(90); sl0 = emuSleepCalls(); pumpMs(150);
+  ck(emuSleepCalls() == sl0 && !imuFifoActive(), "screen on: no sleep, the poll task counts the steps");
+  g_emuUsb = false;
 }
 
 static void swingTests() {

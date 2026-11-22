@@ -15,3 +15,10 @@ bool imuReadAccel(float &x, float &y, float &z);   // in g; false when no new sa
 uint8_t imuReadBatch(float *xyz, uint32_t *ms, uint8_t max);
 bool imuFifoOn();                             // the background reader is running (STATS: "imu fifo=")
 uint32_t imuDroppedCount();                   // samples lost to a stalled loop
+// The sensor's own FIFO (imu_fifo.h): with the screen off and on battery the poll task is suspended
+// and imuReadBatch() collects what the sensor stored, so the CPU can sleep. false when it cannot.
+bool imuFifoEnter();
+void imuFifoExit();                           // back to the poll task
+bool imuFifoActive();
+uint32_t imuFifoFailCount();                  // reads that failed (STATS)
+uint32_t imuFifoSampleCount();                // samples read this way since boot (STATS)

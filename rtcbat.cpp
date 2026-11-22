@@ -1,5 +1,6 @@
 #include "rtcbat.h"
 #include "imu.h"     // i2cLock: the bus is shared with the IMU task
+#include "batcurve.h" // the LiPo curve and the power-off rule
 #include "pin_config.h"  // define XPOWERS_CHIP_AXP2101
 #include <Wire.h>
 #include <time.h>
@@ -48,6 +49,7 @@ void rtcSetEpoch(uint32_t e) {
 bool batBegin() {
   pmuOk = pmu.begin(Wire, AXP2101_SLAVE_ADDRESS, IIC_SDA, IIC_SCL);
   if (!pmuOk) Serial.println("AXP2101 not detected");
+  else pmu.setSysPowerDownVoltage(BAT_HW_CUTOFF_MV);   // the PMU cuts at 3.1 V as a backstop
   return pmuOk;
 }
 
@@ -69,6 +71,7 @@ void pmuEnablePanel() {
 static uint32_t powerCacheT = 0;
 static int cachedPct = -1;
 static bool cachedCharging = false, cachedUsb = true;
+static BatMonitor batMon;   // smoothed voltage, a percentage that only falls while discharging, and the power-off rule
 
 static void refreshPower() {
   uint32_t now = millis();
@@ -79,12 +82,33 @@ static void refreshPower() {
   cachedPct = pmu.isBatteryConnect() ? pmu.getBatteryPercent() : -1;
   cachedCharging = pmu.isCharging();
   cachedUsb = pmu.isVbusIn();
+  // On battery the percentage comes from the LiPo curve over a smoothed voltage; on USB or while
+  // charging the PMU's own gauge is used and the monitor starts over from it at the next unplug.
+  if (cachedUsb || cachedCharging || cachedPct < 0) {
+    batMon.reset();
+  } else {
+    batMon.seed(cachedPct);
+    int p = batMon.sample(pmu.getBattVoltage(), now);
+    if (p >= 0) cachedPct = p;
+  }
   i2cUnlock();
 }
 
 int batPercent() { refreshPower(); return cachedPct; }
 bool batCharging() { refreshPower(); return cachedCharging; }
 bool usbPresent() { refreshPower(); return cachedUsb; }
+
+bool batShouldShutdown() {
+  refreshPower();
+  return pmuOk && !cachedUsb && !cachedCharging && batMon.shutdownNeeded(millis());
+}
+
+void batPowerOff() {
+  if (!pmuOk) return;
+  i2cLock();
+  pmu.shutdown();
+  i2cUnlock();
+}
 
 void pwrSetup() {
   if (!pmuOk) return;

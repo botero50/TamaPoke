@@ -138,6 +138,8 @@ int batPercent() { return 87; }
 bool batCharging() { return false; }
 bool g_emuUsb = false;   // tests set it: the standby clock and self-care need USB power
 bool usbPresent() { return g_emuUsb; }
+bool batShouldShutdown() { return false; }
+void batPowerOff() {}
 void pwrSetup() {}
 bool pwrShortPressed() { return false; }
 
@@ -148,6 +150,12 @@ void i2cUnlock() {}
 bool imuReadAccel(float &, float &, float &) { return false; }
 uint8_t imuReadBatch(float *, uint32_t *, uint8_t) { return 0; }
 bool imuFifoOn() { return false; }
+static bool g_emuFifo = false;
+bool imuFifoEnter() { g_emuFifo = true; return true; }
+void imuFifoExit() { g_emuFifo = false; }
+bool imuFifoActive() { return g_emuFifo; }
+uint32_t imuFifoFailCount() { return 0; }
+uint32_t imuFifoSampleCount() { return 0; }
 uint32_t imuDroppedCount() { return 0; }
 
 // --- audio (silent) ---

@@ -33,6 +33,11 @@ inline void delay(uint32_t ms) {
 inline uint8_t &emuCpuMhz() { static uint8_t m = 240; return m; }   // what the sketch last asked for
 inline bool setCpuFrequencyMhz(uint32_t mhz) { emuCpuMhz() = (uint8_t)mhz; return true; }
 inline void pinMode(int, int) {}
+#ifndef LOW
+#define LOW 0
+#define HIGH 1
+#endif
+inline int digitalRead(int) { return 1; }   // the touch line idles high
 inline int digitalPinToInterrupt(int p) { return p; }
 
 // There is no interrupt controller here, so the handler is kept in a slot and
