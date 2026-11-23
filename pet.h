@@ -18,6 +18,7 @@ inline void sweepTimer(uint32_t &t, uint32_t now) { if (t && (int32_t)(t - now) 
 #include "party.h"
 #include "mega.h"
 #include "mine.h"
+#include "fruit.h"
 
 // 1 tick = 1 game minute. Lower this value to test faster
 // (e.g. 5000UL = stats fall 12x faster).
@@ -681,7 +682,11 @@ public:
   bool plantSeed();             // needs a seed, an empty plot and the clock
   bool gardenReady() const;
   uint8_t gardenPercent() const;  // 0..100 grown
-  int8_t harvest();             // the FoodId it gave, or -1 when not ready
+  int8_t harvest();             // the FoodId it gave (FRUIT_FOOD_BASE + kind for a training fruit), or -1 when not ready
+  uint8_t fruitCount[FRUIT_KINDS] = { 0 };   // training fruits kept: Power, Guard, Swift
+  uint8_t lastFruitGain = 0;
+  enum FruitResult : uint8_t { FRUIT_NONE = 0, FRUIT_EATEN, FRUIT_AT_BEST };
+  FruitResult eatFruit(uint8_t kind);   // +FRUIT_GAIN to that training stat, up to its ceiling; nothing is spent at the ceiling
   GiftKind holidayToday() const;  // which holiday the RTC date is, if any
   GiftKind claimHolidayGift();  // hands today's gift over once; the screen says what
   static void civilDate(uint32_t days, int &y, int &m, int &d);   // days since 1970 -> date

@@ -155,7 +155,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battery saver
     "Ahorro de bateria", "Auto", "Siempre", "Normal", "Ahorrando", "Critico", "%d%% %d.%02dV  %s",
     // the mine
-    "Mina", "TOCA LA ROCA!", "Picadas: %u", "Fragmentos %u/10", "Muy cansado para picar", "Hoy no quedan picadas", "Fragmento de Mega Piedra!", "Diez: una Mega Piedra!", "Fosil! Huevo de %s", },
+    "Mina", "TOCA LA ROCA!", "Picadas: %u", "Fragmentos %u/10", "Muy cansado para picar", "Hoy no quedan picadas", "Fragmento de Mega Piedra!", "Diez: una Mega Piedra!", "Fosil! Huevo de %s",
+    // training fruits
+    "Baya Fuerza", "Baya Guardia", "Baya Rapida", "Entrenamiento +%u", "Ya esta al maximo", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -305,7 +307,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battery saver
     "Battery saver", "Auto", "Always", "Normal", "Saving", "Critical", "%d%% %d.%02dV  %s",
     // the mine
-    "Mine", "TAP THE ROCK!", "Digs left: %u", "Shards %u/10", "Too tired to dig", "No digs left today", "Mega Stone shard!", "Ten shards: a Mega Stone!", "A fossil! %s egg next", },
+    "Mine", "TAP THE ROCK!", "Digs left: %u", "Shards %u/10", "Too tired to dig", "No digs left today", "Mega Stone shard!", "Ten shards: a Mega Stone!", "A fossil! %s egg next",
+    // training fruits
+    "Power Fruit", "Guard Fruit", "Swift Fruit", "Training +%u", "Already at its best", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -454,7 +458,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battery saver
     "Economie batterie", "Auto", "Toujours", "Normal", "Economie", "Critique", "%d%% %d.%02dV  %s",
     // the mine
-    "Mine", "TAPE LE ROCHER!", "Forages: %u", "Eclats %u/10", "Trop fatigue pour miner", "Plus de forage ce jour", "Eclat de Mega Pierre!", "Dix: une Mega Pierre!", "Fossile! Oeuf de %s", },
+    "Mine", "TAPE LE ROCHER!", "Forages: %u", "Eclats %u/10", "Trop fatigue pour miner", "Plus de forage ce jour", "Eclat de Mega Pierre!", "Dix: une Mega Pierre!", "Fossile! Oeuf de %s",
+    // training fruits
+    "Fruit Force", "Fruit Garde", "Fruit Vite", "Entrainement +%u", "Deja au maximum", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -603,7 +609,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battery saver
     "Akku-Sparmodus", "Auto", "Immer", "Normal", "Sparend", "Kritisch", "%d%% %d.%02dV  %s",
     // the mine
-    "Mine", "TIPPE AUF DEN FELS!", "Grabungen: %u", "Splitter %u/10", "Zu muede zum Graben", "Heute keine Grabung mehr", "Mega-Stein-Splitter!", "Zehn: ein Mega-Stein!", "Fossil! %s-Ei als Naechstes", },
+    "Mine", "TIPPE AUF DEN FELS!", "Grabungen: %u", "Splitter %u/10", "Zu muede zum Graben", "Heute keine Grabung mehr", "Mega-Stein-Splitter!", "Zehn: ein Mega-Stein!", "Fossil! %s-Ei als Naechstes",
+    // training fruits
+    "Kraftfrucht", "Wehrfrucht", "Flinkfrucht", "Training +%u", "Schon am Maximum", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -752,7 +760,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battery saver
     "Risparmio batteria", "Auto", "Sempre", "Normale", "Risparmio", "Critico", "%d%% %d.%02dV  %s",
     // the mine
-    "Miniera", "TOCCA LA ROCCIA!", "Scavi: %u", "Schegge %u/10", "Troppo stanco per scavare", "Niente scavi oggi", "Scheggia di Megapietra!", "Dieci: una Megapietra!", "Fossile! Uovo di %s", },
+    "Miniera", "TOCCA LA ROCCIA!", "Scavi: %u", "Schegge %u/10", "Troppo stanco per scavare", "Niente scavi oggi", "Scheggia di Megapietra!", "Dieci: una Megapietra!", "Fossile! Uovo di %s",
+    // training fruits
+    "Frutto Forza", "Frutto Guardia", "Frutto Rapido", "Allenamento +%u", "Gia al massimo", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -901,7 +911,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battery saver
     "Economia de bateria", "Auto", "Sempre", "Normal", "Economia", "Critico", "%d%% %d.%02dV  %s",
     // the mine
-    "Mina", "TOQUE NA ROCHA!", "Escavacoes: %u", "Fragmentos %u/10", "Cansado demais para cavar", "Sem escavacoes hoje", "Fragmento de Mega Pedra!", "Dez: uma Mega Pedra!", "Fossil! Ovo de %s", },
+    "Mina", "TOQUE NA ROCHA!", "Escavacoes: %u", "Fragmentos %u/10", "Cansado demais para cavar", "Sem escavacoes hoje", "Fragmento de Mega Pedra!", "Dez: uma Mega Pedra!", "Fossil! Ovo de %s",
+    // training fruits
+    "Fruta Forca", "Fruta Guarda", "Fruta Veloz", "Treino +%u", "Ja esta no maximo", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -1052,7 +1064,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battery saver
     "省电模式", "自动", "总是", "正常", "省电中", "电量极低", "%d%% %d.%02dV  %s",
     // the mine
-    "矿洞", "敲打岩石!", "剩余挖掘: %u", "碎片 %u/10", "太累了,不能挖", "今天不能再挖了", "超级石碎片!", "十个碎片: 一块超级石!", "化石! 下个是%s的蛋", },
+    "矿洞", "敲打岩石!", "剩余挖掘: %u", "碎片 %u/10", "太累了,不能挖", "今天不能再挖了", "超级石碎片!", "十个碎片: 一块超级石!", "化石! 下个是%s的蛋",
+    // training fruits
+    "力量果", "守护果", "迅捷果", "训练 +%u", "已经是最强了", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -1202,7 +1216,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battery saver
     "절전 모드", "자동", "항상", "보통", "절전 중", "위험", "%d%% %d.%02dV  %s",
     // the mine
-    "광산", "바위를 두드려요!", "남은 채굴: %u", "조각 %u/10", "너무 피곤해요", "오늘은 더 못 캐요", "메가스톤 조각!", "조각 10개: 메가스톤!", "화석! 다음 알은 %s", },
+    "광산", "바위를 두드려요!", "남은 채굴: %u", "조각 %u/10", "너무 피곤해요", "오늘은 더 못 캐요", "메가스톤 조각!", "조각 10개: 메가스톤!", "화석! 다음 알은 %s",
+    // training fruits
+    "힘 열매", "수호 열매", "신속 열매", "훈련 +%u", "이미 최고예요", },
 };
 
 // Medal names in their three lengths [language][medal].

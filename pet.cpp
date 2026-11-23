@@ -2362,7 +2362,9 @@ int8_t Pet::harvest() {
   static const uint8_t CROP[8] = { FOOD_JUICE, FOOD_JUICE, FOOD_COOKIE, FOOD_ICECREAM,
                                    FOOD_CAKE, FOOD_SANDWICH, FOOD_SOUP, FOOD_ONIGIRI };
   uint8_t f = CROP[random(8)];
-  if (foodCount[f] < FOOD_STACK_MAX) foodCount[f]++;
+  int8_t fk = fruitFromRoll((uint8_t)random(100), (uint8_t)random(FRUIT_KINDS));
+  if (fk >= 0 && fruitCount[fk] < FRUIT_STACK_MAX) { fruitCount[fk]++; f = (uint8_t)(FRUIT_FOOD_BASE + fk); }
+  else if (foodCount[f] < FOOD_STACK_MAX) foodCount[f]++;
   plantEpoch = 0;
   bumpTally(TALLY_HARVEST);
   noteMission(MIS_GARDEN, 1);
@@ -2370,6 +2372,21 @@ int8_t Pet::harvest() {
   registerCare();
   save();
   return (int8_t)f;
+}
+
+Pet::FruitResult Pet::eatFruit(uint8_t kind) {
+  lastFruitGain = 0;
+  if (kind >= FRUIT_KINDS || !fruitCount[kind] || isEgg() || ceremony != CER_NONE) return FRUIT_NONE;
+  uint8_t *tr = kind == 0 ? &trAtk : kind == 1 ? &trDef : &trSpe;
+  uint8_t cap = kind == 0 ? trMaxAtk() : kind == 1 ? trMaxDef() : trMaxSpe();
+  uint8_t g = fruitGain(*tr, cap);
+  if (!g) return FRUIT_AT_BEST;
+  *tr = (uint8_t)(*tr + g);
+  fruitCount[kind]--;
+  lastFruitGain = g;
+  registerCare();
+  save();
+  return FRUIT_EATEN;
 }
 
 // ---------- the capsule machine ----------
@@ -3659,6 +3676,7 @@ void Pet::save() {
   prefs.putUInt("mnd", mineDay);
   prefs.putUChar("mnn", mineToday);
   prefs.putUChar("msh", mineShards);
+  prefs.putBytes("frt", fruitCount, sizeof(fruitCount));
   prefs.putUShort("mnf", fossilDex);
   prefs.putBool("alOn", alarmOn);
   prefs.putUChar("alH", alarmH);
@@ -3962,6 +3980,8 @@ void Pet::load() {
   fishToday = prefs.getUChar("fshn", 0);
   mineDay = prefs.getUInt("mnd", 0);
   mineToday = prefs.getUChar("mnn", 0);
+  loadBlob(prefs, "frt", fruitCount, sizeof(fruitCount));
+  for (int i = 0; i < FRUIT_KINDS; i++) if (fruitCount[i] > FRUIT_STACK_MAX) fruitCount[i] = FRUIT_STACK_MAX;
   mineShards = prefs.getUChar("msh", 0); if (mineShards >= SHARDS_PER_STONE) mineShards = SHARDS_PER_STONE - 1;
   fossilDex = prefs.getUShort("mnf", 0); if (!isFossilDex((int16_t)fossilDex)) fossilDex = 0;
   alarmOn = prefs.getBool("alOn", false);

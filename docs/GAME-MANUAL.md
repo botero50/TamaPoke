@@ -286,6 +286,12 @@ Rain, snow and storms from the real weather stop the drifting and draw over it. 
 keep the drawn backgrounds. The art was generated for this project (tools/gen_scenery.py, ComfyUI with
 DreamShaper 8) and packed by tools/pack_scenery.py; the files are /mons/bg1_d.bin .. bg7_n.bin.
 
+### Training fruits (v1.51)
+One garden harvest in four gives a **training fruit** instead of food: **Power** (Attack), **Guard** (Defence) or **Swift**
+(Speed). They are kept in the bag under the **Garden** aisle (up to 9 of each). Tap one to eat it: **+4** to that training
+stat, never above the ceiling set by the companion's individual values. At the ceiling it says so and keeps the fruit.
+Natures are not part of this game.
+
 ### The Mine (v1.50)
 The third page of the map has a new place, **Mine**. Tap the rock until it breaks: a Rock, Steel, Fighting or Fire type
 needs 8 taps, Ground and Ice 10, the rest 14, and a strong Attack saves a few (never under 4). Each rock is one dig: it costs

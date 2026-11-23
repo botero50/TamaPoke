@@ -428,7 +428,8 @@ int main(){
     int8_t f = p.harvest();
     int total = 0;
     for (int i = 0; i < FOOD_COUNT; i++) total += p.foodCount[i];
-    ck(f >= 0 && f < FOOD_COUNT && total == 1 && p.plantEpoch == 0, "the harvest is one serving, and the plot is free");
+    int fr = 0; for (int i = 0; i < FRUIT_KINDS; i++) fr += p.fruitCount[i];
+    ck(((f >= 0 && f < FOOD_COUNT && total == 1 && fr == 0) || (f >= FRUIT_FOOD_BASE && total == 0 && fr == 1)) && p.plantEpoch == 0, "the harvest is one serving (or one training fruit), and the plot is free");
   }
 
   // --- seasonal gifts by the date, once a day

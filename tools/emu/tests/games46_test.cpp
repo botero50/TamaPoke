@@ -903,6 +903,26 @@ static void mineSceneTests() {
   pet.energy = 100;
 }
 
+// Training fruits through the real bag: the garden aisle lists them, a tap eats one
+static void fruitBagTests() {
+  extern bool bagOpen; extern int8_t bagCat; extern uint8_t bagPage; extern uint32_t fpToastUntil;
+  pet.dbgHatchAs(25, false);
+  while (pet.hasLearnOffer()) pet.declineLearn();
+  pet.sleeping = false; pet.ceremony = CER_NONE;
+  pet.seedCount = 1; pet.fruitCount[0] = 2; pet.fruitCount[1] = 0; pet.fruitCount[2] = 1; pet.trAtk = 10; pet.trSpe = 0;
+  bagOpen = true; bagCat = 5; bagPage = 0; pumpMs(100);
+  click(233, 224);   // the second row: the first fruit that is in the bag (Power)
+  ck(pet.fruitCount[0] == 1 && pet.trAtk == 14, "tapping a Power fruit in the garden aisle eats it: +4 Attack");
+  ck(fpToastUntil != 0, "and shows a message");
+  click(233, 224);
+  ck(pet.fruitCount[0] == 0 && pet.trAtk == 18, "the last one too");
+  pumpMs(100);
+  ck(bagOpen && bagCat == 5, "the bag stays open");
+  click(233, 224);   // now the second row is the Swift fruit
+  ck(pet.fruitCount[2] == 0 && pet.trSpe == 4, "the list moves up: the next row is the Swift fruit");
+  bagOpen = false; bagCat = -1;
+}
+
 static void saverModeTests() {
   extern int g_emuBatPct; extern bool g_emuUsb; extern uint8_t gPowerLevel, gSaverMode, dimStage;
   extern uint32_t lastInteract;
@@ -955,6 +975,7 @@ int main() {
   shakeTests();
   saverModeTests();
   mineSceneTests();
+  fruitBagTests();
   if (bad) { printf("FAILURES: %d\n", bad); return 1; }
   printf("games46 test passed\n");
   return 0;

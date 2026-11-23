@@ -52,7 +52,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.69"
+#define FW_VERSION "3.14-funpack.70"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -11411,6 +11411,62 @@ void hubTap(int16_t x, int16_t y) {
 // CAT_GARDEN is the seeds' own aisle: care item 2, listed apart so it can be found
 enum : uint8_t { CAT_HATS = 0, CAT_TOYS, CAT_DECOR, CAT_FOOD, CAT_CARE, CAT_GARDEN, CAT_SCENE, CAT_FURN, CAT_BALLS, CAT_COUNT };
 #define CARE_LIKE(c) ((c) == CAT_CARE || (c) == CAT_GARDEN)
+static const char *const SPR_FRUIT[FRUIT_KINDS][16] = {
+  {
+    "................",
+    ".......gg.......",
+    "......gGg.......",
+    ".....kkkkkk.....",
+    "...kkrrrrrrkk...",
+    "..krrwwrrrrrrk..",
+    "..krwwrrrrrrRk..",
+    ".krrwrrrrrrrRRk.",
+    ".krrrrrrrrrrRRk.",
+    ".krrrrrrrrrRRRk.",
+    "..krrrrrrrRRk...",
+    "..krrrrrrRRRk...",
+    "...kRRrrRRRk....",
+    "....kkRRRkk.....",
+    ".....kkkkk......",
+    "................",
+  },
+  {
+    "................",
+    ".......gg.......",
+    "......gGg.......",
+    ".....kkkkkk.....",
+    "...kkBBBBBBkk...",
+    "..kBBwwBBBBBBk..",
+    "..kBwwBBBBBBNk..",
+    ".kBBwBBBBBBBNNk.",
+    ".kBBBBBBBBBBNNk.",
+    ".kBBBBBBBBBNNNk.",
+    "..kBBBBBBBNNk...",
+    "..kBBBBBBNNNk...",
+    "...kNNBBNNNk....",
+    "....kkNNNkk.....",
+    ".....kkkkk......",
+    "................",
+  },
+  {
+    "................",
+    ".......gg.......",
+    "......gGg.......",
+    ".....kkkkkk.....",
+    "...kkffffffkk...",
+    "..kffwwffffffk..",
+    "..kfwwffffffYk..",
+    ".kffwfffffffYYk.",
+    ".kffffffffffYYk.",
+    ".kfffffffffYYYk.",
+    "..kfffffffYYk...",
+    "..kffffffYYYk...",
+    "...kYYffYYYk....",
+    "....kkYYYkk.....",
+    ".....kkkkk......",
+    "................",
+  },
+};
 static StrId accName(uint8_t a);   // with the wardrobe code
 static const StrId CAT_NAME[CAT_COUNT] = { S_WARDROBE, S_TOYS, S_DECOR, S_FOOD_TITLE, S_CARE, S_PLACE_GARDEN, S_SCENERY, S_FURNITURE, S_BTL_BALLS };
 static StrId furnName(uint8_t f) {
@@ -11431,7 +11487,7 @@ bool feedFromBag(uint8_t f);   // defined with the food menu
 // everything there is in a category (the bag) ...
 static uint8_t catCountAll(uint8_t c) {
   return c == CAT_HATS ? HAT_COUNT + ACC_COUNT : c == CAT_TOYS ? DEC_TOY_COUNT : c == CAT_DECOR ? DEC_COUNT - DEC_TOY_COUNT
-       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : c == CAT_GARDEN ? 1 : c == CAT_BALLS ? WILD_BALL_KINDS : 2;
+       : c == CAT_FOOD ? FOOD_SHOP_COUNT : c == CAT_SCENE ? SCENERY_COUNT : c == CAT_FURN ? FURN_COUNT : c == CAT_GARDEN ? 1 + FRUIT_KINDS : c == CAT_BALLS ? WILD_BALL_KINDS : 2;   // GARDEN: the seeds and the training fruits
 }
 // ... and what the shop sells: the arcade prizes are won, never bought
 static uint8_t catCount(uint8_t c) {
@@ -11446,7 +11502,7 @@ static uint8_t catItem(uint8_t c, uint8_t i) {
   return c == CAT_DECOR ? DEC_TOY_COUNT + i : i;
 }
 // the bag lists everything owned, prizes included
-static uint8_t bagItem(uint8_t c, uint8_t i) { return c == CAT_GARDEN ? 2 : c == CAT_DECOR ? DEC_TOY_COUNT + i : i; }
+static uint8_t bagItem(uint8_t c, uint8_t i) { return c == CAT_GARDEN ? 2 + i : c == CAT_DECOR ? DEC_TOY_COUNT + i : i; }
 
 static StrId decorName(uint8_t d) {
   static const StrId T_[DEC_COUNT] = {
@@ -11458,14 +11514,17 @@ static StrId decorName(uint8_t d) {
 static StrId foodName(uint8_t f);
 static const char *const *catIcon(uint8_t c, uint8_t id) {
   if (c == CAT_BALLS) return SPR_BALLS[id % WILD_BALL_KINDS];
+  if (c == CAT_GARDEN && id >= 3) return SPR_FRUIT[(id - 3) % FRUIT_KINDS];
   if (CARE_LIKE(c)) return id == 0 ? SPR_CARE_SOAP : id == 1 ? SPR_CARE_BRUSH : SPR_PLACE_SEED;
   if (c == CAT_SCENE) return id == SCENERY_ROOM ? SPR_FURN_WINDOW : SPR_PLACE_TREE;
   if (c == CAT_FURN) return SPR_FURN[id];
   if (c == CAT_HATS && id >= HAT_COUNT) return SPR_ACC[id - HAT_COUNT];   // past the hats: the accessories
   return c == CAT_HATS ? SPR_HATS[id] : c == CAT_FOOD ? SPR_FOODS[id] : SPR_DECOR[id];
 }
+static StrId fruitName(uint8_t k) { return k == 0 ? S_FRUIT_POWER : k == 1 ? S_FRUIT_GUARD : S_FRUIT_SWIFT; }
 static StrId catName(uint8_t c, uint8_t id) {
   if (c == CAT_BALLS) return id == 0 ? S_BALL_POKE : id == 1 ? S_BALL_GREAT : S_BALL_ULTRA;
+  if (c == CAT_GARDEN && id >= 3) return fruitName((uint8_t)(id - 3));
   if (CARE_LIKE(c)) return id == 0 ? S_SOAP : id == 1 ? S_BRUSH_ITEM : S_SEED;
   if (c == CAT_SCENE) return sceneryName(id);
   if (c == CAT_FURN) return furnName(id);
@@ -11484,6 +11543,7 @@ static uint16_t catPrice(uint8_t c, uint8_t id) {
 static bool catConsumable(uint8_t c, uint8_t id) { return c == CAT_FOOD || c == CAT_BALLS || (CARE_LIKE(c) && id != 1); }
 static bool catOwned(uint8_t c, uint8_t id) {
   if (c == CAT_BALLS) return pet.wildBalls[id % WILD_BALL_KINDS] > 0;
+  if (c == CAT_GARDEN && id >= 3) return pet.fruitCount[(id - 3) % FRUIT_KINDS] > 0;
   if (CARE_LIKE(c)) return id == 0 ? pet.soapCount > 0 : id == 1 ? pet.brushOwned : pet.seedCount > 0;
   if (c == CAT_SCENE) return pet.ownsScenery(id);
   if (c == CAT_FURN) return pet.ownsFurn(id);
@@ -11507,6 +11567,12 @@ static bool catBuy(uint8_t c, uint8_t id) {
 }
 // the row label: a food shows how many servings are in the bag
 static const char *catLabel(uint8_t c, uint8_t id, char *buf, size_t n) {
+  if (c == CAT_GARDEN && id >= 3) {
+    char cnt[8];
+    snprintf(cnt, sizeof(cnt), T(S_COUNT_FMT), (unsigned)pet.fruitCount[(id - 3) % FRUIT_KINDS]);
+    snprintf(buf, n, "%s %s", T(fruitName((uint8_t)(id - 3))), cnt);
+    return buf;
+  }
   uint8_t have = c == CAT_BALLS ? pet.wildBalls[id % WILD_BALL_KINDS] : c == CAT_FOOD ? pet.foodCount[id] : !CARE_LIKE(c) ? 0 : id == 0 ? pet.soapCount : id == 2 ? pet.seedCount : 0;
   if (!have) return T(catName(c, id));
   char cnt[8];
@@ -11517,6 +11583,13 @@ static const char *catLabel(uint8_t c, uint8_t id, char *buf, size_t n) {
 // wear / take off a hat, put out / pick up a toy or decoration
 static void catUse(uint8_t c, uint8_t id) {
   if (c == CAT_BALLS) { fpShowToast(S_BALL_USE, UI_BAR_OK); return; }
+  if (c == CAT_GARDEN && id >= 3) {                                    // eat a training fruit
+    Pet::FruitResult r = pet.eatFruit((uint8_t)(id - 3));
+    if (r == Pet::FRUIT_EATEN) {
+      sfxPlay(SFX_LEVEL); fpShowToast(S_FRUIT_GAIN_FMT, UI_BAR_OK); fpToastNum = pet.lastFruitGain;
+    } else { sfxPlay(SFX_DENY); fpShowToast(S_FRUIT_BEST, UI_BAR_WARN); }
+    return;
+  }
   if (c == CAT_HATS && id >= HAT_COUNT) pet.wearAcc(id - HAT_COUNT);
   else if (c == CAT_HATS) pet.wearHat(pet.hatOn == (int8_t)id ? -1 : (int8_t)id);
   else if (c == CAT_SCENE) pet.pickScenery((int8_t)id);   // again: back to its own
@@ -11714,6 +11787,7 @@ void renderBag() {
     }
   }
   drawPageNav(bagPage, pages);
+  drawFpToast();
   gfx->flush();
 }
 
@@ -13120,7 +13194,7 @@ void placeTap(int16_t x, int16_t y) {
         int8_t f = pet.harvest();
         fxStart(FX_HARVEST);
         char b[48];
-        snprintf(b, sizeof(b), T(S_GOT_FOOD_FMT), T(foodName((uint8_t)f)));
+        snprintf(b, sizeof(b), T(S_GOT_FOOD_FMT), T(f >= FRUIT_FOOD_BASE ? fruitName((uint8_t)(f - FRUIT_FOOD_BASE)) : foodName((uint8_t)f)));
         sfxPlay(SFX_MEDAL);
         placeSay(b);
       } else if (!pet.plantEpoch) {
