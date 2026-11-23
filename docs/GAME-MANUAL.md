@@ -286,6 +286,14 @@ Rain, snow and storms from the real weather stop the drifting and draw over it. 
 keep the drawn backgrounds. The art was generated for this project (tools/gen_scenery.py, ComfyUI with
 DreamShaper 8) and packed by tools/pack_scenery.py; the files are /mons/bg1_d.bin .. bg7_n.bin.
 
+### Swap your companion with a party member (v1.48)
+Open the team, tap a member, and the left button reads **SWAP** (tap it twice to confirm; with an egg waiting it is
+**BRING BACK** as before). Your companion goes into that member's slot and the member comes out as your companion, **no egg
+and no release needed**. Both keep growing: the one that goes into the team is saved with its exact age, bond and needs
+and picks up where it left off the next time you swap it back; it does not age or get hungry while it is in the team. A
+member retired in an earlier version comes out at its level with its needs topped up. A swap ends a Mega Evolution, and
+it is refused while the companion sleeps, is away or is in a ceremony.
+
 ### Mega Evolution (v1.47)
 Win the first gold of the day in the Tournament on **three different days** and you earn a **Mega Stone** (you can keep
 three). On the first profile card (swipe up on the main screen) a violet **MEGA STONE** button shows for a companion whose
@@ -306,7 +314,7 @@ base stats (each event weighs HP, attack, defence and speed its own way), the ge
 strongest does not always win. A dual type takes the average of its two modifiers. Each event costs 15 energy; it
 cannot compete asleep, sick, away, an egg, or under 20 energy. Gold pays 25 coins and 10 joy, silver 12 coins,
 bronze 5; the first gold of each day pays 20 coins more. The list shows your best mark per event and your medals;
-five golds earn the **Tournament gold** trophy. Swipe up (or the red X) leaves the Stadium. In the long jump the athletes run up to the board and land in the sand pit, farther in for a longer jump.
+five golds earn the **Tournament gold** trophy. Swipe up (or the red X) leaves the Stadium. Each event lasts about ten seconds: a 3-2-1-GO start, the whole track and a cheering crowd in view, and a marker over the leader; a photo finish flashes at the line. In the long jump the athletes run up to the board and land in the sand pit, farther in for a longer jump.
 
 ### Wild encounters (phase 44)
 The **Tall Grass** tile, on page 2 of the map, shows how many encounters are waiting:

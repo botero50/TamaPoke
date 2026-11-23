@@ -51,7 +51,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.65"
+#define FW_VERSION "3.14-funpack.67"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -259,6 +259,7 @@ uint8_t chorePage = 0;   // phase 37: the chores come in pages
 uint8_t diaryPage = 0;
 bool alarmRinging = false;   // the alarm clock is going off
 bool questView = false;      // the missions panel shows the weekly quest
+bool gSwapNoPhoto = false;     // the species changed because the player swapped it, not because it evolved: no photo
 bool photoPending = false;   // the next main-screen frame goes into the album
 bool albumOpen = false;      // browsing the photos
 uint8_t albumIdx = 0, albumShown = 255;   // the photo asked for, and the one in the buffer
@@ -1188,8 +1189,8 @@ void loop() {
   placeMusicTick();
   {                                         // an evolution: a photo of the new look
     static int16_t seenSpecies = -1;
-    if (!pet.isEgg() && seenSpecies >= 0 && pet.speciesId != seenSpecies && !pet.evolving()) photoPending = true;
-    if (!pet.evolving()) seenSpecies = pet.isEgg() ? -1 : pet.speciesId;
+    if (!pet.isEgg() && seenSpecies >= 0 && pet.speciesId != seenSpecies && !pet.evolving()) { if (!gSwapNoPhoto) photoPending = true; gSwapNoPhoto = false; }
+    if (!pet.evolving()) { seenSpecies = pet.isEgg() ? -1 : pet.speciesId; gSwapNoPhoto = false; }
   }
 
   // Fun Pack: nobody has touched it for a while in the evening and the screen
@@ -1928,6 +1929,9 @@ void onSwipeV(int dir) {
 // The detail sheet, shared by the party and the box so the two cannot drift.
 // `fromBox` picks which action the LEFT button offers; the right one is always
 // RELEASE, which is irreversible and therefore always asks first.
+static uint32_t gSwapArmUntil = 0;   // a first tap on SWAP waits for a second
+static bool gSwapArmed() { return (int32_t)(gSwapArmUntil - millis()) > 0; }
+
 void renderMonSheet(const PartyMon &m, bool fromBox) {
   const DexEntry &d = DEX_TBL[m.dex];
   gfx->fillScreen(RGB565_BLACK);
@@ -1953,9 +1957,12 @@ void renderMonSheet(const PartyMon &m, bool fromBox) {
   // would silently destroy whatever creature is currently alive, and a rule the
   // player cannot see is worse than a button they cannot press. A box creature
   // goes to the party instead, which is always allowed if there is room.
+  // With a companion alive the same button SWAPS: the companion goes into this slot, still growing,
+  // and this one comes out growing. With an egg waiting it brings it back, as before.
+  bool swapMode = !fromBox && !pet.isEgg();
   bool leftOk = fromBox ? (party.firstFree() >= 0)
-                        : (pet.isEgg() && !pet.awaitingStarter());
-  const char *leftLbl = fromBox ? T(S_BOX_TAKE) : T(S_REVIVE);
+                        : swapMode ? pet.canSwap() : (pet.isEgg() && !pet.awaitingStarter());
+  const char *leftLbl = fromBox ? T(S_BOX_TAKE) : swapMode ? (gSwapArmed() ? T(S_SWAP_CONFIRM) : T(S_SWAP)) : T(S_REVIVE);
   gfx->fillRoundRect(PDET_L_X, PDET_BTN_Y, PDET_L_W, PDET_BTN_H, 10,
                      leftOk ? UI_BAR_OK : UI_TRACK_TEXT);
   gfx->drawRoundRect(PDET_L_X, PDET_BTN_Y, PDET_L_W, PDET_BTN_H, 10, UI_INK);
@@ -1977,7 +1984,7 @@ void renderMonSheet(const PartyMon &m, bool fromBox) {
   // Above the button there is clear space between it and the stat line, and
   // that is also where the eye is already travelling.
   if (!leftOk) {
-    const char *why = fromBox ? T(S_PARTY_FULL) : T(S_REVIVE_EGG);
+    const char *why = fromBox ? T(S_PARTY_FULL) : swapMode ? T(S_SWAP_BUSY) : T(S_REVIVE_EGG);
     uiTextFit(UIF_TINY, CX, PDET_BTN_Y - 8, why, UI_BAR_WARN, 1, 340);
   }
   uiText(UIF_SMALL, CX, 418, T(S_BACK), UI_TRACK_TEXT, 1);
@@ -2115,6 +2122,17 @@ void partyTap(int16_t x, int16_t y) {
     // The confirm is modal: while it is up nothing else on the sheet responds,
     // or a miss on YES would fall through to the move rows underneath it.
     if (releaseConfirm) { monSheetConfirmTap(x, y, false); return; }
+    if (monSheetBtn(x, y, true) && !pet.isEgg()) {   // SWAP: a first tap arms it, the second does it
+      if (!pet.canSwap()) { sfxPlay(SFX_DENY); return; }
+      if (!gSwapArmed()) { gSwapArmUntil = millis() + 4000; sfxPlay(SFX_TAP); return; }
+      gSwapArmUntil = 0;
+      int16_t old = pet.speciesId; bool oldShiny = pet.shiny;
+      if (!pet.swapWith(partyDetail - 1)) { sfxPlay(SFX_DENY); return; }
+      gSwapNoPhoto = true;                              // a swap is not an evolution: no photo
+      evoPmd.unload(); evoPmd.load(old, oldShiny);     // the blink shows the one that left
+      partyDetail = 0; boxSwapFrom = 0; partyOpen = false;
+      return;
+    }
     if (monSheetBtn(x, y, true)) {           // BRING BACK
       if (!pet.isEgg() || pet.awaitingStarter()) { sfxPlay(SFX_DENY); return; }
       uint8_t keepHp = party.hpPct[partyDetail - 1];   // it comes back as hurt as it was banked
@@ -11996,8 +12014,11 @@ void bathMenuTap(int16_t x, int16_t y) {
 #define TOUR_ROW_H 64
 #define TOUR_LX0 100                       // where a runner starts and finishes on its lane
 #define TOUR_LX1 372
-#define TOUR_LANE_G(i) (176 + (i) * 78)    // the ground line of lane i
-#define TOUR_TURN_MS 2000                  // one attempt in the jumps, weights and dives
+#define TOUR_LANE_G(i) (190 + (i) * 88)    // the ground line of lane i
+#define TOUR_TURN_MS 3200                  // one attempt in the jumps, weights and dives
+#define TOUR_INTRO_MS 1400                 // "3 2 1 GO" before the event
+#define TOUR_RACE_MS 9000                  // the fastest runner's time on screen; the others in proportion
+#define TOUR_RACE_MAX_MS 12000
 
 static uint8_t tourPage = 0;               // the list page
 static uint8_t tourPhase = 0;              // 0 the list, 1 the event, 2 the result
@@ -12090,15 +12111,15 @@ static uint32_t tourRunMs(int i) {
     if (eventLowerWins(tourEv) ? tourMark[k] < best : tourMark[k] > best) best = tourMark[k];
   }
   float r = eventLowerWins(tourEv) ? tourMark[i] / best : best / tourMark[i];
-  uint32_t ms = (uint32_t)(4500.0f * r);
-  return ms > 8000 ? 8000 : ms;
+  uint32_t ms = (uint32_t)((float)TOUR_RACE_MS * r);
+  return ms > TOUR_RACE_MAX_MS ? TOUR_RACE_MAX_MS : ms;
 }
 
 static uint32_t tourPlayTotalMs() {
-  if (!tourIsRace(tourEv)) return 3 * TOUR_TURN_MS + 600;
+  if (!tourIsRace(tourEv)) return TOUR_INTRO_MS + 3 * TOUR_TURN_MS + 1000;
   uint32_t m = 0;
   for (int i = 0; i < 3; i++) if (tourRunMs(i) > m) m = tourRunMs(i);
-  return m + 700;
+  return TOUR_INTRO_MS + m + 1200;
 }
 
 static void tourFinishNow() {
@@ -12111,7 +12132,7 @@ static void tourFinishNow() {
 
 // ---- the venues, each a few shapes
 static void tourBands(uint16_t c1, uint16_t c2) {
-  for (int i = 0; i < 3; i++) gfx->fillRect(0, TOUR_LANE_G(i) - 66, 466, 70, (i & 1) ? c2 : c1);
+  for (int i = 0; i < 3; i++) gfx->fillRect(0, TOUR_LANE_G(i) - 66, 466, 80, (i & 1) ? c2 : c1);
 }
 
 static void tourVenue(uint8_t ev) {
@@ -12123,8 +12144,8 @@ static void tourVenue(uint8_t ev) {
       gfx->fillRect(0, 66, 466, 34, C565(0x7a, 0x7f, 0x8c));                       // the stands
       for (int x = 4; x < 466; x += 12) gfx->fillRect(x, 72 + ((x / 12) % 3) * 8, 6, 6, (x / 12) % 2 ? C565(0xe8, 0x50, 0x3a) : C565(0xf8, 0xd9, 0x4a));
       tourBands(C565(0xc4, 0x6b, 0x3c), C565(0xb8, 0x60, 0x34));
-      for (int i = 0; i < 4; i++) gfx->fillRect(0, TOUR_LANE_G(0) - 68 + i * 78 - (i ? 4 : 0), 466, 2, W);
-      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 232, W);                   // the finish line
+      for (int i = 0; i < 4; i++) gfx->fillRect(0, TOUR_LANE_G(0) - 68 + i * 88 - (i ? 4 : 0), 466, 2, W);
+      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 262, W);                   // the finish line
       if (ev == EV_HURDLES)
         for (int i = 0; i < 3; i++)
           for (int h = 0; h < 5; h++) gfx->fillRect(TOUR_LX0 + (int)((0.15f + h * 0.16f) * (TOUR_LX1 - TOUR_LX0)), TOUR_LANE_G(i) - 22, 4, 22, W);
@@ -12134,27 +12155,27 @@ static void tourVenue(uint8_t ev) {
       gfx->fillScreen(C565(0xdc, 0xee, 0xf6));
       tourBands(C565(0x4f, 0x9b, 0xd8), C565(0x62, 0xa9, 0xe0));
       for (int i = 0; i < 4; i++)
-        for (int x = 0; x < 466; x += 14) gfx->fillRect(x, TOUR_LANE_G(0) - 68 + i * 78 - (i ? 4 : 0), 8, 4, (x / 14) % 2 ? C565(0xe8, 0x50, 0x3a) : W);
-      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 232, W);
+        for (int x = 0; x < 466; x += 14) gfx->fillRect(x, TOUR_LANE_G(0) - 68 + i * 88 - (i ? 4 : 0), 8, 4, (x / 14) % 2 ? C565(0xe8, 0x50, 0x3a) : W);
+      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 262, W);
       break;
     case EV_SKATE:
       gfx->fillScreen(C565(0xcf, 0xe8, 0xf4));
       tourBands(C565(0xe4, 0xf2, 0xfa), C565(0xd2, 0xe8, 0xf4));
-      for (int i = 0; i < 4; i++) gfx->fillRect(0, TOUR_LANE_G(0) - 68 + i * 78 - (i ? 4 : 0), 466, 2, C565(0x8f, 0xc0, 0xe0));
-      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 232, C565(0xe8, 0x50, 0x3a));
+      for (int i = 0; i < 4; i++) gfx->fillRect(0, TOUR_LANE_G(0) - 68 + i * 88 - (i ? 4 : 0), 466, 2, C565(0x8f, 0xc0, 0xe0));
+      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 262, C565(0xe8, 0x50, 0x3a));
       break;
     case EV_TORCH:
       gfx->fillScreen(C565(0x6a, 0x80, 0xb8));
       for (int x = 0; x < 466; x += 46) gfx->fillRect(x, 70 + (x / 46 % 3) * 10, 34, 40, C565(0x3c, 0x48, 0x68));    // the city
       tourBands(C565(0x5a, 0x5e, 0x6a), C565(0x52, 0x56, 0x62));
-      for (int i = 0; i < 4; i++) for (int x = 0; x < 466; x += 30) gfx->fillRect(x, TOUR_LANE_G(0) - 68 + i * 78 - (i ? 4 : 0), 16, 2, C565(0xf8, 0xd9, 0x4a));
+      for (int i = 0; i < 4; i++) for (int x = 0; x < 466; x += 30) gfx->fillRect(x, TOUR_LANE_G(0) - 68 + i * 88 - (i ? 4 : 0), 16, 2, C565(0xf8, 0xd9, 0x4a));
       break;
     case EV_TRAIL:
       gfx->fillScreen(C565(0x3c, 0x8a, 0x4c));
       for (int x = 10; x < 466; x += 38) { gfx->fillRect(x, 70, 8, 40, C565(0x7e, 0x55, 0x30)); gfx->fillCircle(x + 4, 66, 16, C565(0x2f, 0x6e, 0x3c)); }
       tourBands(C565(0x9a, 0x70, 0x42), C565(0x8c, 0x64, 0x3a));
       for (int i = 0; i < 3; i++) for (int h = 0; h < 4; h++) gfx->fillRect(TOUR_LX0 + 30 + h * 70, TOUR_LANE_G(i) - 10, 22, 10, C565(0x6a, 0x48, 0x28));   // logs
-      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 232, W);
+      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 262, W);
       break;
     case EV_CLIMB:
       gfx->fillScreen(C565(0x8f, 0xc8, 0xea));
@@ -12191,7 +12212,66 @@ static void tourDrawMon(int i, int x, int ground, uint8_t act, uint32_t t) {
   PmdMon &m = (i == 0) ? pmd : tourMon[i - 1];
   if (!m.loaded) { gfx->fillCircle(x, ground - 22, 18, i == 0 ? UI_BAR_OK : UI_BAR_WARN); return; }
   if (!m.has(act)) act = PMD_IDLE;
-  drawPmdActZ(m, act, x, ground, t, true, false, 3, 100, 64);
+  drawPmdActZ(m, act, x, ground, t, true, false, 3, 66, 46);     // zoomed out: the whole track and its crowd fit
+}
+
+// The crowd along the top (heads bobbing in a wave) and pennants, the same everywhere
+static void tourCrowd(uint32_t now, bool flags) {
+  static const uint16_t SK[4] = { 0xF6B6, 0xDD70, 0xB4A8, 0x8B66 };
+  static const uint16_t CL[6] = { 0xE8A8, 0xF7E0, 0x3C9F, 0x4DE9, 0xC81F, 0xFFFF };
+  for (int x = 6; x < 466; x += 14) {
+    int k = x / 14;
+    int bob = (int)(sinf(now * 0.006f + k * 0.7f) * 3.0f);
+    gfx->fillRect(x, 92 + bob, 9, 9, CL[(k * 5) % 6]);
+    gfx->fillCircle(x + 4, 88 + bob, 4, SK[(k * 3) % 4]);
+    if ((now / 500 + k) % 9 == 0) gfx->fillRect(x - 1, 78 + bob, 2, 8, SK[(k * 3) % 4]);   // an arm up
+  }
+  if (flags) {
+    for (int x = 10; x < 466; x += 46) {
+      gfx->fillRect(x, 60, 2, 30, 0xFFFF);
+      int w = 12 + (int)(sinf(now * 0.01f + x) * 3.0f);
+      gfx->fillTriangle(x + 2, 60, x + 2 + w, 66, x + 2, 72, ((x / 46) & 1) ? 0xE8A8 : 0xF7E0);
+    }
+  }
+}
+
+// what each venue adds: water ripples, ice sparkles, the torch flame, spotlights, chalk and dust
+static void tourExtras(uint8_t ev, uint32_t now) {
+  switch (ev) {
+    case EV_SWIM:
+      for (int i = 0; i < 3; i++)
+        for (int k = 0; k < 7; k++) gfx->fillRect((int)((now / 14 + k * 71 + i * 23) % 466), TOUR_LANE_G(i) - 30 + (k & 1) * 12, 12, 2, 0xFFFF);
+      break;
+    case EV_SKATE:
+      for (int k = 0; k < 14; k++)
+        if (((now / 120) + k * 5) % 7 < 2) gfx->fillRect((k * 83 + (now / 40) % 40) % 460, TOUR_LANE_G(k % 3) - 40, 3, 3, 0xFFFF);
+      break;
+    case EV_TORCH: {
+      int fx = TOUR_LX1 + 38, fy = TOUR_LANE_G(0) - 40;
+      int fl = (int)(sinf(now * 0.03f) * 4.0f);
+      gfx->fillRect(fx - 2, fy, 4, 40, 0x7BCF);
+      gfx->fillTriangle(fx - 10, fy, fx + 10, fy, fx, fy - 28 - fl, 0xFBE0);
+      gfx->fillTriangle(fx - 5, fy, fx + 5, fy, fx, fy - 16 - fl, 0xFFE0);
+      break;
+    }
+    case EV_LIFT: {
+      int sx = 233 + (int)(sinf(now * 0.0014f) * 150.0f);
+      gfx->fillTriangle(sx - 6, 20, sx + 6, 20, sx - 70, 330, 0x4A69);
+      gfx->fillTriangle(sx - 6, 20, sx + 6, 20, sx + 70, 330, 0x4A69);
+      break;
+    }
+    case EV_DIVE:
+      for (int k = 0; k < 8; k++) gfx->fillRect((int)((now / 18 + k * 61) % 466), 300 + (k % 3) * 22, 14, 2, 0xFFFF);
+      break;
+    case EV_CLIMB:
+      for (int i = 0; i < 3; i++) for (int y = 110; y < 380; y += 68) gfx->fillRect(146 + i * 100 + ((y / 34) % 2) * 14, y + 8, 8, 3, 0xFFFF);
+      break;
+    case EV_HURDLES:
+      for (int i = 0; i < 3; i++)
+        for (int h = 0; h < 5; h++) gfx->fillRect(TOUR_LX0 + (int)((0.15f + h * 0.16f) * (TOUR_LX1 - TOUR_LX0)) - 3, TOUR_LANE_G(i), 10, 3, 0x4208);
+      break;
+    default: break;
+  }
 }
 
 static void tourLabel(const char *s, int x, int y, uint16_t col) {
@@ -12200,10 +12280,21 @@ static void tourLabel(const char *s, int x, int y, uint16_t col) {
 }
 
 static void renderTourPlay() {
-  const uint32_t t = millis() - tourT0;
+  const uint32_t tAll = millis() - tourT0;
+  const bool intro = tAll < TOUR_INTRO_MS;
+  const uint32_t t = intro ? 0 : tAll - TOUR_INTRO_MS;
   tourVenue(tourEv);
+  tourCrowd(tAll, tourEv != EV_LIFT);
+  tourExtras(tourEv, tAll);
   char b[24];
   uiTextFit(UIF_MID, CX, 50, T(tourEvName(tourEv)), 0xFFFF, 1, 260);
+  if (intro) {                                       // 3 - 2 - 1 - GO, with a tick on each
+    static int lastCount = -1;
+    int c = (int)(tAll * 4 / TOUR_INTRO_MS);        // 0 = 3, 1 = 2, 2 = 1, 3 = GO
+    if (c != lastCount) { lastCount = c; sfxPlay(SFX_TAP); }
+    const char *num[4] = { "3", "2", "1", "GO!" };
+    uiText(UIF_HUGE, CX, 262, num[c > 3 ? 3 : c], c == 3 ? 0xFFE0 : 0xFFFF, 1);
+  } else { static int lastCount = 0; (void)lastCount; }
   if (tourIsRace(tourEv)) {
     const bool climb = tourEv == EV_CLIMB;
     for (int i = 0; i < 3; i++) {
@@ -12214,7 +12305,14 @@ static void renderTourPlay() {
         tourDrawMon(i, x, y, PMD_HOP, t);
       } else {
         int x = TOUR_LX0 + (int)(p * (TOUR_LX1 - TOUR_LX0));
+        if (p > 0.0f && p < 1.0f && tourEv != EV_SWIM && tourEv != EV_SKATE)      // dust kicked up behind a runner
+          for (int d = 0; d < 3; d++) gfx->fillRect(x - 16 - d * 9 - (int)((t / 60 + d) % 4) * 2, TOUR_LANE_G(i) - 4 - d * 3, 5 - d, 4 - d, 0xC5D1);
         tourDrawMon(i, x, TOUR_LANE_G(i), p >= 1.0f ? PMD_IDLE : PMD_WALKR, t);
+        if (p > 0.0f && p < 1.0f) {                                                // the leader wears a marker
+          bool lead = true;
+          for (int k = 0; k < 3; k++) if (k != i && (float)t / (float)tourRunMs(k) > p + 0.001f) lead = false;
+          if (lead) gfx->fillTriangle(x - 6, TOUR_LANE_G(i) - 58, x + 6, TOUR_LANE_G(i) - 58, x, TOUR_LANE_G(i) - 48, 0xFFE0);
+        }
       }
       if (t >= run) { tourFmtMark(tourEv, tourMark[i], b, sizeof(b)); tourLabel(b, climb ? 120 + i * 100 : 24, climb ? 70 : TOUR_LANE_G(i) - 70, i == 0 ? 0xFFE0 : 0xFFFF); }
     }
@@ -12224,7 +12322,7 @@ static void renderTourPlay() {
     for (int s = 0; s < 3; s++) {
       int i = ORDER[s];
       int gy = TOUR_LANE_G(s);
-      bool done = turn > s, now = turn == s;
+      bool done = !intro && turn > s, now = !intro && turn == s;
       uint32_t lt = t > (uint32_t)(s * TOUR_TURN_MS) ? t - (uint32_t)(s * TOUR_TURN_MS) : 0;
       if (tourEv == EV_LONGJUMP) {     // run up to the board, jump, land in the sand pit
         JumpPose jp = longJumpPose(done ? TOUR_TURN_MS : (now ? lt : 0), TOUR_TURN_MS, tourMark[i]);
@@ -12234,8 +12332,13 @@ static void renderTourPlay() {
       if (done || (now && lt > TOUR_TURN_MS - 700)) { tourFmtMark(tourEv, tourMark[i], b, sizeof(b)); tourLabel(b, 250, gy - 24, i == 0 ? 0xFFE0 : 0xFFFF); }
     }
   }
+  if (tourIsRace(tourEv) && !intro) {                // a photo finish: a white flash when the top two are within 3 %
+    uint32_t r0 = tourRunMs(0), r1 = tourRunMs(1), r2 = tourRunMs(2), lo = r0 < r1 ? r0 : r1; lo = lo < r2 ? lo : r2;
+    uint32_t mid = r0 + r1 + r2 - lo - (r0 > r1 ? (r0 > r2 ? r0 : r2) : (r1 > r2 ? r1 : r2));
+    if (mid < lo + lo / 33 && t >= lo && t < lo + 260) gfx->fillRect(TOUR_LX1 + 12, TOUR_LANE_G(0) - 66, 16, 262, 0xFFFF);
+  }
   gfx->flush();
-  if (t >= tourPlayTotalMs()) tourFinishNow();
+  if (tAll >= tourPlayTotalMs()) tourFinishNow();
 }
 
 static void renderTourResult() {

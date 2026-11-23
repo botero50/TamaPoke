@@ -701,7 +701,9 @@ static void stadiumTests() {
   pumpMs(120);
   uint16_t medals0 = pet.tourGold + pet.tourSilver + pet.tourBronze; uint32_t coins0 = pet.coins;
   click(233, 132);                                          // the first event: the 100 m
-  pumpMs(9500);                                             // it plays by itself, the podium follows
+  pumpMs(5000);
+  ck(pet.tourGold + pet.tourSilver + pet.tourBronze == medals0, "an event is still playing after five seconds (about ten in all)");
+  pumpMs(11000);                                            // it plays by itself (3-2-1-GO, the run), the podium follows
   uint16_t medals1 = pet.tourGold + pet.tourSilver + pet.tourBronze;
   ck(medals1 == medals0 + 1, "an event ends with exactly one medal");
   ck(pet.coins >= coins0 + TOUR_COINS_BRONZE && pet.energy == 80 - TOUR_ENERGY_COST, "it paid its coins and cost 15 energy");
@@ -715,7 +717,7 @@ static void stadiumTests() {
   { extern void tourSwipe(int); tourSwipe(-1); }
   pet.energy = 80;
   click(233, 132);
-  pumpMs(7500);
+  pumpMs(13000);                                            // 3-2-1-GO, three turns, the podium
   uint16_t medals2 = pet.tourGold + pet.tourSilver + pet.tourBronze;
   ck(medals2 >= medals1 + 1, "a jump event also ends with a medal");
   click(233, 330); pumpMs(120);

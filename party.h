@@ -36,8 +36,21 @@ struct PartyMon {
   bool empty() const { return dex < 1; }
 };
 
+// What a banked record cannot hold about a companion that was still being raised: its exact age, its
+// birthday, its bond and its needs. Kept in a SEPARATE key (like the box) so the stored team format
+// does not change. live = 1 means "swapped out while growing": it comes back growing, where it left off.
+// An all-zero record (an older save, or a retired companion) is a frozen one, as before.
+struct __attribute__((packed)) PartyExt {
+  uint32_t ageMinutes;
+  uint32_t bornDay;
+  uint8_t bond, fullness, joy, energy, hygiene;
+  uint8_t live;
+};
+
 class Party {
 public:
+  PartyExt ext[PARTY_SLOTS];
+  PartyExt boxExt[BOX_SLOTS];
   PartyMon slots[PARTY_SLOTS];
   PartyMon box[BOX_SLOTS];
   // How much health each one has left, in percent (0 = fainted). Kept beside the
@@ -46,7 +59,7 @@ public:
   uint8_t hpPct[PARTY_SLOTS];
   uint8_t boxHpPct[BOX_SLOTS];
 
-  Party() { for (auto &p : hpPct) p = 100; for (auto &p : boxHpPct) p = 100; }
+  Party() { for (auto &p : hpPct) p = 100; for (auto &p : boxHpPct) p = 100; memset(ext, 0, sizeof(ext)); memset(boxExt, 0, sizeof(boxExt)); }
   bool anyHurt() const;          // anyone in the team or the box below full health
   void healAll();                // everyone back to full: the Pokemon Center
 

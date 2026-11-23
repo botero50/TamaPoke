@@ -952,6 +952,13 @@ public:
   // level() working untouched rather than needing a second source of truth.
   bool frozen = false;
   void reviveFrom(const PartyMon &m);
+  // Swapping the companion with a party member, no egg needed: the live one is banked WITH its raising
+  // state (PartyExt) in the same slot and the chosen one comes out growing (a banked one with no state
+  // comes out at its level with its needs topped up). False when it cannot: a ceremony, away at work,
+  // asleep, choosing a starter, an egg, or an empty slot.
+  bool canSwap() const { return !isEgg() && !sleeping && ceremony == CER_NONE && !atWork() && !starterPick && !evolving(); }
+  bool swapWith(uint8_t slot);
+  void restoreFrom(const PartyMon &m, const PartyExt &x, uint8_t hp);   // revive, then growing again
 
   // The player's own name, alongside the badges and the streak: it belongs to
   // whoever is playing, not to the creature, so newEgg() must never clear it.

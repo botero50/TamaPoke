@@ -82,6 +82,13 @@ void Party::begin() {
   if (prefs.getBytesLength("phbx") == sizeof(boxHpPct)) prefs.getBytes("phbx", boxHpPct, sizeof(boxHpPct));
   for (auto &p : hpPct) if (p > 100) p = 100;
   for (auto &p : boxHpPct) if (p > 100) p = 100;
+  // the raising state of swapped-out companions: absent on an older save = all frozen, as before
+  memset(ext, 0, sizeof(ext));
+  memset(boxExt, 0, sizeof(boxExt));
+  if (prefs.getBytesLength("pxp") == sizeof(ext)) prefs.getBytes("pxp", ext, sizeof(ext));
+  if (prefs.getBytesLength("pxb") == sizeof(boxExt)) prefs.getBytes("pxb", boxExt, sizeof(boxExt));
+  for (int i = 0; i < PARTY_SLOTS; i++) if (slots[i].empty() || ext[i].live > 1) memset(&ext[i], 0, sizeof(PartyExt));
+  for (int i = 0; i < BOX_SLOTS; i++) if (box[i].empty() || boxExt[i].live > 1) memset(&boxExt[i], 0, sizeof(PartyExt));
 }
 
 bool Party::anyHurt() const {
@@ -100,11 +107,13 @@ void Party::healAll() {
 void Party::save() {
   prefs.putBytes("party", slots, sizeof(slots));
   prefs.putBytes("phpp", hpPct, sizeof(hpPct));
+  prefs.putBytes("pxp", ext, sizeof(ext));
 }
 
 void Party::boxSave() {
   prefs.putBytes("box", box, sizeof(box));
   prefs.putBytes("phbx", boxHpPct, sizeof(boxHpPct));
+  prefs.putBytes("pxb", boxExt, sizeof(boxExt));
 }
 
 uint8_t Party::boxCount() const {
@@ -125,6 +134,7 @@ bool Party::boxAdd(const PartyMon &m) {
   if (i < 0) return false;
   box[i] = m;
   boxHpPct[i] = 100;
+  memset(&boxExt[i], 0, sizeof(PartyExt));
   boxSave();
   return true;
 }
@@ -133,6 +143,7 @@ void Party::boxReleaseAt(uint8_t i) {
   if (i >= BOX_SLOTS) return;
   box[i] = PartyMon();
   boxHpPct[i] = 100;
+  memset(&boxExt[i], 0, sizeof(PartyExt));
   boxSave();
 }
 
@@ -144,6 +155,9 @@ void Party::swapPartyBox(uint8_t partyIdx, uint8_t boxIdx) {
   uint8_t h = hpPct[partyIdx];                 // and each one takes its health with it
   hpPct[partyIdx] = boxHpPct[boxIdx];
   boxHpPct[boxIdx] = h;
+  PartyExt x = ext[partyIdx];                   // and its raising state
+  ext[partyIdx] = boxExt[boxIdx];
+  boxExt[boxIdx] = x;
   save();
   boxSave();
 }
@@ -166,6 +180,7 @@ bool Party::add(const PartyMon &m) {
   if (i < 0) return false;
   slots[i] = m;
   hpPct[i] = 100;
+  memset(&ext[i], 0, sizeof(PartyExt));
   save();
   return true;
 }
@@ -174,6 +189,7 @@ void Party::replaceAt(uint8_t i, const PartyMon &m) {
   if (i >= PARTY_SLOTS) return;
   slots[i] = m;
   hpPct[i] = 100;
+  memset(&ext[i], 0, sizeof(PartyExt));
   save();
 }
 
@@ -181,6 +197,7 @@ void Party::releaseAt(uint8_t i) {
   if (i >= PARTY_SLOTS) return;
   slots[i] = PartyMon();
   hpPct[i] = 100;
+  memset(&ext[i], 0, sizeof(PartyExt));
   save();
 }
 

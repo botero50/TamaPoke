@@ -367,6 +367,50 @@ void Pet::reviveFrom(const PartyMon &m) {
   save();
 }
 
+// A banked companion comes out growing again: with the state it was swapped out with, or, when it has
+// none (it was retired in an earlier version), at its banked level with its needs at 80.
+void Pet::restoreFrom(const PartyMon &m, const PartyExt &x, uint8_t hp) {
+  endMega(false);
+  reviveFrom(m);
+  frozen = false;
+  bornDay = today();
+  if (x.live) {
+    ageMinutes = x.ageMinutes;
+    bornDay = x.bornDay;
+    bond = x.bond > 100 ? 100 : x.bond;
+    fullness = x.fullness > 100 ? 100 : x.fullness;
+    joy = x.joy > 100 ? 100 : x.joy;
+    energy = x.energy > 100 ? 100 : x.energy;
+    hygiene = x.hygiene > 100 ? 100 : x.hygiene;
+    lastLearnLevel = level();
+  }
+  neglectTicks = 0;
+  hpPct = hp > 100 ? 100 : hp;
+  save();
+}
+
+bool Pet::swapWith(uint8_t slot) {
+  if (slot >= PARTY_SLOTS || party.slots[slot].empty() || !canSwap()) return false;
+  PartyMon out = PartyMon();
+  out.dex = speciesId; out.level = level(); out.medals = medals;
+  out.ivAtk = ivAtk; out.ivDef = ivDef; out.ivSpe = ivSpe; out.ivHp = ivHp;
+  out.trAtk = trAtk; out.trDef = trDef; out.trSpe = trSpe;
+  out.shiny = shiny ? 1 : 0;
+  for (int i = 0; i < MOVE_SLOTS; i++) out.moves[i] = moves[i];
+  strncpy(out.nick, nick, sizeof(out.nick) - 1);
+  PartyExt ox = { ageMinutes, bornDay, bond, fullness, joy, energy, hygiene, 1 };
+  uint8_t outHp = hpPct;
+  PartyMon in = party.slots[slot];
+  PartyExt ix = party.ext[slot];
+  uint8_t inHp = party.hpPct[slot];
+  party.slots[slot] = out; party.ext[slot] = ox; party.hpPct[slot] = outHp;
+  restoreFrom(in, ix, inHp);
+  party.save();                                   // both halves land together
+  sfxPlay(SFX_EVOLVE);
+  evolveUntil = millis() + EVOLVE_ANIM_MS;
+  return true;
+}
+
 void Pet::snapshotForParty() {
   endedKind = CER_NONE;
   if (isEgg()) return;

@@ -234,7 +234,7 @@ static inline JumpPose longJumpPose(uint32_t lt, uint32_t turnMs, float mark) {
   if (f < AIR) {
     float u = (f - RUN) / (AIR - RUN);
     p.x = (int16_t)(LJ_BOARD_X + (land - LJ_BOARD_X) * u);
-    p.lift = (int16_t)(sinf(u * 3.14159265f) * (50 + 8 * (mark - 2.5f)));
+    p.lift = (int16_t)(sinf(u * 3.14159265f) * (22 + 4 * (mark - 2.5f)));
     p.phase = 2;
     return p;
   }
