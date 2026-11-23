@@ -75,6 +75,8 @@ Huge thanks to that whole community for an enormous amount of work.
 | Board and pinout | [Waveshare ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) |
 | UI font (`uifont.h`, via `tools/gen_font.py`) | [Fredoka](https://fonts.google.com/specimen/Fredoka) and [Nunito](https://fonts.google.com/specimen/Nunito), SIL Open Font License 1.1; the TTFs are in `tools/fonts/` |
 | Standby clock, self-care on USB, light sleep with the sensor FIFO, battery curve and power-off, and the Tournament (rules and numbers adapted from its sport.h) | Ideas and reference from [Mu-Muu/TamaPoke](https://github.com/Mu-Muu/TamaPoke) (MIT, Copyright (c) 2026 Quique Tortosa and the fork's contributors); re-implemented here for this engine, with the MIT notice kept where code is adapted |
+| Mega Evolution (stone, 24 h timer, Tournament bonus) | Idea from Mu-Muu/TamaPoke (MIT); re-implemented here. The Mega sprites (`web/sprites-mega.pak`) are SpriteCollab's, same credit and licence as all our sprites |
+| Region landscapes (`tools/assets/scenery`, `web/sprites-scenery.pak`) | Generated for this project with a local [ComfyUI](https://github.com/comfyanonymous/ComfyUI) and the DreamShaper 8 checkpoint (CreativeML Open RAIL-M); the prompts are in `tools/gen_scenery.py` and name no Pokemon, characters or places from the games. The idea of a landscape per region comes from Mu-Muu/TamaPoke; none of its art is used |
 | Web installer | [ESP Web Tools](https://esphome.github.io/esp-web-tools/) (Nabu Casa) |
 | 5x7 bitmap font in `tools/emu/font.cpp` | [Adafruit_GFX](https://github.com/adafruit/Adafruit-GFX-Library) © 2012 Adafruit Industries, BSD licence |
 

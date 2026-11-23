@@ -12,7 +12,14 @@ bool sdDirty = false;
 bool sdArtDirty = false;
 SdThumbs thumbs;
 
-bool PmdMon::load(int16_t dexNum, bool shiny) {
+bool megaArtOnCard(int16_t dex) {
+  if (!sdReady || !megaHas(dex)) return false;
+  char path[28];
+  megaPath(path, sizeof(path), dex);
+  return SD_MMC.exists(path);
+}
+
+bool PmdMon::load(int16_t dexNum, bool shiny, bool mega) {
   // int16_t, NOT uint8_t. The dex reached 386 and this did not follow, so
   // everything from 256 up wrapped into Kanto: MARSHTOMP (258) opened
   // p002.bin and drew an IVYSAUR. Same trap that caught DexEntry::evolvesTo
@@ -22,9 +29,10 @@ bool PmdMon::load(int16_t dexNum, bool shiny) {
   if (!sdReady) return false;
 
   char path[28];
-  snprintf(path, sizeof(path), "/mons/p%s%03u.bin", shiny ? "s" : "", (unsigned)dexNum);
+  if (mega) megaPath(path, sizeof(path), dexNum);
+  else snprintf(path, sizeof(path), "/mons/p%s%03u.bin", shiny ? "s" : "", (unsigned)dexNum);
   File f = SD_MMC.open(path, FILE_READ);
-  if (!f && shiny) {  // sin shiny PMD: usa el normal
+  if (!f && shiny && !mega) {  // sin shiny PMD: usa el normal
     snprintf(path, sizeof(path), "/mons/p%03u.bin", (unsigned)dexNum);
     f = SD_MMC.open(path, FILE_READ);
   }
@@ -497,4 +505,40 @@ uint16_t *albumBuffer() {
   static uint16_t *b = nullptr;
   if (!b) b = (uint16_t *)ps_malloc(ALBUM_W * ALBUM_W * 2);
   return b;
+}
+
+// ---------- the region landscape ----------
+
+SceneryBg gScenery;
+
+const uint16_t *SceneryBg::get(uint8_t r, uint8_t v) {
+  if (!sdReady || r >= SCN_REGIONS || v >= SCN_VARIANTS) return nullptr;
+  if (region == (int8_t)r && variant == (int8_t)v && px) return px;
+  const uint32_t bit = 1UL << (r * SCN_VARIANTS + v);
+  if (failMask & bit) return nullptr;
+  char path[24];
+  sceneryPath(path, sizeof(path), r, v);
+  File f = SD_MMC.open(path, FILE_READ);
+  const size_t size = f ? (size_t)f.size() : 0;
+  if (!f || size < 10 || size > 10 + 2 * SCN_MAX_COLORS + (size_t)SCN_W * SCN_H + 3 + 2 * SCN_MAX_SPOTS) {   // missing, or not one of ours
+    if (f) f.close();
+    failMask |= bit;
+    return nullptr;
+  }
+  uint8_t *buf = (uint8_t *)ps_malloc(size);
+  if (!buf) { f.close(); return nullptr; }                  // no memory now: try again later, do not remember
+  const bool got = f.read(buf, size) == size;
+  f.close();
+  if (!px) px = (uint16_t *)ps_malloc((size_t)SCN_OUT_W * SCN_OUT_H * 2);
+  bool ok = got && px && sceneryExpand(buf, size, px);
+  nspots = ok ? scenerySpots(buf, size, spots) : 0;
+  free(buf);
+  if (!ok) {
+    region = -1;                                            // px may hold half an image
+    failMask |= bit;
+    return nullptr;
+  }
+  region = (int8_t)r;
+  variant = (int8_t)v;
+  return px;
 }

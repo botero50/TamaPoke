@@ -273,6 +273,28 @@ and +3 bond), a cookie, a seed, a soap, an extra wild encounter or a Great Ball,
 every time. **Call back** on the sign brings it home at once, with no story, and that trip
 still counts. It can't leave from 20:00 until 07:00, or while asleep, sick or at work.
 
+### Region landscapes (v1.46)
+With the optional **Scenery** pack on the SD card (the installer's "Scenery" button, about 0.8 MB), the main
+screen shows a landscape of the region your companion comes from behind it: a hillside town for Kanto, an autumn
+lake and pagoda for Johto, a tropical bay and volcano for Hoenn, snowy pines for Sinnoh, a city on a river for
+Unova, a palace and lavender fields for Kalos, a palm beach for Alola. Each comes in three moods by the clock: day
+(8:00 to 17:59), golden hour (6:00 to 7:59 and 18:00 to 19:59) and night (from 20:00 to 5:59). The landscapes are alive: every picture sparkles (sun glints on the
+water, lit windows, stars), and each region has something that drifts: pink petals and seed fluff over Kanto,
+maple leaves over Johto, ash by day and embers at dusk over Hoenn, snowfall over Sinnoh, birds over Unova by
+day, lavender pollen over Kalos, hibiscus petals over Alola, and fireflies in Kanto, Johto and Kalos at night.
+Rain, snow and storms from the real weather stop the drifting and draw over it. An egg, a scenery bought in the shop, or a card without the pack
+keep the drawn backgrounds. The art was generated for this project (tools/gen_scenery.py, ComfyUI with
+DreamShaper 8) and packed by tools/pack_scenery.py; the files are /mons/bg1_d.bin .. bg7_n.bin.
+
+### Mega Evolution (v1.47)
+Win the first gold of the day in the Tournament on **three different days** and you earn a **Mega Stone** (you can keep
+three). On the first profile card (swipe up on the main screen) a violet **MEGA STONE** button shows for a companion whose
+species has a Mega form (41 do, from Charizard and Gengar to Rayquaza); tap it, then tap again to confirm. It evolves
+with the blink and stays **Mega for 24 hours**: the Mega sprite on the main screen (with sparkles around it), the time left on
+the card, and **+15 % in every Tournament event**. Battles are not changed. When the 24 hours end it changes back with a
+message. A new egg or an evolution ends it too. The stone is only spent if the Mega art is on the card: install it with the
+installer's **Mega forms** button (optional, about 12 MB). A shiny companion shows the normal Mega colours.
+
 ### The Stadium: the Tournament (v1.45)
 The **Stadium** tile is on page 3 of the map. It holds eleven events, three to a page (swipe left/right for the
 page): 100 m, hurdles, 50 m swim, long jump, high jump, weights, climbing, diving, skating, torch run and trail run.
@@ -284,7 +306,7 @@ base stats (each event weighs HP, attack, defence and speed its own way), the ge
 strongest does not always win. A dual type takes the average of its two modifiers. Each event costs 15 energy; it
 cannot compete asleep, sick, away, an egg, or under 20 energy. Gold pays 25 coins and 10 joy, silver 12 coins,
 bronze 5; the first gold of each day pays 20 coins more. The list shows your best mark per event and your medals;
-five golds earn the **Tournament gold** trophy. Swipe up (or the red X) leaves the Stadium.
+five golds earn the **Tournament gold** trophy. Swipe up (or the red X) leaves the Stadium. In the long jump the athletes run up to the board and land in the sand pit, farther in for a longer jump.
 
 ### Wild encounters (phase 44)
 The **Tall Grass** tile, on page 2 of the map, shows how many encounters are waiting:

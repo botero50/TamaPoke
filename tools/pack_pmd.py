@@ -101,9 +101,12 @@ def load_animdata(folder):
     return anims
 
 
-def pack(dexnum, shiny=False):
+def pack(dexnum, shiny=False, form=None, out_dir=None):
+    """form: a SpriteCollab form folder ('0001' = Mega) -> writes mNNN.bin into out_dir (see pack_mega.py)"""
     sub = '/0000/0001' if shiny else ''
-    folder = os.path.join(CACHE, f'{dexnum:04d}{"s" if shiny else ""}')
+    if form:
+        sub = '/' + form
+    folder = os.path.join(CACHE, f'{dexnum:04d}{"s" if shiny else ""}' + (('_' + form) if form else ''))
     base = f'{BASE}/{dexnum:04d}{sub}'
     if not fetch(f'{base}/AnimData.xml', os.path.join(folder, 'AnimData.xml')):
         raise RuntimeError('no AnimData.xml')
@@ -145,8 +148,9 @@ def pack(dexnum, shiny=False):
     if not any(p[0] == 0 for p in packed):
         raise RuntimeError('no Idle')
 
-    os.makedirs(OUT, exist_ok=True)
-    path = os.path.join(OUT, f'p{"s" if shiny else ""}{dexnum:03d}.bin')
+    dest = out_dir or OUT
+    os.makedirs(dest, exist_ok=True)
+    path = os.path.join(dest, (f'm{dexnum:03d}.bin') if form else f'p{"s" if shiny else ""}{dexnum:03d}.bin')
     with open(path, 'wb') as f:
         f.write(b'TPK2')
         f.write(struct.pack('<BH', len(packed), len(pal)))
@@ -157,7 +161,7 @@ def pack(dexnum, shiny=False):
             f.write(struct.pack(f'<{nf}H', *ms))
             f.write(data)
     kb = os.path.getsize(path) / 1024
-    print(f"  -> p{'s' if shiny else ''}{dexnum:03d}.bin: {len(packed)} actions, "
+    print(f"  -> {os.path.basename(path)}: {len(packed)} actions, "
           f"{len(pal)} colores, {kb:.0f} KB")
 
 

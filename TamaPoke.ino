@@ -51,7 +51,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.63"
+#define FW_VERSION "3.14-funpack.65"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -90,6 +90,9 @@ PmdMon pmd;         // multi-action PMD sprite (main screen)
 PmdMon evoPmd;      // previous form, only during the evolution blink
 int16_t monFor = -2;
 bool monShinyFor = false;
+bool monMegaFor = false;     // the sprite loaded is the Mega form
+static bool megaBtnHit(int16_t x, int16_t y);
+static void megaBtnTap();
 
 // on-screen behaviour of the creature
 struct {
@@ -985,17 +988,22 @@ void setup() {
 
 // loads/unloads the SD sprite when the species changes
 void ensureMon() {
-  if (pet.speciesId == monFor && monShinyFor == pet.shiny && !sdDirty) return;
+  const bool megaNow = pet.megaActive();
+  if (pet.speciesId == monFor && monShinyFor == pet.shiny && monMegaFor == megaNow && !sdDirty) return;
   sdDirty = false;
+  // a Mega Evolution starting or ending: the blink shows the form it leaves, then the new one
+  if (pet.speciesId == monFor && monMegaFor != megaNow && pet.evolving()) evoPmd.load(monFor, monShinyFor, monMegaFor);
   monFor = pet.speciesId;
   monShinyFor = pet.shiny;
+  monMegaFor = megaNow;
   mon.unload();
   pmd.unload();
   beh.x = beh.targetX = 233;
   beh.mode = 0;
   beh.until = 0;
   if (pet.speciesId >= 1 && pet.speciesId <= DEX_COUNT) {
-    pmd.load(pet.speciesId, pet.shiny);          // primary: PMD
+    if (megaNow) pmd.load(pet.speciesId, false, true);   // the Mega form
+    if (!pmd.loaded) pmd.load(pet.speciesId, pet.shiny);          // primary: PMD
     if (!pmd.loaded) mon.load(pet.speciesId, pet.shiny);  // fallback: B/W
   }
 }
@@ -1074,6 +1082,7 @@ void loop() {
   if (sdArtDirty) {
     sdArtDirty = false;
     sdScanRegionArt(false);
+    gScenery.forgetFailures();
   }
 
   // A farewell or release just finished: the creature is waiting for a slot.
@@ -2526,6 +2535,7 @@ void onTap(int16_t x, int16_t y) {
   if (pet.ceremony) return;  // no buttons during the farewell
   if (cardOpen) {
     if (cardPage == 0 && y < 84) openKeyboard();  // tap the name = rename
+    else if (cardPage == 0 && megaBtnHit(x, y)) megaBtnTap();
     else if (cardPage == 2) {
       for (int i = 0; i < MOVE_SLOTS; i++) {   // tap a slot to change it
         int ry = MOVE_ROW_Y(i);
@@ -4455,6 +4465,66 @@ void bootReport() {
   gCrumbMagic = 0;   // one report per crash, not on every later boot
 }
 
+// ---------- ambient life over the region landscapes ----------
+//
+// Sparkles on the pixels the packer found in the picture (water, lit windows, stars) and, by region
+// and mood, something that drifts: petals, maple leaves, ash and embers, snow, pollen, hibiscus
+// petals, fireflies, birds. The rules are pure (scenery.h: fxKind, fxParticle...); this only paints
+// them with 2 to 4 px blocks, like the doubled art. Drawn over the picture, under the creature.
+
+static void fxBlock(int x, int y, int w, int h, uint16_t c) {
+  if (x > 470 || y > 312 || x + w < 0 || y + h < 0) return;
+  gfx->fillRect(x, y, w, h, c);
+}
+
+static void drawLandscapeFx(uint8_t region, uint8_t variant, uint32_t now, uint8_t weatherKind) {
+  // sparkles first, always: they belong to the picture
+  const uint16_t spark = variant == SCN_NIGHT ? C565(0xff, 0xe6, 0x96) : variant == SCN_GOLD ? C565(0xff, 0xec, 0xbe) : C565(0xff, 0xff, 0xff);
+  for (uint8_t i = 0; i < gScenery.nspots; i++) {
+    float tw = fxTwinkle(now, i);
+    if (tw < 0.25f) continue;
+    int x = gScenery.spots[i * 2] * 2, y = gScenery.spots[i * 2 + 1] * 2;
+    fxBlock(x, y, 4, 4, spark);
+    if (tw > 0.7f) { fxBlock(x - 4, y + 1, 12, 2, spark); fxBlock(x + 1, y - 4, 2, 12, spark); }
+  }
+  if (!fxDriftAllowed(weatherKind)) return;           // rain, snow and storms are the real weather's
+  const uint8_t kind = fxKind(region, variant);
+  const uint8_t n = fxCount(kind, variant);
+  for (uint8_t i = 0; i < n; i++) {
+    const FxP p = fxParticle(kind, now, i);
+    uint16_t c = 0xFFFF;
+    int w = p.size, h = p.size;
+    switch (kind) {
+      case LFX_PETALS: c = p.shade == 0 ? C565(0xff, 0xae, 0xc4) : p.shade == 1 ? C565(0xff, 0xff, 0xff) : C565(0xff, 0xd6, 0xe2); break;
+      case LFX_LEAVES: {
+        c = p.shade == 0 ? C565(0xe8, 0x78, 0x28) : p.shade == 1 ? C565(0xc8, 0x3c, 0x28) : C565(0xf0, 0xbe, 0x3c);
+        if (((now / 300u) + i) & 1u) { w = 7; h = 5; } else { w = 5; h = 7; }                // it tumbles
+        break;
+      }
+      case LFX_EMBERS:
+        if (variant == SCN_DAY) c = p.shade == 0 ? C565(0x8c, 0x84, 0x80) : C565(0xb4, 0xaa, 0xa0);   // ash
+        else c = p.shade == 0 ? C565(0xff, 0x96, 0x3c) : C565(0xff, 0xd2, 0x5a);                       // embers
+        if (((now / 90u) + i) % 5u == 0u) continue;                                                    // they flicker
+        break;
+      case LFX_SNOW: c = p.shade ? C565(0xff, 0xff, 0xff) : C565(0xe6, 0xf0, 0xfa); break;
+      case LFX_POLLEN: c = p.shade == 0 ? C565(0xce, 0xb0, 0xff) : C565(0xff, 0xff, 0xff); break;
+      case LFX_FLOWERS: c = p.shade == 0 ? C565(0xe8, 0x3c, 0x46) : p.shade == 1 ? C565(0xfa, 0x82, 0xaa) : C565(0xfa, 0xd2, 0x50); break;
+      case LFX_FIREFLIES:
+        c = p.shade == 0 ? C565(0x78, 0x96, 0x3c) : p.shade == 1 ? C565(0xc8, 0xe6, 0x5a) : C565(0xf0, 0xff, 0x8c);
+        if (p.shade == 2) fxBlock(p.x - 3, p.y - 3, 10, 10, C565(0x50, 0x6e, 0x28));             // a small glow
+        break;
+      case LFX_BIRDS: {
+        const uint16_t dark = C565(0x2c, 0x34, 0x4c);
+        if (p.shade) { fxBlock(p.x, p.y, 4, 3, dark); fxBlock(p.x + 4, p.y + 3, 4, 3, dark); fxBlock(p.x + 8, p.y, 4, 3, dark); }
+        else { fxBlock(p.x, p.y + 3, 4, 3, dark); fxBlock(p.x + 4, p.y, 4, 3, dark); fxBlock(p.x + 8, p.y + 3, 4, 3, dark); }
+        continue;
+      }
+      default: break;
+    }
+    fxBlock(p.x, p.y, w, h, c);
+  }
+}
+
 void render() {
   crumbDrop();   // so a crash can name the screen it happened on
   if (alarmRinging) { renderAlarm(); return; }
@@ -4612,7 +4682,29 @@ void render() {
   // drawScene covers the full 466x466: no fillScreen(BLACK) beforehand so
   // that an overlapping DMA flush never captures half-painted black (anti-flicker)
   if (pet.sceneryPick == SCENERY_ROOM && !pet.ceremony) drawRoom(gNight);
-  else { drawScene(sceneBiome(), millis(), gNight); drawSkyWeather(millis()); }
+  else {
+    // The region's landscape (SD) behind the companion, in the mood of the hour; the drawn scene when
+    // there is none (an egg, a bought scenery, a card without the scenery pack).
+    const uint16_t *land = nullptr;
+    uint8_t landRegion = 0, landVariant = 0;
+    if (!pet.isEgg() && pet.sceneryPick < 0 && gBiomeOverride < 0) {
+      const uint8_t rg = regionOfDex(pet.speciesId);
+      if (rg < SCN_REGIONS) {
+        landVariant = sceneryVariant(h, gNight);
+        land = gScenery.get(rg, landVariant);
+        landRegion = rg;
+      }
+    }
+    if (land) {
+      gfx->draw16bitRGBBitmap(0, 0, (uint16_t *)land, SCN_OUT_W, SCN_OUT_H);
+      gfx->fillRect(0, SCN_OUT_H, 466, 466 - SCN_OUT_H, gNight ? UI_BG_NIGHT : UI_BG_DAY);
+      drawLandscapeFx(landRegion, landVariant, millis(), weatherShown(millis()));   // it is alive
+      drawSkyWeather(millis());
+    } else {
+      drawScene(sceneBiome(), millis(), gNight);
+      drawSkyWeather(millis());
+    }
+  }
 
   if (pet.ceremony) {
     const DexEntry &d = DEX_TBL[pet.speciesId];
@@ -5708,6 +5800,46 @@ void drawMedalBadge(int x, int y, int i) {
 }
 
 // page 0: profile (big portrait, identity, streak, bond, berry)
+// The Mega Stone button on the profile card, and the time left while it lasts. A first tap arms it (the
+// label asks to tap again), the second spends the stone; without the Mega pack on the card nothing is spent.
+#define MEGA_BTN_X0 123
+#define MEGA_BTN_X1 343
+#define MEGA_BTN_Y0 324
+#define MEGA_BTN_Y1 360
+static uint32_t gMegaArmUntil = 0, gMegaMsgUntil = 0;
+static bool megaBtnShown() { return !pet.megaActive() && megaHas(pet.speciesId) && pet.megaStones > 0; }
+static bool megaBtnHit(int16_t x, int16_t y) {
+  return megaBtnShown() && x >= MEGA_BTN_X0 && x <= MEGA_BTN_X1 && y >= MEGA_BTN_Y0 && y <= MEGA_BTN_Y1;
+}
+static void megaBtnTap() {
+  uint32_t now = millis();
+  if (!pet.canMega()) return;
+  if (!megaArtOnCard(pet.speciesId)) { gMegaMsgUntil = now + 3000; gMegaArmUntil = 0; sfxPlay(SFX_TAP); return; }
+  if ((int32_t)(gMegaArmUntil - now) > 0) { gMegaArmUntil = 0; cardOpen = false; pet.startMega(); return; }
+  gMegaArmUntil = now + 4000;
+  sfxPlay(SFX_TAP);
+}
+static void renderMegaArea() {
+  const uint16_t violet = C565(0x7a, 0x4f, 0xd0);
+  uint32_t now = millis();
+  if (pet.megaActive()) {
+    uint32_t left = pet.megaLeft();
+    char t[24]; snprintf(t, sizeof(t), T(S_MEGA_LEFT_FMT), (unsigned)(left / 3600), (unsigned)(left % 3600 / 60));
+    gfx->fillRoundRect(MEGA_BTN_X0 + 30, MEGA_BTN_Y0 + 4, MEGA_BTN_X1 - MEGA_BTN_X0 - 60, 28, 14, violet);
+    uiTextFit(UIF_SMALL, CX, MEGA_BTN_Y0 + 25, t, UI_WHITE, 1, 140);
+  } else if (megaBtnShown()) {
+    bool armed = (int32_t)(gMegaArmUntil - now) > 0, msg = (int32_t)(gMegaMsgUntil - now) > 0;
+    gfx->fillRoundRect(MEGA_BTN_X0, MEGA_BTN_Y0, MEGA_BTN_X1 - MEGA_BTN_X0, MEGA_BTN_Y1 - MEGA_BTN_Y0, 16, msg ? UI_BAR_WARN : (armed ? UI_BAR_OK : violet));
+    char t[40];
+    if (msg) snprintf(t, sizeof(t), "%s", T(S_MEGA_NEEDS));
+    else if (armed) snprintf(t, sizeof(t), "%s", T(S_MEGA_CONFIRM));
+    else snprintf(t, sizeof(t), T(S_MEGA_BTN_FMT), (unsigned)pet.megaStones);
+    uiTextFit(UIF_SMALL, CX, MEGA_BTN_Y0 + 25, t, UI_WHITE, 1, 200);
+  } else {
+    uiTextFit(UIF_SMALL, CX, 348, T(S_RENAME_HINT), UI_TRACK_TEXT, 1, 260);
+  }
+}
+
 void renderCardProfile() {
   const DexEntry &d = DEX_TBL[pet.speciesId];
   const char *nm = pet.nick[0] ? pet.nick : d.name;
@@ -5744,7 +5876,7 @@ void renderCardProfile() {
            (unsigned long)(pet.ageMinutes / 1440));
   uiTextFit(UIF_SMALL, CX, 312, info, UI_INK, 1, 300);
 
-  uiTextFit(UIF_SMALL, CX, 348, T(S_RENAME_HINT), UI_TRACK_TEXT, 1, 260);
+  renderMegaArea();
 }
 
 // Antialiased text in the rounded UI font (uifont.h, ASCII only). Each pixel is
@@ -8970,6 +9102,7 @@ void drawEvolveFX(uint32_t now) {
   bool showOld = t < 0.9f && evoPmd.loaded && ((now / period) % 2) == 0;
   if (showOld) drawPmdActZ(evoPmd, PMD_IDLE, cx, PET_GROUND, 0, true, true, 5, PET_ZOOM, PET_MAX_PX);
   else drawPmdActZ(pmd, PMD_IDLE, cx, PET_GROUND, 0, true, true, 5, PET_ZOOM, PET_MAX_PX);
+  if (pet.megaEnded) uiTextFit(UIF_SMALL, CX, 400, T(S_MEGA_ENDED), UI_WHITE, 1, 300);
   // sparks shooting out
   for (int i = 0; i < 10; i++) {
     float a = i * (float)(PI / 5) + t * 4.0f;
@@ -9295,6 +9428,17 @@ void behNext() {
   }
 }
 
+// Sparkles circling a Mega companion: stateless, a function of the clock only
+static void drawMegaAura(int cx, int ground, uint32_t now) {
+  const uint16_t a = C565(0xb8, 0x9c, 0xff), b = C565(0xff, 0xff, 0xff);
+  for (int i = 0; i < 8; i++) {
+    float ang = now * 0.0016f + i * (float)(PI / 4);
+    int px = cx + (int)(cosf(ang) * (70 + (i & 1) * 22)), py = ground - 96 + (int)(sinf(ang) * 62);
+    if (((now / 220 + i) & 3) == 0) { gfx->fillRect(px - 5, py, 12, 2, b); gfx->fillRect(px, py - 5, 2, 12, b); }
+    else gfx->fillRect(px - 2, py - 2, 5, 5, (i & 1) ? a : b);
+  }
+}
+
 void drawPetPMD() {
   if (pet.atWork()) { drawAwaySign(); return; }
   uint32_t now = millis();
@@ -9304,6 +9448,7 @@ void drawPetPMD() {
     return;
   }
   if (evoPmd.loaded) evoPmd.unload();  // evolution finished: free the previous form
+  pet.megaEnded = false;
 
   PetMood m = pet.mood();
   uint8_t act;
@@ -9337,6 +9482,7 @@ void drawPetPMD() {
   }
 
   drawAccBack();                       // a cape or wings go behind it (placed by the last frame)
+  if (pet.megaActive()) drawMegaAura((int)beh.x, PET_GROUND, now);
   drawPmdActZ(pmd, act, (int)beh.x, PET_GROUND, now - beh.t0, loop || act == PMD_IDLE, false, 5,
               PET_ZOOM, PET_MAX_PX);
   drawHat(act);
@@ -11860,7 +12006,7 @@ static Athlete tourAth[3];                 // 0 = your companion, 1 and 2 the ri
 static float tourMark[3];
 static uint8_t tourPlace = 1;
 static uint32_t tourT0 = 0, tourResultAt = 0;
-static Pet::TourPay tourPay = { 0, false, false };
+static Pet::TourPay tourPay = { 0, false, false, false };
 static PmdMon tourMon[2];                  // the rivals' sprites, only while an event runs
 
 static StrId tourEvName(uint8_t ev) {
@@ -11916,6 +12062,7 @@ static void tourStart(uint8_t ev) {
   me.trAtk = pet.trAtk > 100 ? 100 : pet.trAtk;
   me.trDef = pet.trDef > 100 ? 100 : pet.trDef;
   me.trSpe = pet.trSpe > 100 ? 100 : pet.trSpe;
+  me.mega = pet.megaActive();                            // +15 % while it is Mega
   tourAth[0] = me;
   for (int k = 0; k < 2; k++) {
     int16_t d = pet.speciesId;
@@ -12079,7 +12226,10 @@ static void renderTourPlay() {
       int gy = TOUR_LANE_G(s);
       bool done = turn > s, now = turn == s;
       uint32_t lt = t > (uint32_t)(s * TOUR_TURN_MS) ? t - (uint32_t)(s * TOUR_TURN_MS) : 0;
-      tourDrawMon(i, 150, gy, now ? PMD_HOP : PMD_IDLE, lt);
+      if (tourEv == EV_LONGJUMP) {     // run up to the board, jump, land in the sand pit
+        JumpPose jp = longJumpPose(done ? TOUR_TURN_MS : (now ? lt : 0), TOUR_TURN_MS, tourMark[i]);
+        tourDrawMon(i, jp.x, gy - jp.lift, jp.phase == 2 ? PMD_HOP : jp.phase == 1 ? PMD_WALKR : PMD_IDLE, lt);
+      } else tourDrawMon(i, 150, gy, now ? PMD_HOP : PMD_IDLE, lt);
       if (now) uiText(UIF_BIG, 70, gy - 22, ">", 0xFFE0, 1);
       if (done || (now && lt > TOUR_TURN_MS - 700)) { tourFmtMark(tourEv, tourMark[i], b, sizeof(b)); tourLabel(b, 250, gy - 24, i == 0 ? 0xFFE0 : 0xFFFF); }
     }
@@ -12118,8 +12268,10 @@ static void renderTourResult() {
   char c[48];
   snprintf(c, sizeof(c), T(S_TOUR_COINS_FMT), (unsigned)tourPay.coins);
   uiTextFit(UIF_SMALL, CX, 336, c, UI_INK, 1, 280);
-  if (tourPay.bonus) { snprintf(c, sizeof(c), T(S_TOUR_BONUS_FMT), (unsigned)TOUR_DAILY_BONUS); uiTextFit(UIF_TINY, CX, 358, c, UI_BAR_OK, 1, 280); }
-  if (tourPay.record) uiTextFit(UIF_SMALL, CX, 384, T(S_TOUR_RECORD), UI_BAR_WARN, 1, 280);
+  if (tourPay.bonus) { snprintf(c, sizeof(c), T(S_TOUR_BONUS_FMT), (unsigned)TOUR_DAILY_BONUS); uiTextFit(UIF_TINY, CX, 356, c, UI_BAR_OK, 1, 280); }
+  if (tourPay.stone) uiTextFit(UIF_TINY, CX, 372, T(S_MEGA_GOT), C565(0x7a, 0x4f, 0xd0), 1, 280);
+  else if (tourPay.bonus && pet.megaStones < MEGA_STONE_MAX) { snprintf(c, sizeof(c), T(S_MEGA_PROG_FMT), (unsigned)pet.megaGoldDays); uiTextFit(UIF_TINY, CX, 372, c, UI_TRACK_TEXT, 1, 280); }
+  if (tourPay.record) uiTextFit(UIF_SMALL, CX, 392, T(S_TOUR_RECORD), UI_BAR_WARN, 1, 280);
   gfx->flush();
 }
 

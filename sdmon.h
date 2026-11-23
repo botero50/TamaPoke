@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "dex.h"
 #include "noart.h"
+#include "scenery.h"
 
 // TPK1 animated sprite (legacy format, fallback path). The project uses
 // PMD/TPK2 (PmdMon) for everything; this path stays inactive if there is no NNN.bin on the SD.
@@ -46,10 +47,12 @@ struct PmdMon {
   uint8_t *blob = nullptr;
   PmdAct acts[PMD_NACTS];
 
-  bool load(int16_t dexNum, bool shiny = false);
+  // mega: the Mega form (/mons/mNNN.bin, mega.h); it has no shiny version and no fallback to the normal form
+  bool load(int16_t dexNum, bool shiny = false, bool mega = false);
   void unload();
   bool has(uint8_t a) const { return loaded && a < PMD_NACTS && acts[a].frames > 0; }
 };
+bool megaArtOnCard(int16_t dex);   // is /mons/mNNN.bin there (a stone is only spent when it is)
 
 
 // The photo album: up to ALBUM_MAX photos at half size (ALBUM_W x ALBUM_W RGB565)
@@ -92,6 +95,20 @@ struct SdThumbs {
   const uint8_t *get(int16_t dex) const;  // blob: w,h,palCount,pal[],idx[]
 };
 extern SdThumbs thumbs;
+
+// The region landscape behind the companion (scenery.h): the one image for the region and mood now
+// showing, expanded to 466 x 312 in PSRAM. Loaded when the region or the mood changes; a file that
+// is missing or bad is remembered, so a card without the scenery pack is asked once, not every frame.
+struct SceneryBg {
+  uint16_t *px = nullptr;
+  int8_t region = -1, variant = -1;   // what px holds now
+  uint32_t failMask = 0;              // bit region * 3 + variant: tried and not usable
+  uint8_t spots[SCN_MAX_SPOTS * 2];   // where this picture can sparkle (x, y in the 233 x 156 picture)
+  uint8_t nspots = 0;
+  const uint16_t *get(uint8_t region, uint8_t variant);   // the image, or nullptr
+  void forgetFailures() { failMask = 0; }                  // after the card changed (a pack was sent)
+};
+extern SceneryBg gScenery;
 
 bool sdBegin();                 // mounts the SD (SDMMC 1-bit), true if there is a card
 // The three species sdScanRegionArt() looks for to decide a region's pack is on

@@ -39,14 +39,26 @@ static uint8_t *slurp(const std::string &path, uint32_t *size) {
   return b;
 }
 
-bool PmdMon::load(int16_t dexNum, bool shiny) {
+bool megaArtOnCard(int16_t dex) {
+  char p[64], q[40];
+  if (!megaHas(dex)) return false;
+  megaPath(q, sizeof(q), dex);                          // "/mons/mNNN.bin": the host folder is the mons folder
+  snprintf(p, sizeof(p), "%s%s", g_spriteDir.c_str(), q + 5);
+  FILE *f = fopen(p, "rb");
+  if (!f) return false;
+  fclose(f);
+  return true;
+}
+
+bool PmdMon::load(int16_t dexNum, bool shiny, bool mega) {
   if (dexNum < 1 || dexNum > 999) return false;
   unload();
   char p[64];
-  snprintf(p, sizeof(p), "%s/p%s%03u.bin", g_spriteDir.c_str(), shiny ? "s" : "", (unsigned)dexNum);
+  if (mega) { char q[40]; megaPath(q, sizeof(q), dexNum); snprintf(p, sizeof(p), "%s%s", g_spriteDir.c_str(), q + 5); }
+  else snprintf(p, sizeof(p), "%s/p%s%03u.bin", g_spriteDir.c_str(), shiny ? "s" : "", (unsigned)dexNum);
   uint32_t size = 0;
   blob = slurp(p, &size);
-  if (!blob) {
+  if (!blob && !mega) {
     snprintf(p, sizeof(p), "%s/p%03u.bin", g_spriteDir.c_str(), (unsigned)dexNum);
     blob = slurp(p, &size);
   }
@@ -259,3 +271,25 @@ uint8_t albumDeleteAllButFav() {
 }
 void albumMigrate() {}
 uint16_t *albumBuffer() { static std::vector<uint16_t> b(ALBUM_W * ALBUM_W); return b.data(); }
+
+// ---------- the region landscape (the real one is in sdmon.cpp, reading the SD card) ----------
+SceneryBg gScenery;
+const uint16_t *SceneryBg::get(uint8_t r, uint8_t v) {
+  if (r >= SCN_REGIONS || v >= SCN_VARIANTS) return nullptr;
+  if (region == (int8_t)r && variant == (int8_t)v && px) return px;
+  const uint32_t bit = 1UL << (r * SCN_VARIANTS + v);
+  if (failMask & bit) return nullptr;
+  char name[24];
+  sceneryPath(name, sizeof(name), r, v);                              // "/mons/bgN_x.bin": the host folder is the mons folder
+  std::string path = g_spriteDir + (name + 5);                        // skip "/mons"
+  uint32_t size = 0;
+  uint8_t *buf = slurp(path.c_str(), &size);
+  if (!buf) { failMask |= bit; return nullptr; }
+  if (!px) px = (uint16_t *)malloc((size_t)SCN_OUT_W * SCN_OUT_H * 2);
+  bool ok = px && sceneryExpand(buf, size, px);
+  nspots = ok ? scenerySpots(buf, size, spots) : 0;
+  free(buf);
+  if (!ok) { region = -1; failMask |= bit; return nullptr; }
+  region = (int8_t)r; variant = (int8_t)v;
+  return px;
+}

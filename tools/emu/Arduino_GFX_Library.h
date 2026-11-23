@@ -52,6 +52,9 @@ public:
   }
 
   void fillScreen(uint16_t c) { std::fill(fb.begin(), fb.end(), c); }
+  void draw16bitRGBBitmap(int x, int y, uint16_t *bmp, int w, int h) {   // the real library has it; the host copies pixel by pixel
+    for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) px(x + i, y + j, bmp[j * w + i]);
+  }
 
   void fillRect(int x, int y, int w, int h, uint16_t c) {
     if (w < 0) { x += w; w = -w; }

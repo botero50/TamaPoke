@@ -208,3 +208,36 @@ static inline bool eventRecord(uint8_t ev, uint16_t stored, uint16_t now) {
   if (!stored) return true;
   return eventLowerWins(ev) ? now < stored : now > stored;
 }
+
+// Long jump: where the jumper is `lt` ms into its turn (`turnMs` long). It runs up to the board
+// (x 60 -> 280), jumps (an arc, landing in the sand pit, which starts at x 300) and stays where it
+// landed. A longer mark lands farther in. lift is how high above the ground the arc is.
+struct JumpPose { int16_t x; int16_t lift; uint8_t phase; };   // phase 0 waiting/standing, 1 running, 2 in the air
+#define LJ_START_X 60
+#define LJ_BOARD_X 280
+#define LJ_PIT_X0 322
+#define LJ_PIT_X1 430
+static inline int16_t longJumpLandX(float mark) {
+  float u = (mark - 2.5f) / 6.5f;
+  if (u < 0) u = 0;
+  if (u > 1) u = 1;
+  return (int16_t)(LJ_PIT_X0 + u * (LJ_PIT_X1 - LJ_PIT_X0));
+}
+static inline JumpPose longJumpPose(uint32_t lt, uint32_t turnMs, float mark) {
+  JumpPose p = { LJ_START_X, 0, 0 };
+  if (lt == 0 || turnMs == 0) return p;
+  if (lt >= turnMs) { p.x = longJumpLandX(mark); return p; }
+  float f = (float)lt / (float)turnMs;
+  const float RUN = 0.45f, AIR = 0.75f;
+  if (f < RUN) { p.x = (int16_t)(LJ_START_X + (LJ_BOARD_X - LJ_START_X) * (f / RUN)); p.phase = 1; return p; }
+  int16_t land = longJumpLandX(mark);
+  if (f < AIR) {
+    float u = (f - RUN) / (AIR - RUN);
+    p.x = (int16_t)(LJ_BOARD_X + (land - LJ_BOARD_X) * u);
+    p.lift = (int16_t)(sinf(u * 3.14159265f) * (50 + 8 * (mark - 2.5f)));
+    p.phase = 2;
+    return p;
+  }
+  p.x = land;
+  return p;
+}

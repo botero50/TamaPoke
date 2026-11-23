@@ -147,7 +147,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battle damage that stays
     "Necesita el Centro Pokemon", "Salud curada. Lo demas cuesta",
     // phase 46: new games, swing to throw, the secret game
-    "Une numeros", "Rompe ladrillos", "Canica rodante", "Carrera de Eevee", "Desliza. Los numeros iguales se unen", "Arrastra o inclina la pala", "Inclina. Come bayas, evita huecos", "Toca para saltar", "Agita para lanzar", "o toca la pantalla", "Un juego secreto desperto!", "Despertar tactil", "Duerme a las", "CUIDADO", "Ritmo de cuidado", "Normal", "Relajado", "Lento", "Ahorro pantalla off", "DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "Estadio", "Torneo", "100 m", "Vallas", "50 m libres", "Salto de longitud", "Salto de altura", "Pesas", "Escalada", "Saltos al agua", "Patinaje", "Antorcha", "Campo a traves", "Demasiado cansado", "ORO!", "PLATA", "BRONCE", "NUEVO RECORD!", "Primer oro de hoy: +%u monedas", "+%u monedas", "Mejor", "Oro en el Torneo", },
+    "Une numeros", "Rompe ladrillos", "Canica rodante", "Carrera de Eevee", "Desliza. Los numeros iguales se unen", "Arrastra o inclina la pala", "Inclina. Come bayas, evita huecos", "Toca para saltar", "Agita para lanzar", "o toca la pantalla", "Un juego secreto desperto!", "Despertar tactil", "Duerme a las", "CUIDADO", "Ritmo de cuidado", "Normal", "Relajado", "Lento", "Ahorro pantalla off", "DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "Estadio", "Torneo", "100 m", "Vallas", "50 m libres", "Salto de longitud", "Salto de altura", "Pesas", "Escalada", "Saltos al agua", "Patinaje", "Antorcha", "Campo a traves", "Demasiado cansado", "ORO!", "PLATA", "BRONCE", "NUEVO RECORD!", "Primer oro de hoy: +%u monedas", "+%u monedas", "Mejor", "Oro en el Torneo",
+    // Mega Evolution
+    "PIEDRA MEGA x%u", "Toca otra vez para usarla", "MEGA %uh %02um", "Falta el pack Mega", "Ganaste una Piedra Mega!", "Piedra Mega: %u/3 dias de oro", "La forma Mega se acabo", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -289,7 +291,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battle damage that stays
     "Needs the Pokemon Center", "HP healed! The rest costs coins",
     // phase 46: new games, swing to throw, the secret game
-    "Merge", "Brick Bash", "Marble Roll", "Eevee Run", "Swipe to slide. Same numbers merge!", "Drag or tilt the paddle", "Tilt to roll. Get berries, skip holes", "Tap to jump!", "Swing to throw!", "or tap the screen", "A secret game woke up!", "Tap wake", "Dozes off at", "CARE", "Care pace", "Normal", "Relaxed", "Slow", "Screen-off saver", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT", "Stadium", "Tournament", "100 m", "Hurdles", "50 m swim", "Long jump", "High jump", "Weights", "Climbing", "Diving", "Skating", "Torch run", "Trail run", "Too tired to compete", "GOLD!", "SILVER", "BRONZE", "NEW RECORD!", "First gold today: +%u coins", "+%u coins", "Best", "Tournament gold", },
+    "Merge", "Brick Bash", "Marble Roll", "Eevee Run", "Swipe to slide. Same numbers merge!", "Drag or tilt the paddle", "Tilt to roll. Get berries, skip holes", "Tap to jump!", "Swing to throw!", "or tap the screen", "A secret game woke up!", "Tap wake", "Dozes off at", "CARE", "Care pace", "Normal", "Relaxed", "Slow", "Screen-off saver", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT", "Stadium", "Tournament", "100 m", "Hurdles", "50 m swim", "Long jump", "High jump", "Weights", "Climbing", "Diving", "Skating", "Torch run", "Trail run", "Too tired to compete", "GOLD!", "SILVER", "BRONZE", "NEW RECORD!", "First gold today: +%u coins", "+%u coins", "Best", "Tournament gold",
+    // Mega Evolution
+    "MEGA STONE x%u", "Tap again to use it", "MEGA %uh %02um", "Needs the Mega pack", "You won a Mega Stone!", "Mega Stone: %u/3 gold days", "The Mega form wore off", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -430,7 +434,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battle damage that stays
     "Va au Centre Pokemon", "PV soignes ! Le reste coute",
     // phase 46: new games, swing to throw, the secret game
-    "Fusion", "Casse-briques", "Bille roulante", "Course d'Evoli", "Glisse. Les memes nombres fusionnent", "Glisse ou incline la raquette", "Incline. Prends les baies, evite les trous", "Touche pour sauter", "Balance pour lancer", "ou touche l'ecran", "Un jeu secret s'est reveille!", "Reveil tactile", "S'endort a", "SOINS", "Rythme des soins", "Normal", "Detendu", "Lent", "Eco ecran eteint", "DIM", "LUN", "MAR", "MER", "JEU", "VEN", "SAM", "Stade", "Tournoi", "100 m", "Haies", "50 m nage", "Saut en longueur", "Saut en hauteur", "Halteres", "Escalade", "Plongeon", "Patinage", "Course du flambeau", "Cross", "Trop fatigue", "OR!", "ARGENT", "BRONZE", "RECORD!", "Premier or du jour: +%u pieces", "+%u pieces", "Meilleur", "Or au tournoi", },
+    "Fusion", "Casse-briques", "Bille roulante", "Course d'Evoli", "Glisse. Les memes nombres fusionnent", "Glisse ou incline la raquette", "Incline. Prends les baies, evite les trous", "Touche pour sauter", "Balance pour lancer", "ou touche l'ecran", "Un jeu secret s'est reveille!", "Reveil tactile", "S'endort a", "SOINS", "Rythme des soins", "Normal", "Detendu", "Lent", "Eco ecran eteint", "DIM", "LUN", "MAR", "MER", "JEU", "VEN", "SAM", "Stade", "Tournoi", "100 m", "Haies", "50 m nage", "Saut en longueur", "Saut en hauteur", "Halteres", "Escalade", "Plongeon", "Patinage", "Course du flambeau", "Cross", "Trop fatigue", "OR!", "ARGENT", "BRONZE", "RECORD!", "Premier or du jour: +%u pieces", "+%u pieces", "Meilleur", "Or au tournoi",
+    // Mega Evolution
+    "PIERRE MEGA x%u", "Touche encore pour l'utiliser", "MEGA %uh %02um", "Il faut le pack Mega", "Tu as gagne une Pierre Mega!", "Pierre Mega: %u/3 jours d'or", "La forme Mega a pris fin", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -571,7 +577,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battle damage that stays
     "Braucht das Pokemon-Center", "KP geheilt! Rest kostet Muenzen",
     // phase 46: new games, swing to throw, the secret game
-    "Zahlen", "Ziegelbruch", "Murmellauf", "Evoli rennt", "Wischen. Gleiche Zahlen verschmelzen", "Ziehen oder neigen", "Neigen. Beeren sammeln, Loecher meiden", "Tippen zum Springen", "Schwingen zum Werfen", "oder auf den Schirm tippen", "Ein Geheimspiel ist erwacht!", "Antippen weckt", "Schlaeft ein um", "PFLEGE", "Pflegetempo", "Normal", "Entspannt", "Langsam", "Sparmodus Display aus", "SO", "MO", "DI", "MI", "DO", "FR", "SA", "Stadion", "Turnier", "100 m", "Huerden", "50 m Schwimmen", "Weitsprung", "Hochsprung", "Gewichtheben", "Klettern", "Turmspringen", "Eislauf", "Fackellauf", "Gelaendelauf", "Zu muede", "GOLD!", "SILBER", "BRONZE", "REKORD!", "Erstes Gold heute: +%u Muenzen", "+%u Muenzen", "Beste", "Turnier-Gold", },
+    "Zahlen", "Ziegelbruch", "Murmellauf", "Evoli rennt", "Wischen. Gleiche Zahlen verschmelzen", "Ziehen oder neigen", "Neigen. Beeren sammeln, Loecher meiden", "Tippen zum Springen", "Schwingen zum Werfen", "oder auf den Schirm tippen", "Ein Geheimspiel ist erwacht!", "Antippen weckt", "Schlaeft ein um", "PFLEGE", "Pflegetempo", "Normal", "Entspannt", "Langsam", "Sparmodus Display aus", "SO", "MO", "DI", "MI", "DO", "FR", "SA", "Stadion", "Turnier", "100 m", "Huerden", "50 m Schwimmen", "Weitsprung", "Hochsprung", "Gewichtheben", "Klettern", "Turmspringen", "Eislauf", "Fackellauf", "Gelaendelauf", "Zu muede", "GOLD!", "SILBER", "BRONZE", "REKORD!", "Erstes Gold heute: +%u Muenzen", "+%u Muenzen", "Beste", "Turnier-Gold",
+    // Mega Evolution
+    "MEGASTEIN x%u", "Nochmal tippen zum Benutzen", "MEGA %uh %02um", "Mega-Paket fehlt", "Du hast einen Megastein!", "Megastein: %u/3 Gold-Tage", "Die Mega-Form ist vorbei", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -712,7 +720,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battle damage that stays
     "Serve il Centro Pokemon", "PS curati! Il resto costa",
     // phase 46: new games, swing to throw, the secret game
-    "Unisci", "Rompi mattoni", "Biglia rotolante", "Corsa di Eevee", "Scorri. I numeri uguali si uniscono", "Trascina o inclina la racchetta", "Inclina. Prendi le bacche, evita i buchi", "Tocca per saltare", "Agita per lanciare", "o tocca lo schermo", "Si e svegliato un gioco segreto!", "Tocco sveglia", "Si addormenta alle", "CURE", "Ritmo delle cure", "Normale", "Rilassato", "Lento", "Risparmio schermo off", "DOM", "LUN", "MAR", "MER", "GIO", "VEN", "SAB", "Stadio", "Torneo", "100 m", "Ostacoli", "50 m nuoto", "Salto in lungo", "Salto in alto", "Pesi", "Arrampicata", "Tuffi", "Pattinaggio", "Corsa della torcia", "Corsa nel bosco", "Troppo stanco", "ORO!", "ARGENTO", "BRONZO", "RECORD!", "Primo oro di oggi: +%u monete", "+%u monete", "Migliore", "Oro al torneo", },
+    "Unisci", "Rompi mattoni", "Biglia rotolante", "Corsa di Eevee", "Scorri. I numeri uguali si uniscono", "Trascina o inclina la racchetta", "Inclina. Prendi le bacche, evita i buchi", "Tocca per saltare", "Agita per lanciare", "o tocca lo schermo", "Si e svegliato un gioco segreto!", "Tocco sveglia", "Si addormenta alle", "CURE", "Ritmo delle cure", "Normale", "Rilassato", "Lento", "Risparmio schermo off", "DOM", "LUN", "MAR", "MER", "GIO", "VEN", "SAB", "Stadio", "Torneo", "100 m", "Ostacoli", "50 m nuoto", "Salto in lungo", "Salto in alto", "Pesi", "Arrampicata", "Tuffi", "Pattinaggio", "Corsa della torcia", "Corsa nel bosco", "Troppo stanco", "ORO!", "ARGENTO", "BRONZO", "RECORD!", "Primo oro di oggi: +%u monete", "+%u monete", "Migliore", "Oro al torneo",
+    // Mega Evolution
+    "PIETRA MEGA x%u", "Tocca ancora per usarla", "MEGA %uh %02um", "Serve il pacchetto Mega", "Hai vinto una Pietra Mega!", "Pietra Mega: %u/3 giorni d'oro", "La forma Mega e finita", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -853,7 +863,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battle damage that stays
     "Precisa do Centro Pokemon", "PS curados! O resto custa",
     // phase 46: new games, swing to throw, the secret game
-    "Junta", "Quebra tijolos", "Bola rolante", "Corrida do Eevee", "Deslize. Numeros iguais se juntam", "Arraste ou incline a raquete", "Incline. Pegue bagas, evite buracos", "Toque para pular", "Balance para lancar", "ou toque na tela", "Um jogo secreto acordou!", "Toque acorda", "Adormece as", "CUIDADOS", "Ritmo de cuidados", "Normal", "Relaxado", "Lento", "Poupanca tela apagada", "DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB", "Estadio", "Torneio", "100 m", "Barreiras", "50 m nado", "Salto em distancia", "Salto em altura", "Pesos", "Escalada", "Saltos ornamentais", "Patinacao", "Corrida da tocha", "Corrida na trilha", "Cansado demais", "OURO!", "PRATA", "BRONZE", "RECORDE!", "Primeiro ouro do dia: +%u moedas", "+%u moedas", "Melhor", "Ouro no torneio", },
+    "Junta", "Quebra tijolos", "Bola rolante", "Corrida do Eevee", "Deslize. Numeros iguais se juntam", "Arraste ou incline a raquete", "Incline. Pegue bagas, evite buracos", "Toque para pular", "Balance para lancar", "ou toque na tela", "Um jogo secreto acordou!", "Toque acorda", "Adormece as", "CUIDADOS", "Ritmo de cuidados", "Normal", "Relaxado", "Lento", "Poupanca tela apagada", "DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB", "Estadio", "Torneio", "100 m", "Barreiras", "50 m nado", "Salto em distancia", "Salto em altura", "Pesos", "Escalada", "Saltos ornamentais", "Patinacao", "Corrida da tocha", "Corrida na trilha", "Cansado demais", "OURO!", "PRATA", "BRONZE", "RECORDE!", "Primeiro ouro do dia: +%u moedas", "+%u moedas", "Melhor", "Ouro no torneio",
+    // Mega Evolution
+    "PEDRA MEGA x%u", "Toque de novo para usar", "MEGA %uh %02um", "Falta o pacote Mega", "Ganhou uma Pedra Mega!", "Pedra Mega: %u/3 dias de ouro", "A forma Mega acabou", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -996,7 +1008,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battle damage that stays
     "需要去宝可梦中心", "体力恢复了! 其余要金币",
     // phase 46: new games, swing to throw, the secret game
-    "合并数字", "打砖块", "滚珠", "伊布快跑", "滑动，相同数字会合并", "拖动或倾斜挡板", "倾斜滚动，吃果子", "点击跳跃", "挥动来投球", "或点击屏幕", "秘密游戏醒来了！", "触摸唤醒", "几点打瞌睡", "照顾", "照顾节奏", "正常", "轻松", "缓慢", "息屏省电", "周日", "周一", "周二", "周三", "周四", "周五", "周六", "体育场", "锦标赛", "100米", "跨栏", "50米游泳", "跳远", "跳高", "举重", "攀岩", "跳水", "滑冰", "火炬跑", "越野跑", "太累了", "金牌!", "银牌", "铜牌", "新纪录!", "今日首金: +%u金币", "+%u金币", "最好", "锦标赛金牌", },
+    "合并数字", "打砖块", "滚珠", "伊布快跑", "滑动，相同数字会合并", "拖动或倾斜挡板", "倾斜滚动，吃果子", "点击跳跃", "挥动来投球", "或点击屏幕", "秘密游戏醒来了！", "触摸唤醒", "几点打瞌睡", "照顾", "照顾节奏", "正常", "轻松", "缓慢", "息屏省电", "周日", "周一", "周二", "周三", "周四", "周五", "周六", "体育场", "锦标赛", "100米", "跨栏", "50米游泳", "跳远", "跳高", "举重", "攀岩", "跳水", "滑冰", "火炬跑", "越野跑", "太累了", "金牌!", "银牌", "铜牌", "新纪录!", "今日首金: +%u金币", "+%u金币", "最好", "锦标赛金牌",
+    // Mega Evolution
+    "超级石 x%u", "再点一次使用", "超级 %uh %02um", "需要超级进化包", "获得了一颗超级石!", "超级石: %u/3 个金牌日", "超级进化结束了", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -1138,7 +1152,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // battle damage that stays
     "포켓몬 센터에 가야 해", "HP 회복! 나머지는 코인",
     // phase 46: new games, swing to throw, the secret game
-    "숫자 합치기", "벽돌 깨기", "구슬 굴리기", "이브이 달리기", "밀어서 숫자를 합쳐요", "패들을 끌거나 기울여요", "기울여서 열매를 모아요", "눌러서 점프해요", "흔들어서 던져요", "또는 화면을 눌러요", "비밀 게임이 깨어났어요!", "터치 깨우기", "잠드는 시각", "돌봄", "돌봄 속도", "보통", "여유", "느림", "화면 꺼짐 절전", "일", "월", "화", "수", "목", "금", "토", "경기장", "대회", "100m", "허들", "수영 50m", "멀리뛰기", "높이뛰기", "역도", "암벽 등반", "다이빙", "스케이팅", "횃불 달리기", "숲길 달리기", "너무 피곤해요", "금메달!", "은메달", "동메달", "신기록!", "오늘의 첫 금: +%u코인", "+%u코인", "최고", "대회 금메달", },
+    "숫자 합치기", "벽돌 깨기", "구슬 굴리기", "이브이 달리기", "밀어서 숫자를 합쳐요", "패들을 끌거나 기울여요", "기울여서 열매를 모아요", "눌러서 점프해요", "흔들어서 던져요", "또는 화면을 눌러요", "비밀 게임이 깨어났어요!", "터치 깨우기", "잠드는 시각", "돌봄", "돌봄 속도", "보통", "여유", "느림", "화면 꺼짐 절전", "일", "월", "화", "수", "목", "금", "토", "경기장", "대회", "100m", "허들", "수영 50m", "멀리뛰기", "높이뛰기", "역도", "암벽 등반", "다이빙", "스케이팅", "횃불 달리기", "숲길 달리기", "너무 피곤해요", "금메달!", "은메달", "동메달", "신기록!", "오늘의 첫 금: +%u코인", "+%u코인", "최고", "대회 금메달",
+    // Mega Evolution
+    "메가스톤 x%u", "한 번 더 누르면 사용", "메가 %uh %02um", "메가 팩이 필요해요", "메가스톤을 얻었어요!", "메가스톤: %u/3 금메달 일", "메가진화가 끝났어요", },
 };
 
 // Medal names in their three lengths [language][medal].

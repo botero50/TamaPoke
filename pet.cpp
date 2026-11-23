@@ -65,6 +65,7 @@ void Pet::begin() {
 }
 
 void Pet::newEgg() {
+  megaUntil = 0; megaDex = 0;
   ceremony = CER_NONE;
   neglectTicks = 0;
   weight = 0;
@@ -117,6 +118,7 @@ static uint8_t dropTo(uint8_t v, uint8_t d, uint8_t fl) {
 
 void Pet::setClock(uint32_t nowEpoch, bool trusted) {
   lastSeenEpoch = nowEpoch;
+  if (megaUntil && nowEpoch && !megaRunning(megaUntil, nowEpoch)) endMega(megaDex == speciesId);
   // A clock change never erases steps. Treating every earlier date as a new start
   // wiped a real day's walk when the hour was set on a clock that had lost its date.
   if (nowEpoch && trusted) {
@@ -1303,6 +1305,7 @@ void Pet::evolve() {
   if (!canEvolveNow()) return;
   const DexEntry &d = DEX_TBL[speciesId];
   prevSpeciesId = speciesId;
+  megaUntil = 0; megaDex = 0;
   int16_t next = d.evolvesTo;
   if (speciesId == DEX_EEVEE) {
     // Eevee's branch: all eight, preferring one still missing from the Pokedex,
@@ -1721,7 +1724,7 @@ bool Pet::canCompete() const {
 // An event is over: it tires the companion, adds the medal, pays the coins (the first gold of a day
 // pays a bonus) and keeps the best mark.
 Pet::TourPay Pet::tourFinish(uint8_t ev, uint8_t place, uint16_t mark) {
-  TourPay r = { 0, false, false };
+  TourPay r = { 0, false, false, false };
   if (ev >= TOUR_EVENTS || place < 1 || place > 3) return r;
   energy = energy > TOUR_ENERGY_COST ? (uint8_t)(energy - TOUR_ENERGY_COST) : 0;
   if (place == 1) {
@@ -1737,11 +1740,33 @@ Pet::TourPay Pet::tourFinish(uint8_t ev, uint8_t place, uint16_t mark) {
     tourGoldDay = today();
     r.coins += TOUR_DAILY_BONUS;
     r.bonus = true;
+    MegaProgress mp = megaGoldDay(megaGoldDays, megaStones);   // the same gold counts towards a Mega Stone
+    megaGoldDays = mp.days; megaStones = mp.stones; r.stone = mp.earned;
   }
   if (eventRecord(ev, tourBest[ev], mark)) { tourBest[ev] = mark; r.record = true; }
   earnCoins(r.coins, false);
   save();
   return r;
+}
+
+bool Pet::startMega() {
+  if (!canMega()) return false;
+  megaStones--;
+  megaDex = (uint16_t)speciesId;
+  megaUntil = lastSeenEpoch + MEGA_SECS;
+  megaEnded = false;
+  megaSeen[(speciesId - 1) >> 3] |= (uint8_t)(1 << ((speciesId - 1) & 7));
+  sfxPlay(SFX_EVOLVE);
+  evolveUntil = millis() + EVOLVE_ANIM_MS;
+  save();
+  return true;
+}
+
+void Pet::endMega(bool animate) {
+  if (!megaUntil) return;
+  megaUntil = 0; megaDex = 0;
+  if (animate && !isEgg()) { megaEnded = true; evolveUntil = millis() + EVOLVE_ANIM_MS; }
+  save();
 }
 
 void Pet::autoCare() {
@@ -3529,6 +3554,11 @@ void Pet::save() {
   prefs.putUShort("tms", tourSilver);
   prefs.putUShort("tmb", tourBronze);
   prefs.putUInt("tgd", tourGoldDay);
+  prefs.putUChar("mgs", megaStones);
+  prefs.putUChar("mgd", megaGoldDays);
+  prefs.putUShort("mgn", megaDex);
+  prefs.putUInt("mgu", megaUntil);
+  prefs.putBytes("mgx", megaSeen, sizeof(megaSeen));
   prefs.putUChar("cpc", carePace);
   prefs.putUChar("pgam", parentGames);
   prefs.putUChar("gmtd", gamesToday);
@@ -3820,6 +3850,11 @@ void Pet::load() {
   tourSilver = prefs.getUShort("tms", 0);
   tourBronze = prefs.getUShort("tmb", 0);
   tourGoldDay = prefs.getUInt("tgd", 0);
+  megaStones = prefs.getUChar("mgs", 0); if (megaStones > MEGA_STONE_MAX) megaStones = MEGA_STONE_MAX;
+  megaGoldDays = prefs.getUChar("mgd", 0); if (megaGoldDays >= MEGA_STONE_DAYS) megaGoldDays = 0;
+  megaDex = prefs.getUShort("mgn", 0);
+  megaUntil = prefs.getUInt("mgu", 0);
+  loadBlob(prefs, "mgx", megaSeen, sizeof(megaSeen));
   dozeStart = prefs.getUChar("dzs", 21);
   if (dozeStart != 0 && (dozeStart < 21 || dozeStart > 23)) dozeStart = 21;
   carePace = prefs.getUChar("cpc", CARE_PACE_DEFAULT);

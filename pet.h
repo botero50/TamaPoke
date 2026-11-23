@@ -16,6 +16,7 @@ inline void sweepTimer(uint32_t &t, uint32_t now) { if (t && (int32_t)(t - now) 
 #include "dex.h"
 #include "trainers.h"   // GYM_REGIONS sizes the badge masks
 #include "party.h"
+#include "mega.h"
 
 // 1 tick = 1 game minute. Lower this value to test faster
 // (e.g. 5000UL = stats fall 12x faster).
@@ -844,7 +845,21 @@ public:
   uint16_t tourBest[TOUR_EVENTS] = { 0 };
   uint16_t tourGold = 0, tourSilver = 0, tourBronze = 0;
   uint32_t tourGoldDay = 0;
-  struct TourPay { uint16_t coins; bool record; bool bonus; };
+  struct TourPay { uint16_t coins; bool record; bool bonus; bool stone; };
+  // Mega Evolution (mega.h): stones earned from the Stadium, and the 24 h it lasts. megaDex is the
+  // species it was started on, so a different companion (a new egg, an evolution) is never Mega.
+  uint8_t megaStones = 0;       // kept, up to MEGA_STONE_MAX
+  uint8_t megaGoldDays = 0;     // first-gold days towards the next stone
+  uint16_t megaDex = 0;
+  uint32_t megaUntil = 0;       // epoch seconds, 0 = not Mega
+  uint8_t megaSeen[(DEX_COUNT + 7) / 8] = { 0 };   // species it has been Mega as (Pokedex mark)
+  bool megaEnded = false;       // set when the time ran out; the screen says so and clears it
+  bool megaActive() const { return !isEgg() && megaUntil && megaDex == speciesId && megaRunning(megaUntil, lastSeenEpoch); }
+  uint32_t megaLeft() const { return megaActive() ? megaRemaining(megaUntil, lastSeenEpoch) : 0; }
+  bool canMega() const { return !isEgg() && megaHas(speciesId) && megaStones > 0 && !megaActive() && ceremony == CER_NONE && !sleeping; }
+  bool megaWasSeen(int16_t dex) const { return dex >= 1 && dex <= DEX_COUNT && (megaSeen[(dex - 1) >> 3] >> ((dex - 1) & 7) & 1); }
+  bool startMega();             // spends a stone; false if it cannot (the screen checks the art first)
+  void endMega(bool animate);   // early (a new companion) or when the time is up
   bool canCompete() const;                                       // awake, healthy, at home, not tired
   TourPay tourFinish(uint8_t ev, uint8_t place, uint16_t mark);  // what an event pays, and what it costs
   uint8_t dozeStart = 21;      // the hour it may doze off with the light on: 21, 22, 23 or 0 (midnight)
