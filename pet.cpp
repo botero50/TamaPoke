@@ -7,6 +7,7 @@
 #include "noart.h"   // speciesHasArt(): the egg pool skips what cannot be drawn
 #include "audio.h"
 #include "save.h"
+#include "tourney.h"   // the Tournament's rules and prizes
 
 // Reads a blob that may be LONGER than the array we are reading it into.
 //
@@ -1710,6 +1711,39 @@ bool Pet::dozeWindow() const {
   return h >= dozeStart || h < DOZE_END;
 }
 
+// ---------- the Tournament ----------
+
+bool Pet::canCompete() const {
+  return !isEgg() && !sleeping && ceremony == CER_NONE && !isSick() && !atWork() && !evolving() &&
+         energy >= TOUR_MIN_ENERGY;
+}
+
+// An event is over: it tires the companion, adds the medal, pays the coins (the first gold of a day
+// pays a bonus) and keeps the best mark.
+Pet::TourPay Pet::tourFinish(uint8_t ev, uint8_t place, uint16_t mark) {
+  TourPay r = { 0, false, false };
+  if (ev >= TOUR_EVENTS || place < 1 || place > 3) return r;
+  energy = energy > TOUR_ENERGY_COST ? (uint8_t)(energy - TOUR_ENERGY_COST) : 0;
+  if (place == 1) {
+    if (tourGold < 65535) tourGold++;
+    joy = clamp100(joy + TOUR_JOY_GOLD);
+  } else if (place == 2) {
+    if (tourSilver < 65535) tourSilver++;
+  } else {
+    if (tourBronze < 65535) tourBronze++;
+  }
+  r.coins = tourCoins(place);
+  if (place == 1 && today() && tourGoldDay != today()) {
+    tourGoldDay = today();
+    r.coins += TOUR_DAILY_BONUS;
+    r.bonus = true;
+  }
+  if (eventRecord(ev, tourBest[ev], mark)) { tourBest[ev] = mark; r.record = true; }
+  earnCoins(r.coins, false);
+  save();
+  return r;
+}
+
 void Pet::autoCare() {
   if (fullness < AUTO_CARE_FROM) {
     fullness = AUTO_CARE_LEVEL;
@@ -2900,6 +2934,7 @@ void Pet::trophyProgress(uint8_t t, uint32_t &cur, uint32_t &goal) const {
     case TRO_ROUTE:   cur = tally[TALLY_ROUTE];   goal = 1;   break;
     case TRO_GOLD:    cur = goldBadges();         goal = 10;  break;
     case TRO_PRIZES:  cur = prizeOwned(PRIZE_CAP) + prizeOwned(PRIZE_VISOR) + prizeOwned(PRIZE_CABINET); goal = 3; break;
+    case TRO_STADIUM: cur = tourGold;             goal = 5;   break;
     default: cur = 0; goal = 1; break;
   }
   if (cur > goal) cur = goal;
@@ -3489,6 +3524,11 @@ void Pet::save() {
   prefs.putUChar("qzhi", quizHi);
   prefs.putUChar("pbed", parentBed);
   prefs.putUChar("dzs", dozeStart);
+  prefs.putBytes("tbst", tourBest, sizeof(tourBest));
+  prefs.putUShort("tmg", tourGold);
+  prefs.putUShort("tms", tourSilver);
+  prefs.putUShort("tmb", tourBronze);
+  prefs.putUInt("tgd", tourGoldDay);
   prefs.putUChar("cpc", carePace);
   prefs.putUChar("pgam", parentGames);
   prefs.putUChar("gmtd", gamesToday);
@@ -3774,6 +3814,12 @@ void Pet::load() {
   quizHi = prefs.getUChar("qzhi", 0);
   parentBed = prefs.getUChar("pbed", 0);
   if (parentBed && (parentBed < PARENT_BED_MIN || parentBed > PARENT_BED_MAX)) parentBed = 0;
+  memset(tourBest, 0, sizeof(tourBest));
+  loadBlob(prefs, "tbst", (uint8_t *)tourBest, sizeof(tourBest));
+  tourGold = prefs.getUShort("tmg", 0);
+  tourSilver = prefs.getUShort("tms", 0);
+  tourBronze = prefs.getUShort("tmb", 0);
+  tourGoldDay = prefs.getUInt("tgd", 0);
   dozeStart = prefs.getUChar("dzs", 21);
   if (dozeStart != 0 && (dozeStart < 21 || dozeStart > 23)) dozeStart = 21;
   carePace = prefs.getUChar("cpc", CARE_PACE_DEFAULT);

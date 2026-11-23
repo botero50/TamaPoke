@@ -23,6 +23,7 @@ inline void sweepTimer(uint32_t &t, uint32_t now) { if (t && (int32_t)(t - now) 
 // Game minutes per level. With 60, CHARMANDER evolves at ~16 h
 // of play with perfect care. Drop to 1 to see evolutions instantly.
 #define MINUTES_PER_LEVEL 60
+#define TOUR_EVENTS 11         // the Tournament's events (tourney.h EV_COUNT)
 #define AUTO_CARE_LEVEL 50    // what self-care raises a low need to
 #define AUTO_CARE_FROM 40     // and the level under which it steps in
 // The care pace a save starts with when it has none (every save made before the setting existed).
@@ -323,6 +324,7 @@ enum TrophyId : uint8_t {
   TRO_DECOR, TRO_STREAK, TRO_LEVEL, TRO_STUDY, TRO_TEETH, TRO_PERFECT, TRO_CAPSULE,
   TRO_FISH, TRO_ROUTE,
   TRO_GOLD, TRO_PRIZES,                      // the arcade (phase 27)
+  TRO_STADIUM,                               // five Tournament golds
   TRO_COUNT
 };
 static_assert(TRO_COUNT <= 32, "trophies needs a bit each");
@@ -837,6 +839,14 @@ public:
   void setPlugged(bool idle10) { pluggedIdle = idle10; }
   uint8_t careEvery() const { return carePace == 1 ? 2 : carePace == 2 ? 4 : 1; }
   bool careDue() const { return ageMinutes % careEvery() == 0; }
+  // The Tournament (the Stadium, see tourney.h): the best mark per event (hundredths; tenths of a
+  // second in the long races), the medals, and the day of the last daily gold bonus.
+  uint16_t tourBest[TOUR_EVENTS] = { 0 };
+  uint16_t tourGold = 0, tourSilver = 0, tourBronze = 0;
+  uint32_t tourGoldDay = 0;
+  struct TourPay { uint16_t coins; bool record; bool bonus; };
+  bool canCompete() const;                                       // awake, healthy, at home, not tired
+  TourPay tourFinish(uint8_t ev, uint8_t place, uint16_t mark);  // what an event pays, and what it costs
   uint8_t dozeStart = 21;      // the hour it may doze off with the light on: 21, 22, 23 or 0 (midnight)
   uint8_t parentGames = 0;      // 0 off, else games a day
   uint8_t gamesToday = 0;

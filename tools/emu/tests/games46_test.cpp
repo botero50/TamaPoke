@@ -8,6 +8,7 @@
 #include "audio.h"
 #include "party.h"
 #include "standby.h"
+#include "tourney.h"
 #include "esp_sleep.h"
 #include "moves.h"
 #include "battle.h"
@@ -674,6 +675,61 @@ static void standbyTests() {
   pet.setPlugged(false);
 }
 
+extern bool tourOpen, mapOpen; extern uint8_t mapPage;
+int mapGridHit(int16_t x, int16_t y);
+void mapMenuTap(int16_t x, int16_t y);
+
+static void stadiumTests() {
+  readyPet();
+  pet.energy = 80; pet.joy = 50; pet.sleeping = false; pet.sickness = SICK_NONE;
+  pet.setClock(D0);
+  extern bool screenOff; screenOff = false;
+  mapOpen = true; mapPage = 2;
+  // the Stadium is a tile on the third page of the map: the second one there
+  int seen[4] = { -9, -9, -9, -9 }, nseen = 0, hx[4] = { 0 }, hy[4] = { 0 };
+  for (int y = 90; y < 400 && nseen < 4; y += 6)
+    for (int x = 60; x < 410 && nseen < 4; x += 6) {
+      int h = mapGridHit((int16_t)x, (int16_t)y);
+      if (h < 0) continue;
+      bool known = false;
+      for (int k = 0; k < nseen; k++) if (seen[k] == h) known = true;
+      if (!known) { seen[nseen] = h; hx[nseen] = x; hy[nseen] = y; nseen++; }
+    }
+  ck(nseen == 2, "the third page of the map holds two places: the trip and the Stadium");
+  mapMenuTap((int16_t)hx[1], (int16_t)hy[1]);
+  ck(tourOpen && !mapOpen, "tapping the second opens the Stadium");
+  pumpMs(120);
+  uint16_t medals0 = pet.tourGold + pet.tourSilver + pet.tourBronze; uint32_t coins0 = pet.coins;
+  click(233, 132);                                          // the first event: the 100 m
+  pumpMs(9500);                                             // it plays by itself, the podium follows
+  uint16_t medals1 = pet.tourGold + pet.tourSilver + pet.tourBronze;
+  ck(medals1 == medals0 + 1, "an event ends with exactly one medal");
+  ck(pet.coins >= coins0 + TOUR_COINS_BRONZE && pet.energy == 80 - TOUR_ENERGY_COST, "it paid its coins and cost 15 energy");
+  ck(pet.tourBest[EV_SPRINT] > 0, "and the 100 m has a record now");
+  click(233, 330);                                          // back to the list (after the podium has been seen)
+  pumpMs(120);
+  click(233, 132 + 76 * 0);                                 // the podium needs a tap first: this one leaves it
+  pumpMs(120);
+  // a jump event (page 2 holds the long jump and the high jump): one at a time
+  tourOpen = true;
+  { extern void tourSwipe(int); tourSwipe(-1); }
+  pet.energy = 80;
+  click(233, 132);
+  pumpMs(7500);
+  uint16_t medals2 = pet.tourGold + pet.tourSilver + pet.tourBronze;
+  ck(medals2 >= medals1 + 1, "a jump event also ends with a medal");
+  click(233, 330); pumpMs(120);
+  // too tired: nothing starts
+  pet.energy = TOUR_MIN_ENERGY - 5;
+  uint16_t medals3 = pet.tourGold + pet.tourSilver + pet.tourBronze;
+  click(233, 132); pumpMs(1500);
+  ck(pet.tourGold + pet.tourSilver + pet.tourBronze == medals3 && pet.energy == TOUR_MIN_ENERGY - 5, "too tired: no event starts and nothing is spent");
+  // the X leaves
+  click(233, 22); pumpMs(120);
+  ck(!tourOpen, "the X leaves the Stadium");
+  pet.energy = 80;
+}
+
 static void carePaceTests() {
   // awake needs: 20 minutes of ticks from a full belly
   auto after20 = [&](uint8_t pace, bool sleep) {
@@ -843,6 +899,7 @@ int main() {
   moonRepro();
   idleWrapTest();
   standbyTests();
+  stadiumTests();
   carePaceTests();
   songTests();
   swingTests();

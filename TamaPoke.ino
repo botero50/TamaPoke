@@ -37,6 +37,7 @@
 #include "wifisync.h"
 #include "weather.h"
 #include "standby.h"
+#include "tourney.h"
 #include "imu_fifo.h"
 #include <esp_sleep.h>
 #include <driver/gpio.h>
@@ -50,7 +51,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.62"
+#define FW_VERSION "3.14-funpack.63"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -782,6 +783,7 @@ uint32_t lastInteract = 0;
 uint32_t lastTouchAt = 0;    // a real touch, unlike lastInteract, which events also move
 bool gStandbyOn = false;     // the standby clock is showing (plugged in and untouched, see standby.h)
 uint32_t gSleepWakes = 0;    // light-sleep cycles since boot (STATS)
+bool tourOpen = false;       // the Stadium (Tournament) is open
 // Milliseconds since a stamp, never negative. loop() reads the clock once at its top and a
 // touch handled later in the same pass stamps lastInteract a few ms AFTER that, so
 // "now - stamp" wrapped to ~49 days: the screen dipped to its idle dim for a frame (the
@@ -1861,6 +1863,7 @@ void onSwipeV(int dir) {
     return;
   }
   if (battleOpen) return;   // no swiping out of a fight
+  if (tourOpen) { tourLeaveIfIdle(); return; }   // swiping up leaves the Stadium between events
   if (pickOpen) { pickOpen = false; return; }
   if (lanOpen) { lanLeave(); lanOpen = false; return; }
   if (gymOpen) {
@@ -2197,6 +2200,7 @@ void onSwipe(int dir) {
   // screen by closing it is the bug this project shipped four times.
   if (rpickSwipe(dir)) return;
   if (pet.awaitingStarter()) return;  // blocked during the starter choice
+  if (tourOpen) { tourSwipe(dir); return; }
   if (menuOpen) { menuOpen = false; return; }   // any swipe closes the menu
   if (shopSwipe(dir)) return;
   if (missionsOpen || walletOpen || hubOpen || shopOpen || bagOpen || hatAdjust || foodOpen || bathOpen || sleepOpen || mapOpen || placeScene || trophyOpen || choresOpen || piggyOpen || diaryOpen || mailOpen) {
@@ -2539,6 +2543,7 @@ void onTap(int16_t x, int16_t y) {
     }
     return;
   }
+  if (tourOpen) { tourTap(x, y); return; }
   if (spdOpen) {
     spdTap(x, y);
     return;
@@ -4403,7 +4408,7 @@ uint8_t uiCurrentScreen() {
   if (lanOpen) return SCR_LAN;
   if (gymOpen) return gymPick ? SCR_GYMPICK : SCR_GYM;
   if (pet.hasLearnOffer()) return SCR_LEARN;
-  if (gameOpen || sackOpen || spdOpen || fpOpen || scrubOpen) return SCR_GAME;
+  if (gameOpen || sackOpen || spdOpen || fpOpen || scrubOpen || tourOpen) return SCR_GAME;
   if (shopOpen) return SCR_MENU;               // the shop can open over the store
   if (placeScene) return SCR_GAME;
   if (trainOpen || fpMenuCat || arcadeView) return SCR_TRAIN;
@@ -4476,6 +4481,7 @@ void render() {
     else renderParty();
     return;
   }
+  if (tourOpen) { renderTournament(); return; }
   if (gameOpen) {
     renderGame();
     return;
@@ -11833,6 +11839,360 @@ void bathMenuTap(int16_t x, int16_t y) {
   else if (pet.brush()) sfxPlay(SFX_HEART);
 }
 
+// ---------- the Stadium: the Tournament (rules in tourney.h, prizes in Pet::tourFinish) ----------
+//
+// On the town map. Eleven events, three to a page. Pick one and your companion and two random
+// Pokemon (whose sprites are on the card) compete by themselves; then the podium.
+
+#define TOUR_PER_PAGE 3
+#define TOUR_PAGES ((TOUR_EVENTS + TOUR_PER_PAGE - 1) / TOUR_PER_PAGE)
+#define TOUR_ROW_Y(i) (104 + (i) * 76)
+#define TOUR_ROW_H 64
+#define TOUR_LX0 100                       // where a runner starts and finishes on its lane
+#define TOUR_LX1 372
+#define TOUR_LANE_G(i) (176 + (i) * 78)    // the ground line of lane i
+#define TOUR_TURN_MS 2000                  // one attempt in the jumps, weights and dives
+
+static uint8_t tourPage = 0;               // the list page
+static uint8_t tourPhase = 0;              // 0 the list, 1 the event, 2 the result
+static uint8_t tourEv = 0;
+static Athlete tourAth[3];                 // 0 = your companion, 1 and 2 the rivals
+static float tourMark[3];
+static uint8_t tourPlace = 1;
+static uint32_t tourT0 = 0, tourResultAt = 0;
+static Pet::TourPay tourPay = { 0, false, false };
+static PmdMon tourMon[2];                  // the rivals' sprites, only while an event runs
+
+static StrId tourEvName(uint8_t ev) {
+  static const StrId N[TOUR_EVENTS] = { S_EV_SPRINT, S_EV_HURDLES, S_EV_SWIM, S_EV_LONGJUMP, S_EV_HIGHJUMP, S_EV_LIFT,
+                                        S_EV_CLIMB, S_EV_DIVE, S_EV_SKATE, S_EV_TORCH, S_EV_TRAIL };
+  return N[ev % TOUR_EVENTS];
+}
+
+// races (and the climb) run side by side; the jumps, weights and dives go one at a time
+static bool tourIsRace(uint8_t ev) {
+  return !(ev == EV_LONGJUMP || ev == EV_HIGHJUMP || ev == EV_LIFT || ev == EV_DIVE);
+}
+
+static void tourFmtMark(uint8_t ev, float m, char *b, size_t n) {
+  switch (eventUnit(ev)) {
+    case UNIT_METERS: snprintf(b, n, "%.2f m", (double)m); break;
+    case UNIT_KG: snprintf(b, n, "%d kg", (int)(m + 0.5f)); break;
+    case UNIT_POINTS: snprintf(b, n, "%.1f", (double)m); break;
+    case UNIT_MINSEC: snprintf(b, n, "%d:%02d", (int)m / 60, (int)m % 60); break;
+    default: snprintf(b, n, "%.2f s", (double)m);
+  }
+}
+static void tourFmtStored(uint8_t ev, uint16_t v, char *b, size_t n) {
+  tourFmtMark(ev, eventUnit(ev) == UNIT_MINSEC ? v / 10.0f : v / 100.0f, b, n);
+}
+
+void openStadium() {
+  tourOpen = true;
+  tourPage = 0;
+  tourPhase = 0;
+}
+
+void tourLeave();
+void tourLeaveIfIdle() {
+  if (tourPhase == 0) tourLeave();
+}
+
+void tourLeave() {
+  tourOpen = false;
+  tourPhase = 0;
+  tourMon[0].unload();
+  tourMon[1].unload();
+}
+
+static float tourRand() { return random(10000) / 10000.0f; }
+
+static void tourStart(uint8_t ev) {
+  tourEv = ev;
+  Athlete me = athleteOf(pet.speciesId, pet.level());
+  me.geneAtk = (uint8_t)(90 + pet.ivAtk * 20 / 31);
+  me.geneDef = (uint8_t)(90 + pet.ivDef * 20 / 31);
+  me.geneSpe = (uint8_t)(90 + pet.ivSpe * 20 / 31);
+  me.trAtk = pet.trAtk > 100 ? 100 : pet.trAtk;
+  me.trDef = pet.trDef > 100 ? 100 : pet.trDef;
+  me.trSpe = pet.trSpe > 100 ? 100 : pet.trSpe;
+  tourAth[0] = me;
+  for (int k = 0; k < 2; k++) {
+    int16_t d = pet.speciesId;
+    tourMon[k].unload();
+    for (int tries = 0; tries < 40 && !tourMon[k].loaded; tries++) {   // a species whose sprite is on the card
+      int16_t c = (int16_t)(1 + random(DEX_COUNT));
+      if (c == pet.speciesId || (k == 1 && c == tourAth[1].dex) || !regionAvailable(regionOfDex(c)) || !speciesHasArt(c)) continue;
+      if (tourMon[k].load(c)) d = c;
+    }
+    if (!tourMon[k].loaded) tourMon[k].load(d);
+    int lv = (int)pet.level() + (int)random(9) - 4;
+    tourAth[1 + k] = rivalAthlete(d, (uint16_t)(lv < 1 ? 1 : lv), tourRand(), tourRand(), tourRand(), tourRand());
+  }
+  for (int i = 0; i < 3; i++) tourMark[i] = eventMark(ev, performance(athleteRating(tourAth[i], ev), tourRand()));
+  tourPlace = playerPlace(tourMark[0], tourMark[1], tourMark[2], eventLowerWins(ev));
+  tourT0 = millis();
+  tourPhase = 1;
+  sfxPlay(SFX_TAP);
+}
+
+// how long each runner takes on screen: the fastest 4.5 s, the others in proportion (at most 8 s)
+static uint32_t tourRunMs(int i) {
+  float best = tourMark[0];
+  for (int k = 1; k < 3; k++) {
+    if (eventLowerWins(tourEv) ? tourMark[k] < best : tourMark[k] > best) best = tourMark[k];
+  }
+  float r = eventLowerWins(tourEv) ? tourMark[i] / best : best / tourMark[i];
+  uint32_t ms = (uint32_t)(4500.0f * r);
+  return ms > 8000 ? 8000 : ms;
+}
+
+static uint32_t tourPlayTotalMs() {
+  if (!tourIsRace(tourEv)) return 3 * TOUR_TURN_MS + 600;
+  uint32_t m = 0;
+  for (int i = 0; i < 3; i++) if (tourRunMs(i) > m) m = tourRunMs(i);
+  return m + 700;
+}
+
+static void tourFinishNow() {
+  uint16_t stored = eventMarkStore(tourEv, tourMark[0]);
+  tourPay = pet.tourFinish(tourEv, tourPlace, stored);
+  tourPhase = 2;
+  tourResultAt = millis();
+  sfxPlay(tourPlace == 1 ? SFX_VICTORY : SFX_MEDAL);
+}
+
+// ---- the venues, each a few shapes
+static void tourBands(uint16_t c1, uint16_t c2) {
+  for (int i = 0; i < 3; i++) gfx->fillRect(0, TOUR_LANE_G(i) - 66, 466, 70, (i & 1) ? c2 : c1);
+}
+
+static void tourVenue(uint8_t ev) {
+  const uint16_t W = 0xFFFF;
+  switch (ev) {
+    case EV_SPRINT:
+    case EV_HURDLES: {
+      gfx->fillScreen(C565(0x8f, 0xc8, 0xea));
+      gfx->fillRect(0, 66, 466, 34, C565(0x7a, 0x7f, 0x8c));                       // the stands
+      for (int x = 4; x < 466; x += 12) gfx->fillRect(x, 72 + ((x / 12) % 3) * 8, 6, 6, (x / 12) % 2 ? C565(0xe8, 0x50, 0x3a) : C565(0xf8, 0xd9, 0x4a));
+      tourBands(C565(0xc4, 0x6b, 0x3c), C565(0xb8, 0x60, 0x34));
+      for (int i = 0; i < 4; i++) gfx->fillRect(0, TOUR_LANE_G(0) - 68 + i * 78 - (i ? 4 : 0), 466, 2, W);
+      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 232, W);                   // the finish line
+      if (ev == EV_HURDLES)
+        for (int i = 0; i < 3; i++)
+          for (int h = 0; h < 5; h++) gfx->fillRect(TOUR_LX0 + (int)((0.15f + h * 0.16f) * (TOUR_LX1 - TOUR_LX0)), TOUR_LANE_G(i) - 22, 4, 22, W);
+      break;
+    }
+    case EV_SWIM:
+      gfx->fillScreen(C565(0xdc, 0xee, 0xf6));
+      tourBands(C565(0x4f, 0x9b, 0xd8), C565(0x62, 0xa9, 0xe0));
+      for (int i = 0; i < 4; i++)
+        for (int x = 0; x < 466; x += 14) gfx->fillRect(x, TOUR_LANE_G(0) - 68 + i * 78 - (i ? 4 : 0), 8, 4, (x / 14) % 2 ? C565(0xe8, 0x50, 0x3a) : W);
+      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 232, W);
+      break;
+    case EV_SKATE:
+      gfx->fillScreen(C565(0xcf, 0xe8, 0xf4));
+      tourBands(C565(0xe4, 0xf2, 0xfa), C565(0xd2, 0xe8, 0xf4));
+      for (int i = 0; i < 4; i++) gfx->fillRect(0, TOUR_LANE_G(0) - 68 + i * 78 - (i ? 4 : 0), 466, 2, C565(0x8f, 0xc0, 0xe0));
+      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 232, C565(0xe8, 0x50, 0x3a));
+      break;
+    case EV_TORCH:
+      gfx->fillScreen(C565(0x6a, 0x80, 0xb8));
+      for (int x = 0; x < 466; x += 46) gfx->fillRect(x, 70 + (x / 46 % 3) * 10, 34, 40, C565(0x3c, 0x48, 0x68));    // the city
+      tourBands(C565(0x5a, 0x5e, 0x6a), C565(0x52, 0x56, 0x62));
+      for (int i = 0; i < 4; i++) for (int x = 0; x < 466; x += 30) gfx->fillRect(x, TOUR_LANE_G(0) - 68 + i * 78 - (i ? 4 : 0), 16, 2, C565(0xf8, 0xd9, 0x4a));
+      break;
+    case EV_TRAIL:
+      gfx->fillScreen(C565(0x3c, 0x8a, 0x4c));
+      for (int x = 10; x < 466; x += 38) { gfx->fillRect(x, 70, 8, 40, C565(0x7e, 0x55, 0x30)); gfx->fillCircle(x + 4, 66, 16, C565(0x2f, 0x6e, 0x3c)); }
+      tourBands(C565(0x9a, 0x70, 0x42), C565(0x8c, 0x64, 0x3a));
+      for (int i = 0; i < 3; i++) for (int h = 0; h < 4; h++) gfx->fillRect(TOUR_LX0 + 30 + h * 70, TOUR_LANE_G(i) - 10, 22, 10, C565(0x6a, 0x48, 0x28));   // logs
+      gfx->fillRect(TOUR_LX1 + 18, TOUR_LANE_G(0) - 66, 4, 232, W);
+      break;
+    case EV_CLIMB:
+      gfx->fillScreen(C565(0x8f, 0xc8, 0xea));
+      gfx->fillRect(40, 70, 386, 330, C565(0x8a, 0x78, 0x66));                      // the wall, three climbing lines
+      for (int i = 0; i < 3; i++) for (int y = 90; y < 390; y += 34) gfx->fillCircle(150 + i * 100 + ((y / 34) % 2) * 14, y, 5, (y / 34) % 2 ? C565(0xe8, 0x50, 0x3a) : C565(0xf8, 0xd9, 0x4a));
+      break;
+    case EV_LONGJUMP:
+      gfx->fillScreen(C565(0x8f, 0xc8, 0xea));
+      gfx->fillRect(0, 150, 466, 220, C565(0xc4, 0x6b, 0x3c));                      // the run-up
+      gfx->fillRect(300, 150, 166, 220, C565(0xf0, 0xd8, 0x90));                    // the sand pit
+      gfx->fillRect(296, 150, 6, 220, W);                                            // the board
+      break;
+    case EV_HIGHJUMP:
+      gfx->fillScreen(C565(0xb8, 0xc8, 0xd8));
+      gfx->fillRect(0, 300, 466, 100, C565(0x6a, 0x7a, 0x90));
+      gfx->fillRect(330, 290, 110, 50, C565(0x3a, 0x6f, 0xc8));                     // the mat
+      gfx->fillRect(300, 150, 6, 150, W); gfx->fillRect(392, 150, 6, 150, W);        // the posts
+      gfx->fillRect(300, 170, 98, 4, C565(0xe8, 0x50, 0x3a));                        // the bar
+      break;
+    case EV_LIFT:
+      gfx->fillScreen(C565(0x1c, 0x1c, 0x2c));
+      gfx->fillRect(30, 330, 406, 40, C565(0x6a, 0x48, 0x28));                      // the stage
+      for (int i = 0; i < 3; i++) gfx->fillCircle(110 + i * 120, 70, 40 - (i & 1) * 8, C565(0x3a, 0x3a, 0x58));   // the spotlights
+      break;
+    default:   // diving
+      gfx->fillScreen(C565(0x8f, 0xc8, 0xea));
+      gfx->fillRect(0, 290, 466, 110, C565(0x4f, 0x9b, 0xd8));
+      gfx->fillRect(60, 160, 120, 10, C565(0xc8, 0xc8, 0xd0)); gfx->fillRect(60, 160, 8, 140, C565(0x8a, 0x90, 0xa0));   // the platform
+      break;
+  }
+}
+
+static void tourDrawMon(int i, int x, int ground, uint8_t act, uint32_t t) {
+  PmdMon &m = (i == 0) ? pmd : tourMon[i - 1];
+  if (!m.loaded) { gfx->fillCircle(x, ground - 22, 18, i == 0 ? UI_BAR_OK : UI_BAR_WARN); return; }
+  if (!m.has(act)) act = PMD_IDLE;
+  drawPmdActZ(m, act, x, ground, t, true, false, 3, 100, 64);
+}
+
+static void tourLabel(const char *s, int x, int y, uint16_t col) {
+  gfx->fillRoundRect(x - 4, y - 14, uiTextWidth(UIF_SMALL, s) + 8, 20, 6, 0x0000);
+  uiText(UIF_SMALL, x, y, s, col, 0);
+}
+
+static void renderTourPlay() {
+  const uint32_t t = millis() - tourT0;
+  tourVenue(tourEv);
+  char b[24];
+  uiTextFit(UIF_MID, CX, 50, T(tourEvName(tourEv)), 0xFFFF, 1, 260);
+  if (tourIsRace(tourEv)) {
+    const bool climb = tourEv == EV_CLIMB;
+    for (int i = 0; i < 3; i++) {
+      uint32_t run = tourRunMs(i);
+      float p = t >= run ? 1.0f : (float)t / (float)run;
+      if (climb) {
+        int x = 150 + i * 100, y = 390 - (int)(p * 300);
+        tourDrawMon(i, x, y, PMD_HOP, t);
+      } else {
+        int x = TOUR_LX0 + (int)(p * (TOUR_LX1 - TOUR_LX0));
+        tourDrawMon(i, x, TOUR_LANE_G(i), p >= 1.0f ? PMD_IDLE : PMD_WALKR, t);
+      }
+      if (t >= run) { tourFmtMark(tourEv, tourMark[i], b, sizeof(b)); tourLabel(b, climb ? 120 + i * 100 : 24, climb ? 70 : TOUR_LANE_G(i) - 70, i == 0 ? 0xFFE0 : 0xFFFF); }
+    }
+  } else {
+    const int turn = (int)(t / TOUR_TURN_MS);          // 0 and 1 the rivals, 2 your companion
+    static const uint8_t ORDER[3] = { 1, 2, 0 };
+    for (int s = 0; s < 3; s++) {
+      int i = ORDER[s];
+      int gy = TOUR_LANE_G(s);
+      bool done = turn > s, now = turn == s;
+      uint32_t lt = t > (uint32_t)(s * TOUR_TURN_MS) ? t - (uint32_t)(s * TOUR_TURN_MS) : 0;
+      tourDrawMon(i, 150, gy, now ? PMD_HOP : PMD_IDLE, lt);
+      if (now) uiText(UIF_BIG, 70, gy - 22, ">", 0xFFE0, 1);
+      if (done || (now && lt > TOUR_TURN_MS - 700)) { tourFmtMark(tourEv, tourMark[i], b, sizeof(b)); tourLabel(b, 250, gy - 24, i == 0 ? 0xFFE0 : 0xFFFF); }
+    }
+  }
+  gfx->flush();
+  if (t >= tourPlayTotalMs()) tourFinishNow();
+}
+
+static void renderTourResult() {
+  gfx->fillScreen(RGB565_BLACK);
+  gfx->fillCircle(CX, CY, 231, UI_BG_DAY);
+  const uint16_t medal = tourPlace == 1 ? C565(0xf8, 0xc8, 0x2a) : tourPlace == 2 ? C565(0xb8, 0xc0, 0xd0) : C565(0xc8, 0x7a, 0x3a);
+  gfx->fillCircle(CX, 92, 26, medal);
+  gfx->drawCircle(CX, 92, 26, UI_INK);
+  char n[4]; snprintf(n, sizeof(n), "%u", (unsigned)tourPlace);
+  uiText(UIF_BIG, CX, 106, n, UI_INK, 1);
+  uiTextFit(UIF_MID, CX, 150, T(tourPlace == 1 ? S_TOUR_GOLD : tourPlace == 2 ? S_TOUR_SILVER : S_TOUR_BRONZE), UI_INK, 1, 280);
+  uiTextFit(UIF_SMALL, CX, 176, T(tourEvName(tourEv)), UI_TRACK_TEXT, 1, 260);
+  // the three, best first
+  int order[3] = { 0, 1, 2 };
+  for (int a = 0; a < 3; a++) for (int b2 = a + 1; b2 < 3; b2++) {
+    bool better = eventLowerWins(tourEv) ? tourMark[order[b2]] < tourMark[order[a]] : tourMark[order[b2]] > tourMark[order[a]];
+    if (tourMark[order[b2]] == tourMark[order[a]]) better = order[b2] == 0;   // a tie goes to the player
+    if (better) { int tmp = order[a]; order[a] = order[b2]; order[b2] = tmp; }
+  }
+  for (int r = 0; r < 3; r++) {
+    int i = order[r], y = 196 + r * 40;
+    gfx->fillRoundRect(76, y, 314, 34, 8, i == 0 ? UI_BAR_OK : UI_WHITE);
+    gfx->drawRoundRect(76, y, 314, 34, 8, UI_INK);
+    char rk[4]; snprintf(rk, sizeof(rk), "%d", r + 1);
+    uiText(UIF_SMALL, 92, y + 23, rk, i == 0 ? UI_WHITE : UI_INK, 0);
+    uiTextFit(UIF_SMALL, 116, y + 23, i == 0 ? DEX_TBL[pet.speciesId].name : DEX_TBL[tourAth[i].dex].name, i == 0 ? UI_WHITE : UI_INK, 0, 150);
+    char mk[24]; tourFmtMark(tourEv, tourMark[i], mk, sizeof(mk));
+    uiText(UIF_SMALL, 376, y + 23, mk, i == 0 ? UI_WHITE : UI_INK, 2);
+  }
+  char c[48];
+  snprintf(c, sizeof(c), T(S_TOUR_COINS_FMT), (unsigned)tourPay.coins);
+  uiTextFit(UIF_SMALL, CX, 336, c, UI_INK, 1, 280);
+  if (tourPay.bonus) { snprintf(c, sizeof(c), T(S_TOUR_BONUS_FMT), (unsigned)TOUR_DAILY_BONUS); uiTextFit(UIF_TINY, CX, 358, c, UI_BAR_OK, 1, 280); }
+  if (tourPay.record) uiTextFit(UIF_SMALL, CX, 384, T(S_TOUR_RECORD), UI_BAR_WARN, 1, 280);
+  gfx->flush();
+}
+
+static void renderTourList() {
+  gfx->fillScreen(RGB565_BLACK);
+  gfx->fillCircle(CX, CY, 231, UI_BG_DAY);
+  uiTextFit(UIF_BIG, CX, 66, T(S_TOURNAMENT), UI_INK, 1, 250);
+  // the medals: gold, silver, bronze
+  const uint16_t mc[3] = { C565(0xf8, 0xc8, 0x2a), C565(0xb8, 0xc0, 0xd0), C565(0xc8, 0x7a, 0x3a) };
+  const uint16_t mv[3] = { pet.tourGold, pet.tourSilver, pet.tourBronze };
+  for (int k = 0; k < 3; k++) {
+    int x = CX - 92 + k * 62;
+    gfx->fillCircle(x, 90, 8, mc[k]); gfx->drawCircle(x, 90, 8, UI_INK);
+    char m[8]; snprintf(m, sizeof(m), "%u", (unsigned)mv[k]);
+    uiText(UIF_SMALL, x + 14, 96, m, UI_INK, 0);
+  }
+  drawExitBtn();
+  const bool can = pet.canCompete();
+  for (int r = 0; r < TOUR_PER_PAGE; r++) {
+    int ev = tourPage * TOUR_PER_PAGE + r;
+    if (ev >= TOUR_EVENTS) break;
+    int y = TOUR_ROW_Y(r) + 8;
+    gfx->fillRoundRect(76, y, 314, TOUR_ROW_H, 14, can ? UI_WHITE : UI_TRACK_TEXT);
+    gfx->drawRoundRect(76, y, 314, TOUR_ROW_H, 14, UI_INK);
+    uiTextFit(UIF_MID, 92, y + 28, T(tourEvName(ev)), UI_INK, 0, 190);
+    char bst[24];
+    if (pet.tourBest[ev]) tourFmtStored(ev, pet.tourBest[ev], bst, sizeof(bst)); else snprintf(bst, sizeof(bst), "--");
+    char l[40]; snprintf(l, sizeof(l), "%s %s", T(S_TOUR_BEST), bst);
+    uiTextFit(UIF_TINY, 92, y + 52, l, UI_TRACK_TEXT, 0, 190);
+    gfx->fillTriangle(364, y + 20, 364, y + 44, 378, y + 32, can ? UI_BAR_OK : UI_BG_DAY);   // an arrow on the right
+  }
+  for (uint8_t i = 0; i < TOUR_PAGES; i++)
+    gfx->fillCircle(CX - (TOUR_PAGES - 1) * 12 + i * 24, 346, i == tourPage ? 5 : 3, i == tourPage ? UI_INK : UI_TRACK_TEXT);
+  gfx->flush();
+}
+
+void renderTournament() {
+  if (tourPhase == 1) renderTourPlay();
+  else if (tourPhase == 2) renderTourResult();
+  else renderTourList();
+}
+
+void tourTap(int16_t x, int16_t y) {
+  if (tourPhase == 1) return;                                    // the event plays by itself
+  if (tourPhase == 2) {
+    if (millis() - tourResultAt < 700) return;                   // the podium is seen first
+    tourPhase = 0;
+    tourMon[0].unload();
+    tourMon[1].unload();
+    return;
+  }
+  if (exitHit(x, y)) { tourLeave(); return; }
+  for (int r = 0; r < TOUR_PER_PAGE; r++) {
+    int ev = tourPage * TOUR_PER_PAGE + r;
+    int ry = TOUR_ROW_Y(r) + 8;
+    if (ev >= TOUR_EVENTS || x < 76 || x > 390 || y < ry || y > ry + TOUR_ROW_H) continue;
+    if (!pet.canCompete()) { sfxPlay(SFX_DENY); fpShowToast(S_TOUR_TIRED, UI_BAR_BAD); return; }
+    tourStart((uint8_t)ev);
+    return;
+  }
+  if (y > 320 && y < 372) {                                      // the page dots
+    tourPage = (uint8_t)((tourPage + (x < CX ? TOUR_PAGES - 1 : 1)) % TOUR_PAGES);
+    sfxPlay(SFX_TAP);
+  }
+}
+
+// a horizontal swipe turns the list page
+void tourSwipe(int dir) {
+  if (tourPhase != 0) return;
+  tourPage = (uint8_t)((tourPage + (dir > 0 ? TOUR_PAGES - 1 : 1)) % TOUR_PAGES);
+  sfxPlay(SFX_TAP);
+}
+
 // ---------- the sleep menu ----------
 
 void renderSleepMenu() {
@@ -12015,7 +12375,7 @@ void drawBathDuck() {
 #define DEX_CHANSEY 113           // the nurse
 enum : uint8_t { PLACE_NONE = 0, PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_TEETH,
                  PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN,
-                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS, PLACE_TRIP };
+                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS, PLACE_TRIP, PLACE_STADIUM };
 
 uint32_t placeAnimUntil = 0;      // the park walk animation
 // An action's animation (phase 28): what is playing, when it began, where, and in
@@ -12057,6 +12417,7 @@ void mapMenuTap(int16_t x, int16_t y) {
   mapOpen = false;
   if (pl == PLACE_GRASS) { startWildBattle(); return; }
   if (pl == PLACE_TRIP) { startTripFromMap(); return; }
+  if (pl == PLACE_STADIUM) { openStadium(); return; }
   if (pl == PLACE_ARCADE) { if (!fpBlockedBySick()) trainOpen = true; return; }   // the arcade is the games menu
   schoolReset();
   enterPlaceFamily();
@@ -13022,7 +13383,7 @@ static StrId trophyName(uint8_t t) {
   static const StrId T_[TRO_COUNT] = {
     S_TRO_MEALS, S_TRO_GAMES, S_TRO_BATHS, S_TRO_WALKS, S_TRO_HARVEST, S_TRO_COINS, S_TRO_HATS,
     S_TRO_DECOR, S_TRO_STREAK, S_TRO_LEVEL, S_TRO_STUDY, S_TRO_TEETH, S_TRO_PERFECT, S_TRO_CAPSULE,
-    S_TRO_FISH, S_TRO_ROUTE, S_TRO_GOLD, S_TRO_PRIZES
+    S_TRO_FISH, S_TRO_ROUTE, S_TRO_GOLD, S_TRO_PRIZES, S_TRO_STADIUM
   };
   return T_[t % TRO_COUNT];
 }
@@ -13176,10 +13537,29 @@ static int tileHit(int16_t x, int16_t y, int n, bool hub) {
 }
 
 #define MAP_PAGES 3
+// the Stadium's tile: a podium with a star
+static const char *const SPR_PLACE_STADIUM[16] = {
+  "................",
+  "................",
+  ".......f........",
+  "......fff.......",
+  ".....fffff......",
+  "......fff.......",
+  "......f.f.......",
+  "................",
+  ".....kkkkk......",
+  ".....kfffk......",
+  ".....kfffk......",
+  "kkkkkkfffkkkkk..",
+  "kbbbkkfffkooook.",
+  "kbbbkkfffkooook.",
+  "kbbbkkfffkooook.",
+  "kkkkkkkkkkkkkk..",
+};
 static const uint8_t MAP_PLACE[MAP_PAGES][MAP_TILES] = {
   { PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN },
   { PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS },
-  { PLACE_TRIP, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE },
+  { PLACE_TRIP, PLACE_STADIUM, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE },
 };
 
 void renderMapGrid() {
@@ -13187,12 +13567,12 @@ void renderMapGrid() {
   static const char *const *const ICON[MAP_PAGES][MAP_TILES] = {
     { SPR_PLACE_TREE, SPR_ICON_COIN, SPR_PLACE_CROSS, SPR_PLACE_SPROUT, SPR_ICON_MISSION, SPR_PLACE_FISH, SPR_PLACE_FLAG, SPR_PLACE_POT },
     { SPR_DEC_DUCK, SPR_ICON_DIARY, SPR_CARE_NOTE, SPR_ACC_MEDAL, SPR_CAT_ARCADE, SPR_FURN_CLOCK, SPR_PLACE_NURSERY, SPR_PLACE_GRASS },
-    { SPR_PLACE_TRIP },
+    { SPR_PLACE_TRIP, SPR_PLACE_STADIUM },
   };
   static const StrId NAME[MAP_PAGES][MAP_TILES] = {
     { S_PLACE_PARK, S_SHOP, S_CENTER_SHORT, S_PLACE_GARDEN, S_PLACE_SCHOOL, S_PLACE_LAKE, S_PLACE_ADVENTURE, S_PLACE_KITCHEN },
     { S_PLACE_BEACH, S_PLACE_LIBRARY, S_PLACE_MUSIC, S_PLACE_CONTEST, S_PLACE_ARCADE, S_PLACE_JOBS, S_PLACE_NURSERY, S_PLACE_GRASS },
-    { S_PLACE_TRIP },
+    { S_PLACE_TRIP, S_PLACE_STADIUM },
   };
   uint16_t lit = lerp565(UI_BAR_OK, UI_WHITE, 4, 8);
   uint8_t pg = mapPage % MAP_PAGES;

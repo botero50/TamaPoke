@@ -273,6 +273,19 @@ and +3 bond), a cookie, a seed, a soap, an extra wild encounter or a Great Ball,
 every time. **Call back** on the sign brings it home at once, with no story, and that trip
 still counts. It can't leave from 20:00 until 07:00, or while asleep, sick or at work.
 
+### The Stadium: the Tournament (v1.45)
+The **Stadium** tile is on page 3 of the map. It holds eleven events, three to a page (swipe left/right for the
+page): 100 m, hurdles, 50 m swim, long jump, high jump, weights, climbing, diving, skating, torch run and trail run.
+Pick one and your companion and two random Pokemon whose sprites are on the card compete by themselves, nobody
+taps: races run side by side, the jumps, weights and dives go one at a time. Who does well depends on the species'
+base stats (each event weighs HP, attack, defence and speed its own way), the genes (IVs) and training, the level
+(up to +20 %), the evolution stage (first forms are a little slower, final forms a little faster) and the type
+(water in the pool, electric in the 100 m, ice on the rink, fire in the torch run...), plus 15 % of luck, so the
+strongest does not always win. A dual type takes the average of its two modifiers. Each event costs 15 energy; it
+cannot compete asleep, sick, away, an egg, or under 20 energy. Gold pays 25 coins and 10 joy, silver 12 coins,
+bronze 5; the first gold of each day pays 20 coins more. The list shows your best mark per event and your medals;
+five golds earn the **Tournament gold** trophy. Swipe up (or the red X) leaves the Stadium.
+
 ### Wild encounters (phase 44)
 The **Tall Grass** tile, on page 2 of the map, shows how many encounters are waiting:
 one free each day, plus one per 500 steps walked, holding up to 3 from steps. Tapping it
