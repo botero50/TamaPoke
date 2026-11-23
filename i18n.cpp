@@ -153,7 +153,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // swap the companion with a party member
     "CAMBIAR", "Toca otra vez para cambiar", "Ahora no: dormido, de viaje o en ceremonia",
     // battery saver
-    "Ahorro de bateria", "Auto", "Siempre", "Normal", "Ahorrando", "Critico", "%d%% %d.%02dV  %s", },
+    "Ahorro de bateria", "Auto", "Siempre", "Normal", "Ahorrando", "Critico", "%d%% %d.%02dV  %s",
+    // the mine
+    "Mina", "TOCA LA ROCA!", "Picadas: %u", "Fragmentos %u/10", "Muy cansado para picar", "Hoy no quedan picadas", "Fragmento de Mega Piedra!", "Diez: una Mega Piedra!", "Fosil! Huevo de %s", },
   // ---------------- EN ----------------
   {
     "Evolving!", "Yum yum!", "It likes it!", "It's hungry!", "Needs a bath!",
@@ -301,7 +303,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // swap the companion with a party member
     "SWAP", "Tap again to swap", "Not now: asleep, away or in a ceremony",
     // battery saver
-    "Battery saver", "Auto", "Always", "Normal", "Saving", "Critical", "%d%% %d.%02dV  %s", },
+    "Battery saver", "Auto", "Always", "Normal", "Saving", "Critical", "%d%% %d.%02dV  %s",
+    // the mine
+    "Mine", "TAP THE ROCK!", "Digs left: %u", "Shards %u/10", "Too tired to dig", "No digs left today", "Mega Stone shard!", "Ten shards: a Mega Stone!", "A fossil! %s egg next", },
   // ---------------- FR ----------------
   {
     "Il evolue!", "Miam miam!", "Il aime ca!", "Il a faim!", "Besoin d'un bain!",
@@ -448,7 +452,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // swap the companion with a party member
     "ECHANGER", "Touche encore pour echanger", "Pas maintenant: endormi, parti ou en ceremonie",
     // battery saver
-    "Economie batterie", "Auto", "Toujours", "Normal", "Economie", "Critique", "%d%% %d.%02dV  %s", },
+    "Economie batterie", "Auto", "Toujours", "Normal", "Economie", "Critique", "%d%% %d.%02dV  %s",
+    // the mine
+    "Mine", "TAPE LE ROCHER!", "Forages: %u", "Eclats %u/10", "Trop fatigue pour miner", "Plus de forage ce jour", "Eclat de Mega Pierre!", "Dix: une Mega Pierre!", "Fossile! Oeuf de %s", },
   // ---------------- DE ----------------
   {
     "Entwickelt sich!", "Mampf mampf!", "Gefaellt ihm!", "Hat Hunger!", "Braucht ein Bad!",
@@ -595,7 +601,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // swap the companion with a party member
     "TAUSCHEN", "Nochmal tippen zum Tauschen", "Jetzt nicht: schlaeft, weg oder Zeremonie",
     // battery saver
-    "Akku-Sparmodus", "Auto", "Immer", "Normal", "Sparend", "Kritisch", "%d%% %d.%02dV  %s", },
+    "Akku-Sparmodus", "Auto", "Immer", "Normal", "Sparend", "Kritisch", "%d%% %d.%02dV  %s",
+    // the mine
+    "Mine", "TIPPE AUF DEN FELS!", "Grabungen: %u", "Splitter %u/10", "Zu muede zum Graben", "Heute keine Grabung mehr", "Mega-Stein-Splitter!", "Zehn: ein Mega-Stein!", "Fossil! %s-Ei als Naechstes", },
   // ---------------- IT ----------------
   {
     "Si evolve!", "Gnam gnam!", "Gli piace!", "Ha fame!", "Vuole un bagno!",
@@ -742,7 +750,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // swap the companion with a party member
     "SCAMBIA", "Tocca ancora per scambiare", "Non ora: dorme, via o in cerimonia",
     // battery saver
-    "Risparmio batteria", "Auto", "Sempre", "Normale", "Risparmio", "Critico", "%d%% %d.%02dV  %s", },
+    "Risparmio batteria", "Auto", "Sempre", "Normale", "Risparmio", "Critico", "%d%% %d.%02dV  %s",
+    // the mine
+    "Miniera", "TOCCA LA ROCCIA!", "Scavi: %u", "Schegge %u/10", "Troppo stanco per scavare", "Niente scavi oggi", "Scheggia di Megapietra!", "Dieci: una Megapietra!", "Fossile! Uovo di %s", },
   // ---------------- PT ----------------
   {
     "Evoluindo!", "Nham nham!", "Ele gosta!", "Esta com fome!", "Precisa de banho!",
@@ -889,7 +899,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // swap the companion with a party member
     "TROCAR", "Toque de novo para trocar", "Agora nao: dormindo, fora ou em cerimonia",
     // battery saver
-    "Economia de bateria", "Auto", "Sempre", "Normal", "Economia", "Critico", "%d%% %d.%02dV  %s", },
+    "Economia de bateria", "Auto", "Sempre", "Normal", "Economia", "Critico", "%d%% %d.%02dV  %s",
+    // the mine
+    "Mina", "TOQUE NA ROCHA!", "Escavacoes: %u", "Fragmentos %u/10", "Cansado demais para cavar", "Sem escavacoes hoje", "Fragmento de Mega Pedra!", "Dez: uma Mega Pedra!", "Fossil! Ovo de %s", },
   // ---------------- ZH (simplified) ----------------
   // The only rows allowed non-ASCII: glyphs come from cjkfont.h (tools/gen_cjk.py).
   {
@@ -1038,7 +1050,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // swap the companion with a party member
     "交换", "再点一次交换", "现在不行: 睡觉、外出或仪式中",
     // battery saver
-    "省电模式", "自动", "总是", "正常", "省电中", "电量极低", "%d%% %d.%02dV  %s", },
+    "省电模式", "自动", "总是", "正常", "省电中", "电量极低", "%d%% %d.%02dV  %s",
+    // the mine
+    "矿洞", "敲打岩石!", "剩余挖掘: %u", "碎片 %u/10", "太累了,不能挖", "今天不能再挖了", "超级石碎片!", "十个碎片: 一块超级石!", "化石! 下个是%s的蛋", },
   // ---------------- KO ----------------
   {
     "진화 중!", "냠냠!", "좋아해요!", "배고파요!", "목욕이 필요해요!",
@@ -1186,7 +1200,9 @@ static const char *const STRINGS[LANG_COUNT][STR_COUNT] = {
     // swap the companion with a party member
     "교체", "한 번 더 누르면 교체", "지금은 안 돼요: 잠, 외출, 의식 중",
     // battery saver
-    "절전 모드", "자동", "항상", "보통", "절전 중", "위험", "%d%% %d.%02dV  %s", },
+    "절전 모드", "자동", "항상", "보통", "절전 중", "위험", "%d%% %d.%02dV  %s",
+    // the mine
+    "광산", "바위를 두드려요!", "남은 채굴: %u", "조각 %u/10", "너무 피곤해요", "오늘은 더 못 캐요", "메가스톤 조각!", "조각 10개: 메가스톤!", "화석! 다음 알은 %s", },
 };
 
 // Medal names in their three lengths [language][medal].

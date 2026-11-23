@@ -87,6 +87,13 @@ void Pet::newEgg() {
     eggShiny = nursery.eggShiny != 0;
     eggBred = true;
   }
+  // a fossil found in the Mine is waiting: this egg is its (the Nursery's egg, if kept, goes first)
+  eggFossil = false;
+  if (fossilDex && !starterPick && !eggBred) {
+    eggTarget = fossilDex;
+    eggByRegion[region % REGION_COUNT] = eggTarget;
+    eggFossil = true;
+  }
   // The debt lands on the creature about to hatch, and is spent doing so --
   // it is a one-day penalty, not a running total that compounds each retire.
   evoPen = retirePending ? EVO_PENALTY_LEVELS : 0;
@@ -657,7 +664,7 @@ void Pet::setRegion(uint8_t r) {
   if (r == region) return;
   uint8_t old = region;
   region = r;
-  if (isEgg() && eggTarget >= 1 && !eggBred) {   // a bred egg is its parents', whatever the region
+  if (isEgg() && eggTarget >= 1 && !eggBred && !eggFossil) {   // a bred or fossil egg is its parents', whatever the region
     if (old < REGION_COUNT) eggByRegion[old] = eggTarget;
     int16_t known = eggByRegion[r];
     eggTarget = known >= 1 ? known : rollInRegion(r, eggRarity());
@@ -1309,6 +1316,7 @@ void Pet::hatch() {
     nursery.eggDex = 0;
   }
   eggBred = false;
+  if (eggFossil) { fossilDex = 0; eggFossil = false; }   // the fossil hatched
   trAtk = trDef = trSpe = 0;
   goodTicks = 0;
   berryKnown = false;
@@ -3152,6 +3160,40 @@ FishResult Pet::fishCatch() {
   return r;
 }
 
+// ---------- the mine ----------
+
+uint8_t Pet::mineTaps() const {
+  if (isEgg()) return 14;
+  const DexEntry &d = DEX_TBL[speciesId];
+  return mineTapsFor(d.type1, d.type2, atkStat());
+}
+
+Pet::MineFind Pet::mineDig() {
+  MineFind f = { ML_COINS, 0, 0, false };
+  if (!canMine()) return f;
+  if (mineDay != today()) { mineDay = today(); mineToday = 0; }
+  if (mineToday < 255) mineToday++;
+  energy = energy > MINE_ENERGY_COST ? (uint8_t)(energy - MINE_ENERGY_COST) : 0;
+  registerCare();
+  MineKind k = mineLootKind((uint8_t)random(100));
+  if (k == ML_FOSSIL && fossilDex) k = ML_SHARD;                 // one fossil at a time
+  if (k == ML_SHARD) {
+    ShardResult s = mineAddShard(mineShards, megaStones);
+    mineShards = s.shards; megaStones = s.stones; f.stone = s.stone;
+  } else if (k == ML_FOSSIL) {
+    fossilDex = (uint16_t)fossilPick((uint8_t)random(255)); f.dex = fossilDex;
+  } else if (k == ML_SEEDS) {
+    if (seedCount < FOOD_STACK_MAX) seedCount++;
+  } else if (k == ML_SNACK) {
+    if (foodCount[FOOD_ONIGIRI] < FOOD_STACK_MAX) foodCount[FOOD_ONIGIRI]++;
+  } else {
+    f.coins = (uint8_t)earnCoins(mineCoinsFor((uint8_t)random(255)), false);
+  }
+  f.kind = k;
+  save();
+  return f;
+}
+
 // ---------- the kitchen ----------
 
 const Recipe &Pet::recipe(uint8_t r) {
@@ -3614,6 +3656,10 @@ void Pet::save() {
   prefs.putUInt("gymW", gymLastWinDay);
   prefs.putUInt("fshd", fishDay);
   prefs.putUChar("fshn", fishToday);
+  prefs.putUInt("mnd", mineDay);
+  prefs.putUChar("mnn", mineToday);
+  prefs.putUChar("msh", mineShards);
+  prefs.putUShort("mnf", fossilDex);
   prefs.putBool("alOn", alarmOn);
   prefs.putUChar("alH", alarmH);
   prefs.putUChar("alM", alarmM);
@@ -3914,6 +3960,10 @@ void Pet::load() {
   gymLastWinDay = prefs.getUInt("gymW", 0);      // phase 36: none in an older save, so no week to wait
   fishDay = prefs.getUInt("fshd", 0);
   fishToday = prefs.getUChar("fshn", 0);
+  mineDay = prefs.getUInt("mnd", 0);
+  mineToday = prefs.getUChar("mnn", 0);
+  mineShards = prefs.getUChar("msh", 0); if (mineShards >= SHARDS_PER_STONE) mineShards = SHARDS_PER_STONE - 1;
+  fossilDex = prefs.getUShort("mnf", 0); if (!isFossilDex((int16_t)fossilDex)) fossilDex = 0;
   alarmOn = prefs.getBool("alOn", false);
   alarmH = prefs.getUChar("alH", 7) % 24;
   alarmM = prefs.getUChar("alM", 0) % 60;
@@ -3974,6 +4024,7 @@ void Pet::load() {
   if (nursery.aDex < 0 || nursery.aDex > DEX_COUNT || nursery.bDex < 0 || nursery.bDex > DEX_COUNT) nursery.aDex = nursery.bDex = 0;
   if (nursery.eggDex < 0 || nursery.eggDex > DEX_COUNT) nursery.eggDex = 0;
   eggBred = prefs.getBool("eggB", false) && nursery.eggDex > 0 && isEgg();
+  eggFossil = fossilDex && isEgg() && !eggBred && eggTarget == (int16_t)fossilDex;
   {
     const char *k[3] = { "acF", "acN", "acB" };
     for (int s = 0; s < 3; s++) { int8_t v = prefs.getChar(k[s], -1); accOn[s] = (v >= 0 && v < ACC_COUNT && accSlot(v) == s && ownsAcc(v)) ? v : -1; }

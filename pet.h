@@ -17,6 +17,7 @@ inline void sweepTimer(uint32_t &t, uint32_t now) { if (t && (int32_t)(t - now) 
 #include "trainers.h"   // GYM_REGIONS sizes the badge masks
 #include "party.h"
 #include "mega.h"
+#include "mine.h"
 
 // 1 tick = 1 game minute. Lower this value to test faster
 // (e.g. 5000UL = stats fall 12x faster).
@@ -880,6 +881,17 @@ public:
   uint8_t lastFishCoins = 0;
   uint8_t fishPaidLeft() const { return fishDay == today() ? (fishToday < FISH_PER_DAY ? FISH_PER_DAY - fishToday : 0) : FISH_PER_DAY; }
   FishResult fishCatch();              // a fish on the line, caught in time
+  // The Mine (mine.h): digs a day, Mega Stone shards, and a fossil waiting to hatch. fossilDex is
+  // the species of the next fossil egg, from the moment it is found until it hatches.
+  uint32_t mineDay = 0;
+  uint8_t mineToday = 0, mineShards = 0;
+  uint16_t fossilDex = 0;
+  bool eggFossil = false;              // the waiting egg is the fossil's (not rerolled by a region change)
+  struct MineFind { MineKind kind; uint8_t coins; uint16_t dex; bool stone; };
+  uint8_t mineDigsLeft() const { return ::mineDigsLeft(mineDay, mineToday, today()); }
+  bool canMine() const { return !isEgg() && !sleeping && ceremony == CER_NONE && !atWork() && energy >= MINE_MIN_ENERGY && mineDigsLeft() > 0; }
+  uint8_t mineTaps() const;            // taps this companion needs to break a rock
+  MineFind mineDig();                  // the rock broke: costs the energy, one dig, the loot
   static const Recipe &recipe(uint8_t r);
   bool canCook(uint8_t r) const;
   bool cook(uint8_t r);

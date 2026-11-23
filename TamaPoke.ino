@@ -52,7 +52,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.68"
+#define FW_VERSION "3.14-funpack.69"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -8683,6 +8683,10 @@ void renderGallery() {
     snprintf(head, sizeof(head), "N.%03d %s%s", galleryDetail,
              pet.isShinyRegistered(galleryDetail) ? "*" : "", reg ? d.name : "???");
     uiTextFit(UIF_BIG, CX, 77, head, reg ? d.accent : UI_INK, 1, 260);  // long names step down
+    if (reg && pet.megaWasSeen(galleryDetail)) {   // it has been Mega: a violet badge under the name
+      gfx->fillRoundRect(CX - 30, 88, 60, 20, 10, C565(0x7a, 0x4f, 0xd0));
+      uiText(UIF_TINY, CX, 103, "MEGA", UI_WHITE, 1);
+    }
     if (galleryPmd.loaded) {
       // animated and in colour if registered; static silhouette if not ("?" style)
       drawPmdActM(galleryPmd, PMD_IDLE, CX, 300, reg ? millis() : 0, true, !reg, 6);
@@ -8719,6 +8723,7 @@ void renderGallery() {
         if (pet.isShinyRegistered(dex)) {
           uiText(UIF_SMALL, x + 62, y + 20, "*", UI_BAR_WARN, 0);
         }
+        if (pet.megaWasSeen(dex)) uiText(UIF_TINY, x + 4, y + 14, "M", C565(0x7a, 0x4f, 0xd0), 0);   // has been Mega
       } else {
         char num[6];
         snprintf(num, sizeof(num), "%d", dex);
@@ -12672,7 +12677,7 @@ void drawBathDuck() {
 #define DEX_CHANSEY 113           // the nurse
 enum : uint8_t { PLACE_NONE = 0, PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_TEETH,
                  PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN,
-                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS, PLACE_TRIP, PLACE_STADIUM };
+                 PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS, PLACE_TRIP, PLACE_STADIUM, PLACE_MINE };
 
 uint32_t placeAnimUntil = 0;      // the park walk animation
 // An action's animation (phase 28): what is playing, when it began, where, and in
@@ -13875,10 +13880,29 @@ static const char *const SPR_PLACE_STADIUM[16] = {
   "kbbbkkfffkooook.",
   "kkkkkkkkkkkkkk..",
 };
+// the Mine's tile: a gem in a rock
+static const char *const SPR_PLACE_MINE[16] = {
+  "................",
+  "................",
+  ".......bb.......",
+  "......bwBb......",
+  ".....bwBBBb.....",
+  "......bBBb......",
+  ".......bb.......",
+  "....kkkkkkkk....",
+  "...kllllllllk...",
+  "..kllllklllllk..",
+  "..kllllllklllk..",
+  ".kllklllllllllk.",
+  ".klllllllklllkk.",
+  ".kkkkkkkkkkkkkk.",
+  "................",
+  "................",
+};
 static const uint8_t MAP_PLACE[MAP_PAGES][MAP_TILES] = {
   { PLACE_PARK, PLACE_STORE, PLACE_CENTER, PLACE_GARDEN, PLACE_SCHOOL, PLACE_LAKE, PLACE_ADVENTURE, PLACE_KITCHEN },
   { PLACE_BEACH, PLACE_LIBRARY, PLACE_MUSIC, PLACE_CONTEST, PLACE_ARCADE, PLACE_JOBS, PLACE_NURSERY, PLACE_GRASS },
-  { PLACE_TRIP, PLACE_STADIUM, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE },
+  { PLACE_TRIP, PLACE_STADIUM, PLACE_MINE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE, PLACE_NONE },
 };
 
 void renderMapGrid() {
@@ -13886,12 +13910,12 @@ void renderMapGrid() {
   static const char *const *const ICON[MAP_PAGES][MAP_TILES] = {
     { SPR_PLACE_TREE, SPR_ICON_COIN, SPR_PLACE_CROSS, SPR_PLACE_SPROUT, SPR_ICON_MISSION, SPR_PLACE_FISH, SPR_PLACE_FLAG, SPR_PLACE_POT },
     { SPR_DEC_DUCK, SPR_ICON_DIARY, SPR_CARE_NOTE, SPR_ACC_MEDAL, SPR_CAT_ARCADE, SPR_FURN_CLOCK, SPR_PLACE_NURSERY, SPR_PLACE_GRASS },
-    { SPR_PLACE_TRIP, SPR_PLACE_STADIUM },
+    { SPR_PLACE_TRIP, SPR_PLACE_STADIUM, SPR_PLACE_MINE },
   };
   static const StrId NAME[MAP_PAGES][MAP_TILES] = {
     { S_PLACE_PARK, S_SHOP, S_CENTER_SHORT, S_PLACE_GARDEN, S_PLACE_SCHOOL, S_PLACE_LAKE, S_PLACE_ADVENTURE, S_PLACE_KITCHEN },
     { S_PLACE_BEACH, S_PLACE_LIBRARY, S_PLACE_MUSIC, S_PLACE_CONTEST, S_PLACE_ARCADE, S_PLACE_JOBS, S_PLACE_NURSERY, S_PLACE_GRASS },
-    { S_PLACE_TRIP, S_PLACE_STADIUM },
+    { S_PLACE_TRIP, S_PLACE_STADIUM, S_PLACE_MINE },
   };
   uint16_t lit = lerp565(UI_BAR_OK, UI_WHITE, 4, 8);
   uint8_t pg = mapPage % MAP_PAGES;
@@ -14310,9 +14334,105 @@ static void kitchenTap(int16_t x, int16_t y) {
   }
 }
 
+// ---------- the mine ----------
+
+uint8_t mineHits = 0;
+uint32_t mineHitAt = 0, mineBreakAt = 0;
+int8_t mineHitDx = 0;
+#define MINE_ROCK_X 322
+#define MINE_ROCK_Y 318          // the rock's centre
+#define MINE_SHAKE_MS 160
+#define MINE_BREAK_MS 700
+
+static void mineScene(uint32_t now) {
+  // a cave: dark rock above, a lit floor, stalactites and a lantern glow on the left
+  for (int y = 0; y < FP_GROUND; y += 8) gfx->fillRect(0, y, 466, 8, lerp565(C565(0x2c, 0x26, 0x38), C565(0x5a, 0x4c, 0x62), y, FP_GROUND));
+  gfx->fillRect(0, FP_GROUND, 466, 466 - FP_GROUND, C565(0x4a, 0x3c, 0x34));
+  for (int x = 0; x < 466; x += 46) gfx->drawFastVLine(x, FP_GROUND, 466 - FP_GROUND, C565(0x3a, 0x2e, 0x28));
+  for (int k = 0; k < 9; k++) {                                   // stalactites
+    int x = 30 + k * 52 + (k * 17) % 14, h = 26 + (k * 29) % 40;
+    gfx->fillTriangle(x - 14, 70, x + 14, 70, x, 70 + h, C565(0x3c, 0x34, 0x4a));
+  }
+  uint16_t glow = lerp565(C565(0x5a, 0x4c, 0x62), C565(0xff, 0xcb, 0x05), 2 + (int)(sinf(now * 0.004f) * 1), 12);
+  gfx->fillCircle(70, 230, 54, glow);                              // the lantern's glow
+  gfx->fillCircle(70, 230, 30, lerp565(glow, UI_WHITE, 1, 4));
+  gfx->fillRect(68, 150, 4, 60, C565(0x7e, 0x55, 0x30));
+  gfx->fillRoundRect(60, 208, 20, 26, 5, C565(0xff, 0xcb, 0x05));
+  fpDrawPet(130, FP_GROUND, PMD_IDLE, 3);
+  // the rock: shakes when hit, cracks with every hit, bursts when it breaks
+  uint32_t since = now - mineBreakAt;
+  bool breaking = mineBreakAt && since < MINE_BREAK_MS;
+  int dx = (mineHitAt && now - mineHitAt < MINE_SHAKE_MS) ? mineHitDx * (int)(1 + (MINE_SHAKE_MS - (now - mineHitAt)) / 40) : 0;
+  int rx = MINE_ROCK_X + dx, ry = MINE_ROCK_Y;
+  uint8_t need = pet.mineTaps();
+  if (breaking) {
+    for (int k = 0; k < 14; k++) {                                // flying chunks
+      float a = k * 0.45f + 0.3f, d = since * 0.22f * (0.6f + (k % 4) * 0.2f);
+      int cx = rx + (int)(cosf(a) * d), cy = ry - 20 + (int)(sinf(a) * d * 0.8f + since * since * 0.0003f);
+      gfx->fillRect(cx - 5, cy - 5, 10 - (int)(since / 120), 8, k % 3 ? C565(0x9a, 0x92, 0xa8) : C565(0x6a, 0x62, 0x78));
+    }
+    fxSparkle(rx, ry - 30, 12 + (int)(since / 40), C565(0xff, 0xff, 0xff));
+  } else {
+    uint16_t rock = C565(0x8c, 0x84, 0x9c), rockL = C565(0xb4, 0xac, 0xc4), rockD = C565(0x5c, 0x54, 0x6c);
+    gfx->fillCircle(rx, ry, 62, rockD);
+    gfx->fillCircle(rx - 6, ry - 6, 58, rock);
+    gfx->fillCircle(rx - 22, ry - 24, 22, rockL);
+    gfx->fillCircle(rx + 28, ry + 22, 16, rockD);
+    // the gem inside shows through the cracks
+    uint16_t gem = lerp565(C565(0x7c, 0xc4, 0xea), UI_WHITE, (int)(sinf(now * 0.006f) * 2) + 2, 8);
+    gfx->fillTriangle(rx + 12, ry - 28, rx + 30, ry - 14, rx + 8, ry - 8, gem);
+    int cracks = need ? (int)mineHits * 8 / need : 0;             // 0..7 crack lines, growing
+    static const int8_t CR[8][4] = { { -10, -40, -4, -10 }, { 20, -50, 10, -20 }, { -40, -4, -8, 6 }, { 40, 10, 8, 4 },
+                                     { -20, 40, -4, 12 }, { 30, 44, 12, 12 }, { -4, -10, 4, 20 }, { -30, -28, -10, -14 } };
+    for (int c = 0; c < cracks && c < 8; c++) {
+      gfx->drawLine(rx + CR[c][0], ry + CR[c][1], rx + CR[c][2], ry + CR[c][3], UI_INK);
+      gfx->drawLine(rx + CR[c][0] + 1, ry + CR[c][1], rx + CR[c][2] + 1, ry + CR[c][3], UI_INK);
+    }
+    // sparks where the pickaxe struck
+    if (mineHitAt && now - mineHitAt < 220) {
+      int e = (int)(now - mineHitAt);
+      for (int k = 0; k < 6; k++) fxSparkle(rx - 50 + (k * 19) % 60, ry - 20 - e / 6 + (k * 13) % 30, 3 + k % 3, k % 2 ? C565(0xff, 0xcb, 0x05) : UI_WHITE);
+    }
+    // the pickaxe, swinging in
+    if (mineHitAt && now - mineHitAt < 160) {
+      int sw = (int)(now - mineHitAt);
+      gfx->drawLine(rx - 100 + sw / 2, ry - 70, rx - 44, ry - 24, C565(0x7e, 0x55, 0x30));
+      gfx->drawLine(rx - 99 + sw / 2, ry - 70, rx - 43, ry - 24, C565(0x7e, 0x55, 0x30));
+      gfx->fillRect(rx - 56, ry - 34, 24, 8, C565(0xb4, 0xb8, 0xc4));
+    }
+  }
+}
+
+static void mineTap() {
+  uint32_t now = millis();
+  if (mineBreakAt && now - mineBreakAt < MINE_BREAK_MS) return;     // wait for the rock to fall
+  if (!pet.canMine()) {
+    sfxPlay(SFX_DENY);
+    placeSay(T(pet.mineDigsLeft() ? S_MINE_TIRED : S_MINE_NONE));
+    return;
+  }
+  mineHits++;
+  mineHitAt = now; mineHitDx = (mineHits & 1) ? 5 : -5;
+  if (mineHits < pet.mineTaps()) { sfxPlay(SFX_TAP); return; }
+  // it breaks
+  mineHits = 0;
+  mineBreakAt = now;
+  Pet::MineFind f = pet.mineDig();
+  char b[48];
+  switch (f.kind) {
+    case ML_SHARD:  snprintf(b, sizeof(b), "%s", T(f.stone ? S_MINE_STONE : S_MINE_SHARD)); break;
+    case ML_FOSSIL: snprintf(b, sizeof(b), T(S_MINE_FOSSIL_FMT), DEX_TBL[f.dex].name); break;
+    case ML_SEEDS:  snprintf(b, sizeof(b), "%s", T(S_CAP_SEED)); break;
+    case ML_SNACK:  snprintf(b, sizeof(b), T(S_ADV_FOOD_FMT), T(foodName(FOOD_ONIGIRI))); break;
+    default:        snprintf(b, sizeof(b), "+%u %s", (unsigned)f.coins, T(S_COINS)); break;
+  }
+  sfxPlay(f.stone || f.kind == ML_FOSSIL ? SFX_VICTORY : f.kind == ML_SHARD ? SFX_LEVEL : SFX_MEDAL);
+  placeSay(b);
+}
+
 // ---------- the three new places, through the shared place buttons ----------
 
-void enterPlaceFamily() { fishPhase = FISH_IDLE; fishShow = 0; cooking = false; }
+void enterPlaceFamily() { fishPhase = FISH_IDLE; fishShow = 0; cooking = false; mineHits = 0; mineHitAt = mineBreakAt = 0; }
 
 bool renderPlaceFamily() {
   uint32_t now = millis();
@@ -14321,8 +14441,9 @@ bool renderPlaceFamily() {
   if (placeScene == PLACE_LAKE) { lakeTick(now); lakeScene(now); }
   else if (placeScene == PLACE_ADVENTURE) { adventureScene(now); act = S_CLAIM; on = pet.advReady(); title = routeName(pet.advRoute); }
   else if (placeScene == PLACE_KITCHEN) { kitchenScene(now); title = S_PLACE_KITCHEN; }
+  else if (placeScene == PLACE_MINE) { mineScene(now); title = S_PLACE_MINE; }
   else return false;
-  uiTextFit(UIF_MID, CX, 52, T(title), UI_INK, 1, 300);
+  uiTextFit(UIF_MID, CX, 52, T(title), placeScene == PLACE_MINE ? UI_WHITE : UI_INK, 1, 300);
   if (placeScene == PLACE_LAKE) {
     char b[32];
     uint8_t left = pet.fishPaidLeft();
@@ -14332,8 +14453,16 @@ bool renderPlaceFamily() {
     if (fishPhase == FISH_WAITING) uiTextFit(UIF_SMALL, CX, 360, T(S_FISH_WAIT), UI_WHITE, 1, 260);
     if (fishPhase == FISH_BITING) uiTextFit(UIF_SMALL, CX, 360, T(S_FISH_BITE), UI_BAR_WARN, 1, 260);
   }
-  if (placeScene == PLACE_KITCHEN) {
-    // only BACK in the kitchen: the recipes are the buttons
+  if (placeScene == PLACE_MINE) {
+    char b[40];
+    snprintf(b, sizeof(b), T(S_MINE_LEFT_FMT), (unsigned)pet.mineDigsLeft());
+    uiTextFit(UIF_TINY, CX, 80, b, UI_WHITE, 1, 260);
+    snprintf(b, sizeof(b), T(S_MINE_SHARDS_FMT), (unsigned)pet.mineShards);
+    uiTextFit(UIF_TINY, CX, 98, b, C565(0x7c, 0xc4, 0xea), 1, 260);
+    if (!mineHits && !placeMsgUntil) uiTextFit(UIF_SMALL, CX, 140, T(S_MINE_TAP), UI_WHITE, 1, 300);
+  }
+  if (placeScene == PLACE_KITCHEN || placeScene == PLACE_MINE) {
+    // only BACK in the kitchen and the mine: the recipes / the rock are the buttons
     int x = PLACE_BACK_X - 64;
     gfx->fillRoundRect(x, PLACE_BTN_Y, PLACE_BTN_W, PLACE_BTN_H, 12, UI_WHITE);
     gfx->drawRoundRect(x, PLACE_BTN_Y, PLACE_BTN_W, PLACE_BTN_H, 12, UI_INK);
@@ -14347,12 +14476,12 @@ bool renderPlaceFamily() {
 }
 
 bool placeTapFamily(int16_t x, int16_t y) {
-  if (placeScene != PLACE_LAKE && placeScene != PLACE_ADVENTURE && placeScene != PLACE_KITCHEN) return false;
+  if (placeScene != PLACE_LAKE && placeScene != PLACE_ADVENTURE && placeScene != PLACE_KITCHEN && placeScene != PLACE_MINE) return false;
   bool inBtnRow = y >= PLACE_BTN_Y && y <= PLACE_BTN_Y + PLACE_BTN_H;
-  if (placeScene == PLACE_KITCHEN) {
+  if (placeScene == PLACE_KITCHEN || placeScene == PLACE_MINE) {
     int bx = PLACE_BACK_X - 64;
     if (y < 72 || (inBtnRow && x >= bx && x <= bx + PLACE_BTN_W)) { sfxPlay(SFX_TAP); cooking = false; placeScene = PLACE_NONE; return true; }
-    kitchenTap(x, y);
+    if (placeScene == PLACE_MINE) mineTap(); else kitchenTap(x, y);
     return true;
   }
   if (y < 72 || (inBtnRow && x >= PLACE_BACK_X && x <= PLACE_BACK_X + PLACE_BTN_W)) {

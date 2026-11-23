@@ -695,7 +695,7 @@ static void stadiumTests() {
       for (int k = 0; k < nseen; k++) if (seen[k] == h) known = true;
       if (!known) { seen[nseen] = h; hx[nseen] = x; hy[nseen] = y; nseen++; }
     }
-  ck(nseen == 2, "the third page of the map holds two places: the trip and the Stadium");
+  ck(nseen == 3, "the third page of the map holds three places: the trip, the Stadium and the Mine");
   mapMenuTap((int16_t)hx[1], (int16_t)hy[1]);
   ck(tourOpen && !mapOpen, "tapping the second opens the Stadium");
   pumpMs(120);
@@ -880,6 +880,29 @@ static void shakeTests() {
 }
 
 // the battery saver (powersave.h) at loop level
+// The Mine through the real screen: the map tile, taps on the rock, the dig, the limits
+static void mineSceneTests() {
+  extern uint8_t placeScene, mapPage, mineHits; extern bool mapOpen;
+  pet.dbgHatchAs(74, false);
+  while (pet.hasLearnOffer()) pet.declineLearn();
+  pet.sleeping = false; pet.ceremony = CER_NONE; pet.energy = 80; pet.mineDay = 0; pet.mineToday = 0;
+  uint8_t before = pet.mineDigsLeft();
+  mapOpen = true; mapPage = 2; pumpMs(100);
+  click(150, 212);
+  ck(placeScene == 20, "the map's third page has the Mine tile, and it opens");
+  int need = pet.mineTaps();
+  ck(need >= 4 && need <= 8, "a rock type needs 4 to 8 taps");
+  for (int k = 0; k < need - 1; k++) click(233, 250);
+  ck(pet.mineDigsLeft() == before && pet.energy == 80 && mineHits == need - 1, "taps crack the rock but the dig is not spent yet");
+  click(233, 250);
+  ck(pet.mineDigsLeft() == before - 1 && pet.energy <= 70 && mineHits == 0, "the last tap breaks it: one dig, ten energy");
+  pumpMs(900);
+  click(233, 400 + 0);   // BACK
+  ck(placeScene == 0, "BACK leaves the mine");
+  mapOpen = false;
+  pet.energy = 100;
+}
+
 static void saverModeTests() {
   extern int g_emuBatPct; extern bool g_emuUsb; extern uint8_t gPowerLevel, gSaverMode, dimStage;
   extern uint32_t lastInteract;
@@ -931,6 +954,7 @@ int main() {
   swingTests();
   shakeTests();
   saverModeTests();
+  mineSceneTests();
   if (bad) { printf("FAILURES: %d\n", bad); return 1; }
   printf("games46 test passed\n");
   return 0;

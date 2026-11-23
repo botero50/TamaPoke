@@ -286,6 +286,15 @@ Rain, snow and storms from the real weather stop the drifting and draw over it. 
 keep the drawn backgrounds. The art was generated for this project (tools/gen_scenery.py, ComfyUI with
 DreamShaper 8) and packed by tools/pack_scenery.py; the files are /mons/bg1_d.bin .. bg7_n.bin.
 
+### The Mine (v1.50)
+The third page of the map has a new place, **Mine**. Tap the rock until it breaks: a Rock, Steel, Fighting or Fire type
+needs 8 taps, Ground and Ice 10, the rest 14, and a strong Attack saves a few (never under 4). Each rock is one dig: it costs
+**10 energy** and you get **5 digs a day**. A rock gives coins, a rice ball, a seed, a **Mega Stone shard** or, very rarely, a
+**fossil**. **Ten shards make one Mega Stone** (you can keep 3 stones; with 3 stones the shards wait at 9). A fossil is a
+prize for your next egg: the next time you start a new egg it will hatch Omanyte, Kabuto, Aerodactyl, Lileep, Anorith,
+Cranidos, Shieldon, Tirtouga, Archen, Tyrunt or Amaura. Only one fossil waits at a time, and the very first starter pick is
+never replaced. The Pokedex now marks a species that has been Mega (a MEGA tag in its page, an M in the grid).
+
 ### Battery saver and the power log (v1.49)
 The Care page has a third row, **Battery saver**: **Auto** (the default), **Off** or **Always**. In Auto, on battery at **20 %**
 or less the ball saves power: the screen is dimmer (at most about half brightness), draws slower, dims after 45 s instead of

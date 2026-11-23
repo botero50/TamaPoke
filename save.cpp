@@ -86,7 +86,7 @@ const SaveField SAVE_FIELDS[] = {
   // settings, so a restored device plays the way it did
   { "lang", SK_U8 },    { "snd", SK_BOOL },   { "vol", SK_U8 },
   { "vol2", SK_U8 },
-  { "bri", SK_U8 }, { "h24", SK_U8 }, { "twk", SK_U8 }, { "dzs", SK_U8 }, { "cpc", SK_U8 }, { "tbst", SK_BYTES }, { "tmg", SK_U16 }, { "tms", SK_U16 }, { "tmb", SK_U16 }, { "tgd", SK_U32 }, { "sos", SK_U8 }, { "bsm", SK_U8 }, { "pxp", SK_BYTES }, { "pxb", SK_BYTES }, { "mgs", SK_U8 }, { "mgd", SK_U8 }, { "mgn", SK_U16 }, { "mgu", SK_U32 }, { "mgx", SK_BYTES },
+  { "bri", SK_U8 }, { "h24", SK_U8 }, { "twk", SK_U8 }, { "dzs", SK_U8 }, { "cpc", SK_U8 }, { "tbst", SK_BYTES }, { "tmg", SK_U16 }, { "tms", SK_U16 }, { "tmb", SK_U16 }, { "tgd", SK_U32 }, { "sos", SK_U8 }, { "bsm", SK_U8 }, { "pxp", SK_BYTES }, { "pxb", SK_BYTES }, { "mgs", SK_U8 }, { "mgd", SK_U8 }, { "mgn", SK_U16 }, { "mgu", SK_U32 }, { "mgx", SK_BYTES }, { "mnd", SK_U32 }, { "mnn", SK_U8 }, { "msh", SK_U8 }, { "mnf", SK_U16 },
   // this board's own bookkeeping: listed so the table stays complete, but never
   // carried in a backup (see isLocalKey)
   { SAVE_CUT_KEY, SK_BOOL }, { SAVE_RECOVERED_KEY, SK_U16 },
