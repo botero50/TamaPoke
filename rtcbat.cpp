@@ -95,6 +95,7 @@ static void refreshPower() {
 }
 
 int batPercent() { refreshPower(); return cachedPct; }
+int batSmoothMv() { refreshPower(); return batMon.smoothMv; }
 bool batCharging() { refreshPower(); return cachedCharging; }
 bool usbPresent() { refreshPower(); return cachedUsb; }
 

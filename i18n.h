@@ -246,6 +246,8 @@ enum StrId : uint16_t {
   S_MEGA_BTN_FMT, S_MEGA_CONFIRM, S_MEGA_LEFT_FMT, S_MEGA_NEEDS, S_MEGA_GOT, S_MEGA_PROG_FMT, S_MEGA_ENDED,
   // swap the companion with a party member
   S_SWAP, S_SWAP_CONFIRM, S_SWAP_BUSY,
+  // battery saver
+  S_BSAVER, S_BS_AUTO, S_BS_ALWAYS, S_PL_NORMAL, S_PL_LOW, S_PL_CRIT, S_BS_INFO_FMT,
   STR_COUNT
 };
 

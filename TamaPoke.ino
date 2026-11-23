@@ -39,6 +39,7 @@
 #include "standby.h"
 #include "tourney.h"
 #include "imu_fifo.h"
+#include "powersave.h"
 #include <esp_sleep.h>
 #include <driver/gpio.h>
 #include "talk.h"
@@ -51,7 +52,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.67"
+#define FW_VERSION "3.14-funpack.68"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -194,6 +195,9 @@ int clockH = 12, clockM = 0;  // hora en edicion
 // settings pages, swiped left/right
 enum { SET_TIME, SET_VOLUME, SET_BRIGHT, SET_LANG, SET_ALARM, SET_PARENT, SET_CARE, SET_ABOUT, SET_PAGES };
 uint8_t gBright = 7;           // screen brightness 1..10, saved under "bri"
+uint8_t gSaverMode = BSM_AUTO;   // battery saver: auto (saves at 20 % and 10 %), off, always; saved under "bsm"
+uint8_t gPowerLevel = PL_NORMAL;
+static PowerLog gPowerLog;
 uint8_t gScreenOffSaver = 1;   // 1 = with the screen off the chip runs slower and the loop sleeps (steps still count); saved under "sos"
 uint8_t gTapWake = 1;          // 0 = with the screen off, only the PWR button wakes it (saved under "twk")
 uint8_t gClock24 = 0;          // 1 = show the time as 13:05, not 1:05 PM (saved under "h24")
@@ -923,6 +927,7 @@ void setup() {
     gClock24 = bp.getUChar("h24", 0) ? 1 : 0;
     gTapWake = bp.getUChar("twk", 1) ? 1 : 0;
     gScreenOffSaver = bp.getUChar("sos", 1) ? 1 : 0;
+    gSaverMode = bp.getUChar("bsm", BSM_AUTO); if (gSaverMode > BSM_ALWAYS) gSaverMode = BSM_AUTO;
     bp.end();
     if (gBright < 1 || gBright > 10) gBright = 7;
   }
@@ -1137,6 +1142,7 @@ void loop() {
     pet.setPlugged(selfCareDue(usb, idle));
   }
 
+  powerTick(now);
   updateBrightness(now);
 
   // a holiday gift, handed over once on the day
@@ -1252,6 +1258,7 @@ void loop() {
   // Nobody is watching a clock or a dimmed pet screen: draw it at 2-3 frames a second, not 10.
   if (gStandbyOn) renderGap = 500;
   else if (dimStage >= 1 && uiCurrentScreen() == SCR_MAIN) renderGap = 300;
+  renderGap = powerRenderGap(gPowerLevel, renderGap);
   if (!screenOff && now - lastRender >= renderGap) {
     lastRender = now;
     render();
@@ -1272,7 +1279,7 @@ void loop() {
   // task rests and the chip can sleep; if that cannot be set up it stays on the poll task.
   if (saver && onBattery) { if (!imuFifoActive()) imuFifoEnter(); }
   else if (imuFifoActive()) imuFifoExit();
-  const uint8_t wantMhz = saver ? 80 : 240;
+  const uint8_t wantMhz = saver ? 80 : (screenOff ? 240 : powerCpuMhz(gPowerLevel, dimStage));
   if (wantMhz != cpuMhz) { setCpuFrequencyMhz(wantMhz); cpuMhz = wantMhz; }
   const SleepCtx sc = { screenOff, gScreenOffSaver != 0, onBattery, imuFifoActive(),
                         wifiBusy(), lan.live() || linkNowUp(), audioMusicNow() != MUS_NONE, alarmRinging };
@@ -1294,7 +1301,27 @@ void loop() {
     gSleepWakes++;
     return;
   }
-  delay(saver ? 40 : 1);   // the other tasks get a turn on every pass
+  delay(saver ? 40 : (screenOff ? 1 : powerLoopDelayMs(gPowerLevel, dimStage)));   // the other tasks get a turn on every pass
+}
+
+// The battery saver level (checked every 5 s) and the power log (a sample every two minutes while on battery).
+static uint8_t powerState() {
+  if (screenOff) return PST_OFF;
+  if (gStandbyOn) return PST_STANDBY;
+  return dimStage >= 1 ? PST_DIM : PST_AWAKE;
+}
+void powerTick(uint32_t now) {
+  static uint32_t lastCheck = 0, lastLog = 0;
+  if (lastCheck && now - lastCheck < 5000) return;
+  lastCheck = now;
+  const int pct = batPercent();
+  const bool usb = usbPresent();
+  const uint8_t lv = powerLevel(pct, usb, gSaverMode, gPowerLevel);
+  if (lv != gPowerLevel) { gPowerLevel = lv; Serial.printf("POWER level=%u pct=%d usb=%d\n", (unsigned)lv, pct, usb); }
+  if (!usb && pct >= 0 && (!lastLog || now - lastLog >= POWERLOG_EVERY_S * 1000UL)) {
+    lastLog = now;
+    gPowerLog.add(now / 1000, (uint16_t)batSmoothMv(), (uint8_t)pct, powerState());
+  }
 }
 
 // brightness according to sleep + inactivity (AMOLED protection)
@@ -1304,13 +1331,14 @@ void updateBrightness(uint32_t now) {
     lastInteract = now;
   }
   uint32_t idle = msSince(now, lastInteract);
-  dimStage = (idle > 300000) ? 2 : (idle > 90000) ? 1 : 0;
+  dimStage = (idle > powerDimMs(gPowerLevel, 2)) ? 2 : (idle > powerDimMs(gPowerLevel, 1)) ? 1 : 0;
   // the player's level (1..10) sets the awake brightness; the sleep and idle
   // dim levels below it only ever go DOWN from it, never above
   uint8_t base = (uint8_t)(gBright * 255 / 10);
   uint8_t target = pet.sleeping ? 25 : base;
   if (dimStage == 1) target = pet.sleeping ? 10 : (base < 60 ? base : 60);
   else if (dimStage == 2) target = gStandbyOn ? (base < 60 ? base : 60) : 8;   // the clock stays readable
+  target = powerBrightCap(gPowerLevel, target);
   if (screenOff) target = 0;
   static uint8_t current = 255;
   if (target != current) {
@@ -1694,6 +1722,19 @@ void handleSerial() {
     Serial.printf("psram=%u screen=%s btlspr=%d/%d\n", (unsigned)ESP.getFreePsram(),
                   SCREEN_NAME[uiCurrentScreen() % SCR_COUNT],
                   btlPmd[0].loaded ? 1 : 0, btlPmd[1].loaded ? 1 : 0);
+    Serial.println("DONE");
+  } else if (line == "POWER") {
+    // the power log: per state, the minutes on battery and the percent lost an hour, then the estimate
+    static const char *const NM[PST_COUNT] = { "awake", "dim", "off", "standby" };
+    PowerRate r[PST_COUNT]; powerRates(gPowerLog, r);
+    Serial.printf("POWER level=%u mode=%u pct=%d mv=%d usb=%d cpu=%uMHz samples=%u wakes=%lu\n", (unsigned)gPowerLevel, (unsigned)gSaverMode,
+                  batPercent(), batSmoothMv(), usbPresent(), (unsigned)getCpuFrequencyMhz(), (unsigned)gPowerLog.count, (unsigned long)gSleepWakes);
+    for (int i = 0; i < PST_COUNT; i++) {
+      uint32_t th = powerTenthsPerHour(r[i]);
+      Serial.printf("POWER %s min=%lu drop=%lu.%lu%% rate=%lu.%lu%%/h\n", NM[i], (unsigned long)r[i].minutes, (unsigned long)(r[i].dropTenths / 10),
+                    (unsigned long)(r[i].dropTenths % 10), (unsigned long)(th / 10), (unsigned long)(th % 10));
+    }
+    Serial.printf("POWER hours_left=%d\n", powerHoursLeft(r, batPercent()));
     Serial.println("DONE");
   } else if (line == "STATS") {
     Serial.printf("spec=%d lv=%u food=%u joy=%u ene=%u hyg=%u miss=%u sd=%d mon=%d bat=%d usb=%d rtc=%u\n",
@@ -4716,7 +4757,7 @@ void render() {
     if (land) {
       gfx->draw16bitRGBBitmap(0, 0, (uint16_t *)land, SCN_OUT_W, SCN_OUT_H);
       gfx->fillRect(0, SCN_OUT_H, 466, 466 - SCN_OUT_H, gNight ? UI_BG_NIGHT : UI_BG_DAY);
-      drawLandscapeFx(landRegion, landVariant, millis(), weatherShown(millis()));   // it is alive
+      if (powerFxAllowed(gPowerLevel)) drawLandscapeFx(landRegion, landVariant, millis(), weatherShown(millis()));   // it is alive (not while saving power)
       drawSkyWeather(millis());
     } else {
       drawScene(sceneBiome(), millis(), gNight);
@@ -5581,6 +5622,7 @@ void saveScreenOffSaver() {
   Preferences bp;
   bp.begin("tamapoke", false);
   bp.putUChar("sos", gScreenOffSaver);
+  bp.putUChar("bsm", gSaverMode);
   bp.end();
 }
 
@@ -13595,12 +13637,19 @@ static const char *carePaceName() {
   return T(pet.carePace == 1 ? S_PACE_RELAXED : pet.carePace == 2 ? S_PACE_SLOW : S_PACE_NORMAL);
 }
 
+static const char *saverModeName() { return T(gSaverMode == BSM_OFF ? S_OFF_LBL : gSaverMode == BSM_ALWAYS ? S_BS_ALWAYS : S_BS_AUTO); }
+
 void renderCarePage() {
   settingsTitle(T(S_CARE_TITLE));
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 3; i++) {
     int y = PAR_ROW_Y(i);
     gfx->fillRoundRect(PAR_ROW_X, y, PAR_ROW_W, PAR_ROW_H, 14, UI_WHITE);
     gfx->drawRoundRect(PAR_ROW_X, y, PAR_ROW_W, PAR_ROW_H, 14, UI_INK);
+    if (i == 2) {
+      uiTextFit(UIF_SMALL, PAR_ROW_X + 16, y + 22, T(S_BSAVER), UI_INK, 0, 205);
+      uiText(UIF_MID, PAR_ROW_X + PAR_ROW_W - 16, y + 38, saverModeName(), gSaverMode == BSM_OFF ? UI_TRACK_TEXT : UI_BAR_OK, 2);
+      continue;
+    }
     if (i == 0) {
       uiTextFit(UIF_SMALL, PAR_ROW_X + 16, y + 22, T(S_CARE_PACE), UI_INK, 0, 150);
       uiText(UIF_MID, PAR_ROW_X + PAR_ROW_W - 16, y + 38, carePaceName(), pet.carePace ? UI_BAR_OK : UI_TRACK_TEXT, 2);
@@ -13609,15 +13658,30 @@ void renderCarePage() {
       uiText(UIF_MID, PAR_ROW_X + PAR_ROW_W - 16, y + 38, T(gScreenOffSaver ? S_SND_ON : S_SND_OFF), gScreenOffSaver ? UI_BAR_OK : UI_TRACK_TEXT, 2);
     }
   }
+  {                                                  // the battery: charge, voltage and the saver level
+    int pc = batPercent(), mv = batSmoothMv();
+    char b[48];
+    const char *lvn = T(gPowerLevel == PL_CRITICAL ? S_PL_CRIT : gPowerLevel == PL_LOW ? S_PL_LOW : S_PL_NORMAL);
+    if (mv > 0) snprintf(b, sizeof(b), T(S_BS_INFO_FMT), pc < 0 ? 0 : pc, mv / 1000, (mv % 1000) / 10, lvn);
+    else snprintf(b, sizeof(b), "%d%%  %s", pc < 0 ? 0 : pc, lvn);      // no voltage reading while charging
+    uiTextFit(UIF_SMALL, CX, PAR_ROW_Y(3) + 20, b, gPowerLevel == PL_NORMAL ? UI_INK : UI_BAR_WARN, 1, 300);
+    PowerRate r[PST_COUNT]; powerRates(gPowerLog, r);
+    int h = usbPresent() ? -1 : powerHoursLeft(r, pc);
+    if (h >= 0) { snprintf(b, sizeof(b), "~%dh", h); uiText(UIF_SMALL, CX, PAR_ROW_Y(3) + 46, b, UI_TRACK_TEXT, 1); }
+  }
 }
 
 void carePageTap(int16_t x, int16_t y) {
   if (x < PAR_ROW_X || x > PAR_ROW_X + PAR_ROW_W) return;
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 3; i++) {
     int ry = PAR_ROW_Y(i);
     if (y < ry || y > ry + PAR_ROW_H) continue;
     sfxPlay(SFX_TAP);
-    if (i == 0) {
+    if (i == 2) {
+      gSaverMode = (uint8_t)((gSaverMode + 1) % 3);
+      gPowerLevel = powerLevel(batPercent(), usbPresent(), gSaverMode, PL_NORMAL);
+      saveScreenOffSaver();
+    } else if (i == 0) {
       pet.carePace = (uint8_t)((pet.carePace + 1) % 3);
       pet.saveParentLimits();
     } else {

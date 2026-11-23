@@ -146,7 +146,9 @@ uint32_t rtcEpoch() { return g_epoch + millis() / 1000; }
 void rtcSetEpoch(uint32_t e) { g_epoch = e - millis() / 1000; }
 bool batBegin() { return true; }
 void pmuEnablePanel() {}
-int batPercent() { return 87; }
+int g_emuBatPct = 87;   // tests set it
+int batPercent() { return g_emuBatPct; }
+int batSmoothMv() { return 3950; }
 bool batCharging() { return false; }
 bool g_emuUsb = false;   // tests set it: the standby clock and self-care need USB power
 bool usbPresent() { return g_emuUsb; }

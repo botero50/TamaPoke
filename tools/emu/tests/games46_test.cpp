@@ -879,6 +879,30 @@ static void shakeTests() {
   pet.sleeping = false;
 }
 
+// the battery saver (powersave.h) at loop level
+static void saverModeTests() {
+  extern int g_emuBatPct; extern bool g_emuUsb; extern uint8_t gPowerLevel, gSaverMode, dimStage;
+  extern uint32_t lastInteract;
+  pet.sleeping = false; screenOff = false; gStandbyOn = false;
+  g_emuUsb = false; gSaverMode = 0; g_emuBatPct = 80; lastInteract = millis(); pumpMs(6000);
+  ck(gPowerLevel == 0, "80 % on battery: normal");
+  g_emuBatPct = 18; pumpMs(6000);
+  ck(gPowerLevel == 1, "18 %: the saver is on");
+  lastInteract = millis(); pumpMs(50000);
+  ck(dimStage >= 1, "in the saver it dims after about 45 s (normally 90 s)");
+  g_emuBatPct = 8; pumpMs(6000);
+  ck(gPowerLevel == 2, "8 %: critical");
+  g_emuUsb = true; pumpMs(6000);
+  ck(gPowerLevel == 0, "plugged in: back to normal");
+  g_emuUsb = false; g_emuBatPct = 80; gSaverMode = 2; pumpMs(6000);
+  ck(gPowerLevel == 1, "'always' saves at any charge");
+  gSaverMode = 1; g_emuBatPct = 5; pumpMs(6000);
+  ck(gPowerLevel == 0, "'off' never saves");
+  gSaverMode = 0; g_emuBatPct = 87; pumpMs(6000);
+  ck(gPowerLevel == 0, "back to a full charge: normal");
+  lastInteract = millis(); pumpMs(200);
+}
+
 int main() {
   mergeRules();
   ballRules();
@@ -906,6 +930,7 @@ int main() {
   songTests();
   swingTests();
   shakeTests();
+  saverModeTests();
   if (bad) { printf("FAILURES: %d\n", bad); return 1; }
   printf("games46 test passed\n");
   return 0;

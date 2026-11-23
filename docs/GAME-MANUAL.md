@@ -286,6 +286,15 @@ Rain, snow and storms from the real weather stop the drifting and draw over it. 
 keep the drawn backgrounds. The art was generated for this project (tools/gen_scenery.py, ComfyUI with
 DreamShaper 8) and packed by tools/pack_scenery.py; the files are /mons/bg1_d.bin .. bg7_n.bin.
 
+### Battery saver and the power log (v1.49)
+The Care page has a third row, **Battery saver**: **Auto** (the default), **Off** or **Always**. In Auto, on battery at **20 %**
+or less the ball saves power: the screen is dimmer (at most about half brightness), draws slower, dims after 45 s instead of
+90 s, the chip runs slower while dimmed and the landscape's drifting particles stop. At **10 %** it saves harder (a quarter
+brightness, dims after 20 s). Plugged in it never saves (except Always). It switches back above 25 % / 14 % so it does not
+flicker. Under the rows the page shows the charge, the voltage, the level, and, after about an hour on battery, an estimate of
+the hours left from what the ball measured. Over USB the `POWER` command prints the minutes and the percent an hour lost
+per state (awake, dim, screen off, standby clock) from a log kept in RAM (a sample every two minutes while on battery).
+
 ### Swap your companion with a party member (v1.48)
 Open the team, tap a member, and the left button reads **SWAP** (tap it twice to confirm; with an egg waiting it is
 **BRING BACK** as before). Your companion goes into that member's slot and the member comes out as your companion, **no egg

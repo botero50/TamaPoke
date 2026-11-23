@@ -32,6 +32,7 @@ inline void delay(uint32_t ms) {
 }
 inline uint8_t &emuCpuMhz() { static uint8_t m = 240; return m; }   // what the sketch last asked for
 inline bool setCpuFrequencyMhz(uint32_t mhz) { emuCpuMhz() = (uint8_t)mhz; return true; }
+inline uint32_t getCpuFrequencyMhz() { return emuCpuMhz(); }
 inline void pinMode(int, int) {}
 #ifndef LOW
 #define LOW 0

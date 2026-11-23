@@ -9,6 +9,7 @@ void rtcSetEpoch(uint32_t e);
 // PMU AXP2101: battery state
 bool batBegin();
 void pmuEnablePanel();           // turns on BLDO1 (OLED VDD 3.3V); call before gfx->begin()
+int batSmoothMv();                // the smoothed battery voltage in mV, 0 if unknown
 int batPercent();                // 0-100, -1 if no battery is connected
 bool batCharging();
 bool usbPresent();
