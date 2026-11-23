@@ -112,12 +112,14 @@ static const Note N_HEAL[] = { {523, 110}, {659, 110}, {784, 110}, {659, 110}, {
 
 // a need is very low: two soft tones, easy to tell from everything else
 static const Note N_NEED[] = { {880, 90}, {0, 70}, {880, 90} };
+// a pickaxe on rock: a hard noise strike, then a short metallic ring that dies at once
+static const Note N_PICK[] = { {200, 24}, {2300, 22}, {1500, 70} };
 
 static const SfxDef SFX[SFX_COUNT] = {
   {N_TAP, 1}, {N_EAT, 3}, {N_PLAY, 2}, {N_HEART, 2}, {N_HATCH, 4},
   {N_EVOLVE, 5}, {N_MEDAL, 5}, {N_DENY, 2}, {N_BYE, 3}, {N_LEVEL, 2},
   {N_HIT, 2}, {N_BEAM, 3}, {N_STATUS, 3}, {N_SUPER, 3}, {N_FAINT, 4},
-  {N_VICTORY, 6}, {N_THUNDER, 3}, {N_HEAL, 10}, {N_NEED, 3},
+  {N_VICTORY, 6}, {N_THUNDER, 3}, {N_HEAL, 10}, {N_NEED, 3}, {N_PICK, 3},
 };
 
 // A loop, not a one-shot: the task walks it and starts over.
@@ -288,6 +290,8 @@ static void audioTask(void *) {
             gSyn.noise((uint8_t)(12 - i * 3), -1, 6, d.n[i].ms, (uint16_t)(70 + i * 45));
           else if (id == SFX_HIT || id == SFX_FAINT)
             gSyn.noise(13, -1, 2, d.n[i].ms, (uint16_t)(4 + i * 4));
+          else if (id == SFX_PICK)
+            { if (i == 0) gSyn.noise(14, -1, 1, d.n[i].ms, 3); else gSyn.note(0, f, 2, 15, -1, 1, d.n[i].ms); }
           else if (f)
             gSyn.note(0, f, 1, 14, -1, 4, d.n[i].ms);
           else

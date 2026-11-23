@@ -49,10 +49,11 @@
 #include "logo.h"
 #include "uifont.h"
 #include "audio.h"
+#include "cry.h"
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.70"
+#define FW_VERSION "3.14-funpack.71"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -2748,7 +2749,9 @@ void onTap(int16_t x, int16_t y) {
     if (!pet.sleeping) {
       // the creature answers a pet now and then; every tap would be a racket
       static uint32_t lastCryAt = 0;
-      if (!lastCryAt || millis() - lastCryAt > PET_CRY_GAP_MS) {
+      // Only Kanto and Johto have cries: anything else (a Hoenn companion) must not stay silent on its first pet
+      if (!cryHas(pet.speciesId)) sfxPlay(SFX_HEART);
+      else if (!lastCryAt || millis() - lastCryAt > PET_CRY_GAP_MS) {
         lastCryAt = millis() ? millis() : 1;
         audioCry(pet.speciesId);
       } else sfxPlay(SFX_HEART);
@@ -14487,7 +14490,8 @@ static void mineTap() {
   }
   mineHits++;
   mineHitAt = now; mineHitDx = (mineHits & 1) ? 5 : -5;
-  if (mineHits < pet.mineTaps()) { sfxPlay(SFX_TAP); return; }
+  if (mineHits < pet.mineTaps()) { sfxPlay(SFX_PICK); return; }
+  sfxPlay(SFX_HIT);                                  // the last strike: the rock cracks apart
   // it breaks
   mineHits = 0;
   mineBreakAt = now;

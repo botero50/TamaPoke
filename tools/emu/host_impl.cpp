@@ -174,7 +174,9 @@ uint32_t imuDroppedCount() { return 0; }
 
 // --- audio (silent) ---
 void audioBegin() {}
-void sfxPlay(uint8_t) {}
+uint8_t g_emuLastSfx = 255; int g_emuSfxCount = 0;
+void sfxPlay(uint8_t id) { g_emuLastSfx = id; g_emuSfxCount++; }
+bool cryHas(int16_t d) { return d >= 1 && d <= 251; }   // Kanto and Johto only, like cries.h
 void audioSetQuiet(bool) {}
 // remembers the last request so tests can see which creature was asked to cry
 int16_t g_emuLastCry = 0; int g_emuCryCount = 0;

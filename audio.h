@@ -24,6 +24,7 @@ enum Sfx : uint8_t {
   SFX_THUNDER,  // a storm outside (the real weather)
   SFX_HEAL,     // the Pokemon Center's machine (an original jingle)
   SFX_NEED,     // a need is very low
+  SFX_PICK,     // a pickaxe striking rock (the Mine)
   SFX_COUNT
 };
 

@@ -903,6 +903,22 @@ static void mineSceneTests() {
   pet.energy = 100;
 }
 
+// Petting: a species with no cry (Hoenn) answers the very first pet with the heart sound; Kanto cries
+static void petSoundTests() {
+  extern int16_t g_emuLastCry; extern int g_emuCryCount, g_emuSfxCount; extern uint8_t g_emuLastSfx;
+  pet.sleeping = false; pet.ceremony = CER_NONE;
+  pet.dbgHatchAs(317, false);   // Swalot, no cry
+  while (pet.hasLearnOffer()) pet.declineLearn();
+  int cries = g_emuCryCount, sfx = g_emuSfxCount;
+  click(233, 250);
+  ck(g_emuCryCount == cries && g_emuSfxCount > sfx && g_emuLastSfx == SFX_HEART, "a Hoenn companion's first pet plays the heart sound, not silence");
+  pet.dbgHatchAs(25, false);
+  while (pet.hasLearnOffer()) pet.declineLearn();
+  cries = g_emuCryCount;
+  click(233, 250);
+  ck(g_emuCryCount == cries + 1 && g_emuLastCry == 25, "a Pikachu still cries");
+}
+
 // Training fruits through the real bag: the garden aisle lists them, a tap eats one
 static void fruitBagTests() {
   extern bool bagOpen; extern int8_t bagCat; extern uint8_t bagPage; extern uint32_t fpToastUntil;
@@ -975,6 +991,7 @@ int main() {
   shakeTests();
   saverModeTests();
   mineSceneTests();
+  petSoundTests();
   fruitBagTests();
   if (bad) { printf("FAILURES: %d\n", bad); return 1; }
   printf("games46 test passed\n");
