@@ -53,7 +53,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.71"
+#define FW_VERSION "3.14-funpack.72"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -7476,8 +7476,10 @@ static void renderPlayerBadges() {
   // of what is missing is still visible.
   for (int i = 0; i < TRAINER_GYMS; i++) {
     int bx = 140 + (i % 4) * 62, by = 202 + (i / 4) * 60;
-    bool got = pet.hasBadge(playerBadgeRegion, i, false);
     bool hard = pet.hasBadge(playerBadgeRegion, i, true);
+    // The hard ladder is separate: a leader beaten only on hard has no easy
+    // badge, and used to draw as an empty outline inside its gold halo.
+    bool got = hard || pet.hasBadge(playerBadgeRegion, i, false);
     if (hard) {
       // Beaten on hard: a golden halo. Concentric rings, not a filled disc --
       // a disc sat behind the art and read as a gold coin rather than a glow.

@@ -71,13 +71,25 @@ int main(){
   { StepDetector d; int got = walk(d, 1.8f, 0.16f, 20, 30, 2);
     ck(got >= 45, "a gentle walk (0.16 g) is still counted"); }
 
+  // 2b. the reason for the Mu-Muu thresholds: a ball in a bag or on a lanyard feels
+  //     only light steps, and the stricter detector missed most of them
+  { StepDetector d; int got = walk(d, 1.8f, 0.11f, 16, 30, 2);
+    int want = (int)(30 * 1.8f);
+    char w[96]; snprintf(w, sizeof(w), "light steps (0.11 g): %d of ~%d counted", got, want);
+    ck(got >= want * 85 / 100 && got <= want + 4, w); }
+  { StepDetector d; int got = walk(d, 1.8f, 0.13f, 16, 30, 2, 1000, 0.01f);
+    ck(got >= 50, "light steps (0.13 g): nearly all counted"); }
+
   // 3. NOT counting: the other half of the rule, and the half a lazy test skips
   { StepDetector d; int got = walk(d, 0.0f, 0.0f, 16, 60, 2, 1000, 0.03f);
     ck(got == 0, "sitting still, with sensor noise: 0 steps"); }
   { StepDetector d; int got = walk(d, 0.3f, 0.4f, 16, 60, 2);
     ck(got == 0, "slow rocking at 0.3 Hz: 0 steps"); }
-  { StepDetector d; int got = walk(d, 2.0f, 0.4f, 16, 1, 2);    // two peaks only
-    ck(got == 0, "a shake of two peaks: 0 steps"); }
+  { StepDetector d; int got = walk(d, 2.0f, 0.4f, 16, 0, 2);    // nothing
+    ck(got == 0, "no samples: 0 steps"); }
+  { StepDetector d; uint32_t t = 1000; int got = 0;             // one bump on a still ball
+    for (int i = 0; i < 100; i++, t += 16) got += d.feed(0, 0, 1.0f + (i == 50 ? 0.4f : 0.0f), t);
+    ck(got == 0, "a single bump: 0 steps"); }
   { StepDetector d; int got = walk(d, 8.0f, 0.5f, 16, 20, 2);   // a rattle, far faster than a walk
     ck(got == 0, "rattling at 8 Hz: 0 steps"); }
   // the guard must actually be what rejects the shake, or the check above proves nothing
