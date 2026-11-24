@@ -806,6 +806,40 @@ static void carePaceTests() {
   g_emuUsb = false;
 }
 
+// The companion faints in a wild fight and a party member (a low-level Mankey) takes over: it can still act
+static void wildFaintTests() {
+  extern Combatant btlYou, btlFoe, btlSquad[7]; extern uint8_t btlSquadAt, btlSquadN; extern bool btlOver; extern int8_t btlSwapWho;
+  readyPet();
+  pet.dbgHatchAs(317, false); while (pet.hasLearnOffer()) pet.declineLearn(); pet.hpPct = 100;
+  for (int i = 0; i < PARTY_SLOTS; i++) { party.slots[i] = PartyMon(); party.hpPct[i] = 100; }
+  party.slots[0].dex = 56; party.slots[0].level = 3; party.slots[0].ivAtk = party.slots[0].ivDef = party.slots[0].ivSpe = party.slots[0].ivHp = 15;
+  party.slots[0].moves[0] = 2; party.slots[0].moves[1] = 83;
+  pet.wildFreeDay = 0; pet.wildCharges = 1;
+  ck(startWildBattle() && battleOpen && btlWild, "wild fight starts with Mankey in the party");
+  btlMsgCount = 0; btlMenu = 0;
+  btlYou.hp = 1; btlYou.base[SI_SPE] = 1;            // the companion is about to go down
+  for (int turn = 0; turn < 6 && btlSwapWho < 0 && !btlOver; turn++) {
+    btlMsgCount = 0; btlMenu = 1; battleTap(89, 294); pumpMs(300);
+  }
+  ck(btlSwapWho == 0, "the companion faints and a replacement is due");
+  for (int k = 0; k < 30 && btlSwapWho >= 0; k++) { battleTap(233, 330); pumpMs(200); }
+  ck(btlSquadAt >= 1 && btlYou.dex == 56, "Mankey comes out");
+  ck(btlYou.moves[0] != 0, "and it knows a move");
+  btlMsgCount = 0; btlMenu = 0; pumpMs(100);
+  uint16_t foeHp = btlFoe.hp; uint8_t at = btlSquadAt;
+  btlMenu = 1; battleTap(89, 294); pumpMs(300);
+  ck(btlFoe.hp < foeHp || btlMsgCount > 0 || btlYou.hp != btlSquad[at].hp, "Mankey can take a turn");
+  printf("      (squad at %u of %u, foe hp %u -> %u, msgs %u, over %d)\n", btlSquadAt, btlSquadN, foeHp, btlFoe.hp, btlMsgCount, (int)btlOver);
+  {   // a banked record with no moves (a level 1 Smeargle) still gets something to fight with
+    PartyMon e; e.dex = 235; e.level = 1;
+    Combatant c; combatantFromParty(c, e);
+    ck(c.moves[0] == MV_TACKLE && !c.moves[1], "a party member with no moves fights with TACKLE");
+    e.moves[0] = 2; combatantFromParty(c, e);
+    ck(c.moves[0] == 2 && !c.moves[1], "one that has moves keeps exactly them");
+  }
+  battleOpen = false; btlOver = false;
+}
+
 static void swingTests() {
   readyPet();
   pet.wildBalls[0] = 10; pet.wildBalls[1] = 2; pet.wildBalls[2] = 0;
@@ -988,6 +1022,7 @@ int main() {
   carePaceTests();
   songTests();
   swingTests();
+  wildFaintTests();
   shakeTests();
   saverModeTests();
   mineSceneTests();

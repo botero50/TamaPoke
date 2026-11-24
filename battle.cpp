@@ -28,6 +28,12 @@ void combatantFromParty(Combatant &c, const PartyMon &m) {
   fill(c, m.dex, (uint8_t)m.level, party.vitOf(m), party.atkOf(m), party.defOf(m),
        party.spaOf(m), party.spdOf(m), party.speOf(m));
   for (int i = 0; i < MOVE_SLOTS; i++) c.moves[i] = m.moves[i];
+  {   // A banked record with no moves at all (a level 1 Smeargle, an old save) used to arrive with an
+      // empty FIGHT menu and nothing to do but run. Like a wild foe, it gets TACKLE.
+    bool any = false;
+    for (int i = 0; i < MOVE_SLOTS; i++) if (c.moves[i]) any = true;
+    if (!any) c.moves[0] = MV_TACKLE;
+  }
   c.shiny = m.shiny != 0;
   const char *nm = m.nick[0] ? m.nick : DEX_TBL[m.dex].name;
   snprintf(c.name, sizeof(c.name), "%s", nm);
