@@ -507,13 +507,21 @@ static void clock24Tests() {
   clockOpen = true; settingsPage = 0;   // the time page
   gClock24 = 0;
   pumpMs(150);
-  clockTap(233, 300);
+  clockTap(167, 300);
   ck(gClock24 == 1, "the 12 h / 24 h pill switches to 24 h");
   { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("h24", 0) == 1, "and it is saved"); pr.end(); }
   pumpMs(150);
-  clockTap(233, 300);
+  clockTap(167, 300);
   ck(gClock24 == 0, "and back to 12 h");
   { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("h24", 1) == 0, "and that is saved too"); pr.end(); }
+  extern uint8_t gTempF;
+  gTempF = 0;
+  clockTap(299, 300);
+  ck(gTempF == 1 && gClock24 == 0, "the C / F pill switches to Fahrenheit and leaves the clock alone");
+  { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("tmf", 0) == 1, "and the unit is saved"); pr.end(); }
+  pumpMs(150);
+  clockTap(299, 300);
+  ck(gTempF == 0, "and back to Celsius");
   clockOpen = false;
 }
 

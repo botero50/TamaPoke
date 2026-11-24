@@ -32,6 +32,13 @@ struct WeatherNow {
 static inline bool wmoDrizzle(int code) { return code >= 51 && code <= 57; }   // never drawn as rain
 #define WX_MIN_CLOUD 60
 
+// The temperature as the owner wants to read it: 22C -> "22C", or "72F".
+static inline int tempInUnit(int c, bool fahrenheit) {
+  if (!fahrenheit) return c;
+  int x = c * 9;                                   // c*9/5 + 32, rounded to the nearest degree
+  return (x < 0 ? x - 2 : x + 2) / 5 + 32;
+}
+
 #define WEATHER_FRESH_MS (75UL * 60 * 1000)   // older than this and the sky goes back to normal (2.5 refreshes)
 
 uint8_t wmoKind(int code);                     // a WMO weather code -> WeatherKind

@@ -53,7 +53,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.73"
+#define FW_VERSION "3.14-funpack.74"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -201,7 +201,8 @@ uint8_t gPowerLevel = PL_NORMAL;
 static PowerLog gPowerLog;
 uint8_t gScreenOffSaver = 1;   // 1 = with the screen off the chip runs slower and the loop sleeps (steps still count); saved under "sos"
 uint8_t gTapWake = 1;          // 0 = with the screen off, only the PWR button wakes it (saved under "twk")
-uint8_t gClock24 = 0;          // 1 = show the time as 13:05, not 1:05 PM (saved under "h24")
+uint8_t gTempF = 0;            // 1 = the weather in Fahrenheit, not Celsius (saved under "tmf")
+uint8_t gClock24 = 0;         // 1 = show the time as 13:05, not 1:05 PM (saved under "h24")
 uint8_t settingsPage = 0;
 
 // bath scene: foam over the creature, cleaned up when it bursts
@@ -926,6 +927,7 @@ void setup() {
     bp.begin("tamapoke", true);
     gBright = bp.getUChar("bri", 7);
     gClock24 = bp.getUChar("h24", 0) ? 1 : 0;
+    gTempF = bp.getUChar("tmf", 0) ? 1 : 0;
     gTapWake = bp.getUChar("twk", 1) ? 1 : 0;
     gScreenOffSaver = bp.getUChar("sos", 1) ? 1 : 0;
     gSaverMode = bp.getUChar("bsm", BSM_AUTO); if (gSaverMode > BSM_ALWAYS) gSaverMode = BSM_AUTO;
@@ -5452,7 +5454,7 @@ void renderStandby() {
   const uint8_t wx = weatherShown(now);
   if (wx != WX_NONE) {
     char tc[8];
-    snprintf(tc, sizeof(tc), "%dC", (int)weatherLast().tempC);
+    snprintf(tc, sizeof(tc), gTempF ? "%dF" : "%dC", tempInUnit(weatherLast().tempC, gTempF != 0));
     const int tw = uiTextWidth(UIF_BIG, tc);
     const int x0 = CX - (40 + tw) / 2 + dx;
     standbyWxIcon(wx, x0 + 18, 244 + dy, dim);
@@ -5496,9 +5498,13 @@ void renderClock() {
     uiTextFit(UIF_SMALL, 166, 270, T(S_HOUR), UI_TRACK_TEXT, 1, 120);
     uiTextFit(UIF_SMALL, 314, 270, T(S_MIN), UI_TRACK_TEXT, 1, 120);
     // 12 h / 24 h: one pill that switches the clock between the two
-    gfx->fillRoundRect(CX - 70, 284, 140, 32, 16, gClock24 ? UI_BAR_OK : UI_WHITE);
-    gfx->drawRoundRect(CX - 70, 284, 140, 32, 16, UI_INK);
-    uiText(UIF_SMALL, CX, uiMidY(UIF_SMALL, 284, 32), gClock24 ? "24 h" : "12 h", gClock24 ? UI_BG_DAY : UI_INK, 1);
+    // and beside it the temperature unit, C or F
+    gfx->fillRoundRect(CX - 124, 284, 116, 32, 16, gClock24 ? UI_BAR_OK : UI_WHITE);
+    gfx->drawRoundRect(CX - 124, 284, 116, 32, 16, UI_INK);
+    uiText(UIF_SMALL, CX - 66, uiMidY(UIF_SMALL, 284, 32), gClock24 ? "24 h" : "12 h", gClock24 ? UI_BG_DAY : UI_INK, 1);
+    gfx->fillRoundRect(CX + 8, 284, 116, 32, 16, gTempF ? UI_BAR_OK : UI_WHITE);
+    gfx->drawRoundRect(CX + 8, 284, 116, 32, 16, UI_INK);
+    uiText(UIF_SMALL, CX + 66, uiMidY(UIF_SMALL, 284, 32), gTempF ? "F" : "C", gTempF ? UI_BG_DAY : UI_INK, 1);
   } else if (settingsPage == SET_VOLUME) {
     settingsTitle(T(S_SET_VOLUME));
     // the switch is the master; the level below is how loud it is when on,
@@ -5643,6 +5649,13 @@ void saveClock24() {
   bp.end();
 }
 
+void saveTempUnit() {
+  Preferences bp;
+  bp.begin("tamapoke", false);
+  bp.putUChar("tmf", gTempF);
+  bp.end();
+}
+
 void clockSliderSet(int16_t x) {
   if (settingsPage == SET_BRIGHT) gBright = (uint8_t)sliderValue(x, 1, 10);   // applied live
   else audioSetVolume((uint8_t)sliderValue(x, 0, 100));
@@ -5667,9 +5680,13 @@ void clockTap(int16_t x, int16_t y) {
       else if (x >= 252 && x < 310) clockM = (clockM + 59) % 60;
       else if (x >= 318 && x < 376) clockM = (clockM + 1) % 60;
     }
-    if (y >= 278 && y <= 322 && x >= CX - 80 && x <= CX + 80) {   // the 12 h / 24 h pill
+    if (y >= 278 && y <= 322 && x >= CX - 130 && x < CX) {        // the 12 h / 24 h pill
       gClock24 = gClock24 ? 0 : 1;
       saveClock24();
+      sfxPlay(SFX_TAP);
+    } else if (y >= 278 && y <= 322 && x >= CX && x <= CX + 130) {   // the C / F pill
+      gTempF = gTempF ? 0 : 1;
+      saveTempUnit();
       sfxPlay(SFX_TAP);
     }
   } else if (settingsPage == SET_VOLUME) {
@@ -8800,7 +8817,7 @@ void drawBattery() {
   }
   if (weatherShown(millis()) != WX_NONE) {   // the temperature outside, left of the clock (the menu is on the right)
     char tc[8];
-    snprintf(tc, sizeof(tc), "%dC", (int)weatherLast().tempC);
+    snprintf(tc, sizeof(tc), gTempF ? "%dF" : "%dC", tempInUnit(weatherLast().tempC, gTempF != 0));
     uiText(UIF_SMALL, x0 - 12, 19 + 14, tc, inkColor(), 2);
   }
   if (pc < 0) return;               // no battery connected

@@ -121,6 +121,13 @@ int main(){
   ck(weatherShown(5000) == WX_RAIN && weatherLast().tempC == 9, "fetched: it rains");
   ck(weatherShown(1000 + WEATHER_FRESH_MS + 1) == WX_NONE, "three hours stale: the normal sky again");
 
+  // Celsius to Fahrenheit, to the nearest degree
+  ck(tempInUnit(22, false) == 22 && tempInUnit(-3, false) == -3, "Celsius is shown as it is");
+  ck(tempInUnit(0, true) == 32 && tempInUnit(100, true) == 212, "0C is 32F and 100C is 212F");
+  ck(tempInUnit(22, true) == 72 && tempInUnit(14, true) == 57, "22C is 72F, 14C is 57F (rounded)");
+  ck(tempInUnit(-3, true) == 27 && tempInUnit(-40, true) == -40, "-3C is 27F, and -40 is -40 in both");
+  ck(tempInUnit(-18, true) == 0 && tempInUnit(-20, true) == -4, "below zero Fahrenheit rounds right");
+
   if (bad) printf("FAILURES\n");
   return bad?1:0;
 }
