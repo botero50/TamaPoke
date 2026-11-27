@@ -37,6 +37,7 @@
 #include "wifisync.h"
 #include "weather.h"
 #include "standby.h"
+#include "clockdate.h"
 #include "tourney.h"
 #include "imu_fifo.h"
 #include "powersave.h"
@@ -53,7 +54,7 @@
 
 // Version del firmware. Subir este numero en cada release (y manifest.json para
 // el instalador web). Se muestra en la pantalla de ajustes y por serie al arrancar.
-#define FW_VERSION "3.14-funpack.74"
+#define FW_VERSION "3.14-funpack.75"
 #define PET_CRY_GAP_MS 6000  // minimum time between cries from petting
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
@@ -193,6 +194,9 @@ char partyBannerName[14] = "";
 
 bool clockOpen = false;       // pantalla de ajuste de hora (deslizar abajo)
 int clockH = 12, clockM = 0;  // hora en edicion
+int clockY = 2026, clockMo = 1, clockD = 1;   // the date being edited
+bool clockDateMode = false;                    // the time page is showing the date
+bool clockDateEdited = false;                  // a date button was pressed: OK applies the date too
 // settings pages, swiped left/right
 enum { SET_TIME, SET_VOLUME, SET_BRIGHT, SET_LANG, SET_ALARM, SET_PARENT, SET_CARE, SET_ABOUT, SET_PAGES };
 uint8_t gBright = 7;           // screen brightness 1..10, saved under "bri"
@@ -5266,6 +5270,10 @@ void openClock() {
   if (!e) e = pet.lastSeenEpoch;
   clockH = (e / 3600) % 24;
   clockM = (e / 60) % 60;
+  Pet::civilDate(e / 86400, clockY, clockMo, clockD);
+  if (clockY < DATE_YEAR_MIN) { clockY = 2026; clockMo = 1; clockD = 1; }   // a clock that never knew the date
+  clockDateMode = false;
+  clockDateEdited = false;
   settingsPage = SET_TIME;
   clockOpen = true;
 }
@@ -5273,10 +5281,26 @@ void openClock() {
 void applyClock() {
   uint32_t base = rtcEpoch();
   if (!base) base = pet.lastSeenEpoch;
-  uint32_t e = (base / 86400) * 86400 + (uint32_t)clockH * 3600 + (uint32_t)clockM * 60;
+  const uint32_t day = clockDateEdited ? daysFromCivil(clockY, clockMo, clockD) : base / 86400;
+  uint32_t e = day * 86400 + (uint32_t)clockH * 3600 + (uint32_t)clockM * 60;
   rtcSetEpoch(e);
   pet.setClock(e);
   clockOpen = false;
+}
+
+// the narrower - and + of the date: three pairs have to fit across the round screen
+#define DATE_BTN_W 52
+static const int DATE_BTN_X[6] = { 64, 120, 180, 236, 296, 352 };   // day -+, month -+, year -+
+static void drawDateBtn(int x, const char *l) {
+  gfx->fillRoundRect(x, 190, DATE_BTN_W, 58, 12, UI_WHITE);
+  gfx->drawRoundRect(x, 190, DATE_BTN_W, 58, 12, UI_INK);
+  uiText(UIF_BIG, x + DATE_BTN_W / 2, 190 + 42, l, UI_INK, 1);
+}
+// the three pills under the clock: 12/24 h, C/F, the date
+static void drawTimePill(int x, const char *l, bool on) {
+  gfx->fillRoundRect(x, 284, 92, 32, 16, on ? UI_BAR_OK : UI_WHITE);
+  gfx->drawRoundRect(x, 284, 92, 32, 16, UI_INK);
+  uiText(UIF_SMALL, x + 46, uiMidY(UIF_SMALL, 284, 32), l, on ? UI_BG_DAY : UI_INK, 1);
 }
 
 void drawClockBtn(int x, int y, const char *l) {
@@ -5475,36 +5499,46 @@ void renderClock() {
 
   if (settingsPage == SET_TIME) {
     settingsTitle(T(S_SET_TIME));
-    char t[8];
-    // 12-hour display; clockH stays 0..23 underneath so the +/- buttons and
-    // the stored epoch are unchanged
-    if (gClock24) {                       // 24-hour: 13:05, no AM/PM
-      snprintf(t, sizeof(t), "%02d:%02d", clockH, clockM);
-      uiText(UIF_HUGE, CX, 160, t, UI_INK, 1);
+    if (clockDateMode) {
+      // day / month / year, each over its own - and +
+      char p[3][8];
+      snprintf(p[0], sizeof(p[0]), "%02d", clockD);
+      snprintf(p[1], sizeof(p[1]), "%02d", clockMo);
+      snprintf(p[2], sizeof(p[2]), "%d", clockY);
+      for (int i = 0; i < 3; i++) uiText(UIF_BIG, 118 + i * 116, 160, p[i], UI_INK, 1);
+      uiText(UIF_BIG, 176, 160, "/", UI_TRACK_TEXT, 1);
+      uiText(UIF_BIG, 292, 160, "/", UI_TRACK_TEXT, 1);
+      for (int i = 0; i < 6; i++) drawDateBtn(DATE_BTN_X[i], (i & 1) ? "+" : "-");
     } else {
-      snprintf(t, sizeof(t), "%02d:%02d", clockH % 12 == 0 ? 12 : clockH % 12, clockM);
-      // time block (digits + AM/PM) centred as a whole
-      const char *ap = clockH < 12 ? "AM" : "PM";
-      int tw = uiTextWidth(UIF_HUGE, t), aw = uiTextWidth(UIF_BIG, ap);
-      int x0 = CX - (tw + 10 + aw) / 2;
-      uiText(UIF_HUGE, x0, 160, t, UI_INK, 0);
-      uiText(UIF_BIG, x0 + tw + 10, 160, ap, UI_INK, 0);
-    }
+      char t[8];
+      // 12-hour display; clockH stays 0..23 underneath so the +/- buttons and
+      // the stored epoch are unchanged
+      if (gClock24) {                       // 24-hour: 13:05, no AM/PM
+        snprintf(t, sizeof(t), "%02d:%02d", clockH, clockM);
+        uiText(UIF_HUGE, CX, 160, t, UI_INK, 1);
+      } else {
+        snprintf(t, sizeof(t), "%02d:%02d", clockH % 12 == 0 ? 12 : clockH % 12, clockM);
+        // time block (digits + AM/PM) centred as a whole
+        const char *ap = clockH < 12 ? "AM" : "PM";
+        int tw = uiTextWidth(UIF_HUGE, t), aw = uiTextWidth(UIF_BIG, ap);
+        int x0 = CX - (tw + 10 + aw) / 2;
+        uiText(UIF_HUGE, x0, 160, t, UI_INK, 0);
+        uiText(UIF_BIG, x0 + tw + 10, 160, ap, UI_INK, 0);
+      }
 
-    drawClockBtn(104, 190, "-");  // hora -
-    drawClockBtn(170, 190, "+");  // hora +
-    drawClockBtn(252, 190, "-");  // min -
-    drawClockBtn(318, 190, "+");  // min +
-    uiTextFit(UIF_SMALL, 166, 270, T(S_HOUR), UI_TRACK_TEXT, 1, 120);
-    uiTextFit(UIF_SMALL, 314, 270, T(S_MIN), UI_TRACK_TEXT, 1, 120);
-    // 12 h / 24 h: one pill that switches the clock between the two
-    // and beside it the temperature unit, C or F
-    gfx->fillRoundRect(CX - 124, 284, 116, 32, 16, gClock24 ? UI_BAR_OK : UI_WHITE);
-    gfx->drawRoundRect(CX - 124, 284, 116, 32, 16, UI_INK);
-    uiText(UIF_SMALL, CX - 66, uiMidY(UIF_SMALL, 284, 32), gClock24 ? "24 h" : "12 h", gClock24 ? UI_BG_DAY : UI_INK, 1);
-    gfx->fillRoundRect(CX + 8, 284, 116, 32, 16, gTempF ? UI_BAR_OK : UI_WHITE);
-    gfx->drawRoundRect(CX + 8, 284, 116, 32, 16, UI_INK);
-    uiText(UIF_SMALL, CX + 66, uiMidY(UIF_SMALL, 284, 32), gTempF ? "F" : "C", gTempF ? UI_BG_DAY : UI_INK, 1);
+      drawClockBtn(104, 190, "-");  // hora -
+      drawClockBtn(170, 190, "+");  // hora +
+      drawClockBtn(252, 190, "-");  // min -
+      drawClockBtn(318, 190, "+");  // min +
+      uiTextFit(UIF_SMALL, 166, 270, T(S_HOUR), UI_TRACK_TEXT, 1, 120);
+      uiTextFit(UIF_SMALL, 314, 270, T(S_MIN), UI_TRACK_TEXT, 1, 120);
+    }
+    // 12 h / 24 h, the temperature unit, and the date (which switches the page to it and back)
+    char dm[8];
+    snprintf(dm, sizeof(dm), "%02d/%02d", clockD, clockMo);
+    drawTimePill(CX - 144, gClock24 ? "24 h" : "12 h", gClock24 != 0);
+    drawTimePill(CX - 46, gTempF ? "F" : "C", gTempF != 0);
+    drawTimePill(CX + 52, dm, clockDateMode);
   } else if (settingsPage == SET_VOLUME) {
     settingsTitle(T(S_SET_VOLUME));
     // the switch is the master; the level below is how loud it is when on,
@@ -5674,20 +5708,32 @@ void clockTap(int16_t x, int16_t y) {
     return;
   }
   if (settingsPage == SET_TIME) {
-    if (y >= 190 && y <= 248) {  // fila de botones +/-
+    if (y >= 190 && y <= 248 && clockDateMode) {
+      for (int i = 0; i < 6; i++) {
+        if (x < DATE_BTN_X[i] || x >= DATE_BTN_X[i] + DATE_BTN_W) continue;
+        dateStep(clockY, clockMo, clockD, i / 2, (i & 1) ? 1 : -1);
+        clockDateEdited = true;
+        sfxPlay(SFX_TAP);
+      }
+    } else if (y >= 190 && y <= 248) {  // fila de botones +/-
       if (x >= 104 && x < 162) clockH = (clockH + 23) % 24;
       else if (x >= 170 && x < 228) clockH = (clockH + 1) % 24;
       else if (x >= 252 && x < 310) clockM = (clockM + 59) % 60;
       else if (x >= 318 && x < 376) clockM = (clockM + 1) % 60;
     }
-    if (y >= 278 && y <= 322 && x >= CX - 130 && x < CX) {        // the 12 h / 24 h pill
-      gClock24 = gClock24 ? 0 : 1;
-      saveClock24();
-      sfxPlay(SFX_TAP);
-    } else if (y >= 278 && y <= 322 && x >= CX && x <= CX + 130) {   // the C / F pill
-      gTempF = gTempF ? 0 : 1;
-      saveTempUnit();
-      sfxPlay(SFX_TAP);
+    if (y >= 278 && y <= 322) {                       // the three pills
+      if (x >= CX - 150 && x < CX - 49) {             // 12 h / 24 h
+        gClock24 = gClock24 ? 0 : 1;
+        saveClock24();
+        sfxPlay(SFX_TAP);
+      } else if (x >= CX - 49 && x < CX + 49) {       // C / F
+        gTempF = gTempF ? 0 : 1;
+        saveTempUnit();
+        sfxPlay(SFX_TAP);
+      } else if (x >= CX + 49 && x <= CX + 150) {     // the date
+        clockDateMode = !clockDateMode;
+        sfxPlay(SFX_TAP);
+      }
     }
   } else if (settingsPage == SET_VOLUME) {
     if (y >= SND_SW_Y && y < SND_SW_Y + SND_SW_H && x >= SND_SW_X && x < SND_SW_X + SND_SW_W) {
@@ -8803,7 +8849,9 @@ static const char *headerTimeText(char *t, size_t n) {
 
 // The time and the battery share one row, centred as a group, so neither
 // needs its own band under the other.
+static bool gHeaderTemp = false;   // the header shows a temperature: the row is lower (round screen)
 void drawBattery() {
+  gHeaderTemp = false;
   int pc = batPercent();
   char tbuf[16];
   const char *ts = headerTimeText(tbuf, sizeof(tbuf));
@@ -8812,16 +8860,26 @@ void drawBattery() {
   int total = tw + (ts && pc >= 0 ? GAP : 0) + (pc >= 0 ? BW : 0);
   if (!total) return;               // no clock and no battery
   int x0 = CX - total / 2;
-  if (ts) {
-    uiText(UIF_SMALL, x0, 19 + 14, ts, inkColor(), 0);
-  }
+  char tc[8] = "";
   if (weatherShown(millis()) != WX_NONE) {   // the temperature outside, left of the clock (the menu is on the right)
-    char tc[8];
-    snprintf(tc, sizeof(tc), gTempF ? "%dF" : "%dC", tempInUnit(weatherLast().tempC, gTempF != 0));
-    uiText(UIF_SMALL, x0 - 12, 19 + 14, tc, inkColor(), 2);
+    const int deg = tempInUnit(weatherLast().tempC, gTempF != 0);
+    snprintf(tc, sizeof(tc), gTempF ? "%dF" : "%dC", deg);
+    int shift = headerShiftFor(x0, total, uiTextWidth(UIF_SMALL, tc));
+    if (shift < 0) {                         // too wide for the round edge: the number alone
+      snprintf(tc, sizeof(tc), "%d", deg);
+      shift = headerShiftFor(x0, total, uiTextWidth(UIF_SMALL, tc));
+      if (shift < 0) shift = HEADER_MAX_X - (x0 + total);
+    }
+    x0 += shift;
+    gHeaderTemp = true;
   }
+  const int dy = gHeaderTemp ? HEADER_DROP : 0;
+  if (ts) {
+    uiText(UIF_SMALL, x0, 19 + 14 + dy, ts, inkColor(), 0);
+  }
+  if (tc[0]) uiText(UIF_SMALL, x0 - HEADER_TEMP_GAP, 19 + 14 + dy, tc, inkColor(), 2);
   if (pc < 0) return;               // no battery connected
-  int x = x0 + tw + (ts ? GAP : 0), y = 22, w = 24, h = 11;
+  int x = x0 + tw + (ts ? GAP : 0), y = 22 + dy, w = 24, h = 11;
   bool charging = batCharging();
   uint16_t col = charging ? UI_BAR_OK
                  : (pc >= 40) ? inkColor()
@@ -8989,7 +9047,7 @@ static void drawSwipeHints() {
 // said so. Right of the time+battery group (at most ~131 px wide, centred).
 static void drawMenuHint() {
   if (pet.ceremony || confirmUntil || pet.awaitingStarter()) return;
-  const int x = CX + 78, y = 22;
+  const int x = CX + 78 + (gHeaderTemp ? 6 : 0), y = 22 + (gHeaderTemp ? HEADER_DROP : 0);
   for (int i = 0; i < 3; i++) gfx->fillRoundRect(x, y + i * 6, 18, 3, 1, inkColor());
 }
 

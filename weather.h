@@ -39,6 +39,20 @@ static inline int tempInUnit(int c, bool fahrenheit) {
   return (x < 0 ? x - 2 : x + 2) / 5 + 32;
 }
 
+// The header row is [temperature] [clock battery] ... [menu icon]. The screen is round, so
+// with a temperature the row sits HEADER_DROP lower, where HEADER_MIN_X can be seen. This is
+// how far right the clock group must move (from groupX0, groupW wide) for a temperature
+// tempW wide to stay on the glass without running into the menu icon. -1: it does not fit.
+#define HEADER_DROP 7         // how much lower the row is drawn when it has a temperature
+#define HEADER_MIN_X 126      // leftmost visible column at that height
+#define HEADER_MAX_X 312      // the clock group must end before the menu icon
+#define HEADER_TEMP_GAP 8
+static inline int headerShiftFor(int groupX0, int groupW, int tempW) {
+  int need = HEADER_MIN_X - (groupX0 - HEADER_TEMP_GAP - tempW);
+  if (need <= 0) return 0;
+  return need <= HEADER_MAX_X - (groupX0 + groupW) ? need : -1;
+}
+
 #define WEATHER_FRESH_MS (75UL * 60 * 1000)   // older than this and the sky goes back to normal (2.5 refreshes)
 
 uint8_t wmoKind(int code);                     // a WMO weather code -> WeatherKind

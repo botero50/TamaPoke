@@ -128,6 +128,12 @@ int main(){
   ck(tempInUnit(-3, true) == 27 && tempInUnit(-40, true) == -40, "-3C is 27F, and -40 is -40 in both");
   ck(tempInUnit(-18, true) == 0 && tempInUnit(-20, true) == -4, "below zero Fahrenheit rounds right");
 
+  // the header: the temperature stays on the round glass, the clock off the menu icon
+  ck(headerShiftFor(200, 80, 39) == 0, "a short 24 h clock: nothing moves");
+  ck(headerShiftFor(170, 126, 39) == 3, "the widest clock, 22C: the group moves right to fit");
+  ck(headerShiftFor(170, 126, 52) == 16, "even 104F fits beside it");
+  ck(headerShiftFor(170, 126, 62) == -1, "wider than that: the shorter text is used");
+
   if (bad) printf("FAILURES\n");
   return bad?1:0;
 }

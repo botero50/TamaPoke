@@ -501,27 +501,53 @@ static void songTests() {
   ck(audioMusicNow() == MUS_NONE, "walking out of the hall stops it at once");
 }
 
+#include "clockdate.h"
 static void clock24Tests() {
   readyPet();
   extern uint8_t gClock24; extern int clockH;
   clockOpen = true; settingsPage = 0;   // the time page
   gClock24 = 0;
   pumpMs(150);
-  clockTap(167, 300);
+  clockTap(135, 300);
   ck(gClock24 == 1, "the 12 h / 24 h pill switches to 24 h");
   { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("h24", 0) == 1, "and it is saved"); pr.end(); }
   pumpMs(150);
-  clockTap(167, 300);
+  clockTap(135, 300);
   ck(gClock24 == 0, "and back to 12 h");
   { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("h24", 1) == 0, "and that is saved too"); pr.end(); }
   extern uint8_t gTempF;
   gTempF = 0;
-  clockTap(299, 300);
+  clockTap(233, 300);
   ck(gTempF == 1 && gClock24 == 0, "the C / F pill switches to Fahrenheit and leaves the clock alone");
   { Preferences pr; pr.begin("tamapoke", true); ck(pr.getUChar("tmf", 0) == 1, "and the unit is saved"); pr.end(); }
   pumpMs(150);
-  clockTap(299, 300);
+  clockTap(233, 300);
   ck(gTempF == 0, "and back to Celsius");
+  // the date, by hand
+  extern int clockY, clockMo, clockD; extern bool clockDateMode;
+  extern void openClock();
+  openClock();
+  const int y0 = clockY, m0 = clockMo;
+  const uint32_t before = pet.lastSeenEpoch;
+  pumpMs(150);
+  clockTap(330, 300);
+  ck(clockDateMode, "the date pill shows the date");
+  pumpMs(150);
+  clockTap(378, 220);                                  // year +
+  clockTap(262, 220);                                  // month +
+  ck(clockY == y0 + 1 && clockMo == m0 % 12 + 1, "year + and month + change the date");
+  ck(pet.lastSeenEpoch / 86400 == before / 86400, "nothing is applied before OK");
+  const uint32_t want = daysFromCivil(clockY, clockMo, clockD);
+  clockTap(233, 380);                                  // OK
+  ck(!clockOpen && pet.lastSeenEpoch / 86400 == want, "OK sets the new date");
+  openClock(); pumpMs(150);
+  const uint32_t day1 = pet.lastSeenEpoch / 86400;
+  clockTap(233, 380);
+  ck(pet.lastSeenEpoch / 86400 == day1, "OK on the time alone leaves the date as it was");
+  { int y = 2028, m = 1, d = 31; dateStep(y, m, d, 1, 1); ck(m == 2 && d == 29, "31 Jan, month +: 29 Feb in a leap year");
+    dateStep(y, m, d, 2, 1); ck(y == 2029 && d == 28, "...and 28 Feb the year after");
+    dateStep(y, m, d, 0, 1); ck(d == 1 && m == 2, "day + past the end wraps within the month"); }
+  ck(daysFromCivil(1970, 1, 1) == 0 && daysFromCivil(2026, 11, 22) == 20779, "dates count days from 1970");
   clockOpen = false;
 }
 
@@ -660,6 +686,15 @@ static void standbyTests() {
   ck(!menuOpen && pet.fullness == foodBefore, "and only leaves it: that touch did nothing else");
   g_emuUsb = false; lastInteract = millis() - STANDBY_IDLE_MS - 500; pumpMs(150);
   ck(!gStandbyOn, "unplugged: no clock, however long it has been left");
+  // away from home (a trip, a job): the clock still comes, without the companion
+  readyPet(); g_emuUsb = true;
+  bool left = pet.startTrip(3600) || pet.startJob(0);
+  ck(left && pet.atWork(), "the companion is away");
+  lastInteract = millis() - STANDBY_IDLE_MS - 500; pumpMs(150);
+  ck(gStandbyOn, "away on a trip or at work: the standby clock shows all the same");
+  if (pet.onTrip()) pet.callBackTrip();
+  ck(!pet.atWork() || !pet.onTrip(), "(back home for the next tests)");
+  g_emuUsb = false;
   lastInteract = millis();
 
   // self-care: one low need a minute, in order, silently
